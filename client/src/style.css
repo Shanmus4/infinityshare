@@ -1,0 +1,50 @@
+body {
+  font-family: Arial, sans-serif;
+  background: #f8fafc;
+  margin: 0;
+  padding: 0;
+}
+.container {
+  max-width: 400px;
+  margin: 2em auto;
+  background: #fff;
+  padding: 2em;
+  border-radius: 1em;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+  text-align: center;
+}
+.dropzone {
+  border: 2px dashed #4f8cff;
+  border-radius: 8px;
+  padding: 2em;
+  background: #f0f6ff;
+  color: #4f8cff;
+  cursor: pointer;
+  margin-bottom: 1em;
+}
+input[type="text"] {
+  width: 70%;
+  padding: 0.5em;
+  margin-right: 0.5em;
+  border: 1px solid #bcd;
+  border-radius: 4px;
+}
+button {
+  background: #4f8cff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 0.6em 1.2em;
+  cursor: pointer;
+  margin-top: 1em;
+}
+button:disabled {
+  background: #bbb !important;
+  color: #eee !important;
+  cursor: not-allowed !important;
+  opacity: 1 !important;
+  pointer-events: none !important;
+}
+button:hover {
+  background: #2566d4;
+}
