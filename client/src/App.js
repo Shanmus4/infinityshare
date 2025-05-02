@@ -406,6 +406,34 @@ function App() {
     return downloadingFiles.has(fileId);
   }
 
+  // Add a delete handler for sender
+  const handleDeleteFile = (fileId) => {
+    // Check if file is being downloaded (by any receiver)
+    // For now, check if this file is being downloaded locally (sender-side)
+    // In a real app, you might want to track download state via backend or socket events
+    const isDownloadingLocally = false; // Placeholder, as sender doesn't track receiver downloads
+    if (downloadingFiles.has(fileId)) {
+      if (!window.confirm('This file is currently being downloaded. Are you sure you want to delete it? The download will be aborted.')) {
+        return;
+      }
+      // Stop the download locally (receiver will handle abort on their side)
+      setDownloadingFiles(prev => { const s = new Set(prev); s.delete(fileId); return s; });
+      // Send cancel message to service worker to abort and clean up
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ fileId, cancel: true });
+      }
+    }
+    // Remove file from state
+    const newFiles = files.filter(f => f.fileId !== fileId);
+    setFiles(newFiles);
+    filesRef.current = newFiles;
+    const newFilesMeta = filesMeta.filter(f => f.fileId !== fileId);
+    setFilesMeta(newFilesMeta);
+    if (driveCode) {
+      socket.emit('file-list', { room: driveCode, filesMeta: newFilesMeta });
+    }
+  };
+
   // --- UI ---
   if (step === 'init') {
     return (
@@ -462,6 +490,7 @@ function App() {
                 <th>File Name</th>
                 <th>Size</th>
                 <th>Type</th>
+                <th>Delete</th>
               </tr>
             </thead>
             <tbody>
@@ -470,6 +499,7 @@ function App() {
                   <td>{f.name}</td>
                   <td>{f.size.toLocaleString()} bytes</td>
                   <td>{f.type}</td>
+                  <td><button onClick={() => handleDeleteFile(f.fileId)}>Delete</button></td>
                 </tr>
               ))}
             </tbody>

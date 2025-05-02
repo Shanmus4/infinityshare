@@ -94,7 +94,22 @@ self.addEventListener('fetch', (event) => {
 });
 
 self.addEventListener('message', (event) => {
-  const { fileId, chunk, filename, mimetype, done } = event.data;
+  const { fileId, chunk, filename, mimetype, done, cancel } = event.data;
+  // Cancel download if requested
+  if (cancel && fileId) {
+    if (streams[fileId] && streams[fileId].controller && !streams[fileId].closed) {
+      try {
+        streams[fileId].controller.error('Download canceled by sender.');
+        streams[fileId].closed = true;
+        console.log('[SW] Download canceled for', fileId);
+      } catch (e) {
+        console.warn('[SW] Error canceling stream', fileId, e);
+      }
+    }
+    delete streams[fileId];
+    delete pendingChunks[fileId];
+    return;
+  }
   // If stream doesn't exist yet, queue everything (meta, chunk, done)
   if (!streams[fileId]) {
     if (!pendingChunks[fileId]) pendingChunks[fileId] = [];
