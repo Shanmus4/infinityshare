@@ -1,4 +1,7 @@
-export const SIGNALING_SERVER_URL = "wss://b9c2-49-207-206-28.ngrok-free.app"; // Ensure this ngrok URL is still active!
+// Use environment variable for Signaling Server URL, fallback for local dev
+// Example .env file: REACT_APP_SIGNALING_SERVER_URL=wss://your-signaling-server.com
+export const SIGNALING_SERVER_URL =
+  process.env.REACT_APP_SIGNALING_SERVER_URL || "ws://localhost:3000";
 // Base STUN servers
 const baseIceServers = [
   // Google STUN servers (hostname and IP) - Port 19302 is standard STUN
@@ -43,15 +46,21 @@ if (twilioAccountSid && twilioAuthToken) {
   ];
   finalIceServers = finalIceServers.concat(twilioTurnServers);
 } else {
-  console.log("Twilio TURN credentials not found in environment variables. Using STUN servers only.");
+  console.log(
+    "Twilio TURN credentials not found in environment variables. Using STUN servers only."
+  );
 }
 
 export const ICE_SERVERS = finalIceServers;
 
 // Basic check to warn if credentials are missing during development
-if (process.env.NODE_ENV === 'development' && (!process.env.REACT_APP_TWILIO_ACCOUNT_SID || !process.env.REACT_APP_TWILIO_AUTH_TOKEN)) {
+if (
+  process.env.NODE_ENV === "development" &&
+  (!process.env.REACT_APP_TWILIO_ACCOUNT_SID ||
+    !process.env.REACT_APP_TWILIO_AUTH_TOKEN)
+) {
   console.warn(
-    'Twilio TURN credentials (REACT_APP_TWILIO_ACCOUNT_SID, REACT_APP_TWILIO_AUTH_TOKEN) are not set in the environment. ' +
-    'File transfer may fail over networks requiring TURN servers. Create a .env file in the client directory.'
+    "Twilio TURN credentials (REACT_APP_TWILIO_ACCOUNT_SID, REACT_APP_TWILIO_AUTH_TOKEN) are not set in the environment. " +
+      "File transfer may fail over networks requiring TURN servers. Create a .env file in the client directory."
   );
 }

@@ -1,4 +1,6 @@
 const http = require('http');
+const https = require('https'); // Add https module
+const fs = require('fs'); // Add fs module
 const { Server } = require('socket.io');
 
 // Determine allowed origins based on environment variable
@@ -9,8 +11,31 @@ const allowedOrigins = allowedOriginsEnv ? allowedOriginsEnv.split(',') : [defau
 
 console.log('Allowed CORS Origins:', allowedOrigins); // Log allowed origins for debugging
 
-const server = http.createServer(); // Create HTTP server
-const io = new Server(server, {
+// --- Server Setup (HTTP or HTTPS) ---
+let server;
+const sslCertPath = process.env.SSL_CERT_PATH;
+const sslKeyPath = process.env.SSL_KEY_PATH;
+
+if (sslCertPath && sslKeyPath) {
+  try {
+    const options = {
+      key: fs.readFileSync(sslKeyPath),
+      cert: fs.readFileSync(sslCertPath),
+    };
+    server = https.createServer(options); // Create HTTPS server
+    console.log(`SSL certificate and key found. Starting HTTPS server.`);
+  } catch (err) {
+    console.error(`Error reading SSL certificate/key files from paths: ${sslCertPath}, ${sslKeyPath}`);
+    console.error('Falling back to HTTP. Ensure paths are correct and files are readable.', err);
+    server = http.createServer(); // Fallback to HTTP on error
+  }
+} else {
+  console.log('SSL certificate/key paths not provided in environment. Starting HTTP server.');
+  server = http.createServer(); // Create HTTP server
+}
+
+// --- Socket.IO Setup ---
+const io = new Server(server, { // Attach Socket.IO to the created server (http or https)
   cors: {
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps or curl requests)
@@ -96,7 +121,8 @@ server.listen(PORT, (err) => {
   if (err) {
     console.error('Failed to start signaling server:', err);
   } else {
-    console.log(`Signaling server listening on port ${PORT}`);
+    const protocol = server instanceof https.Server ? 'HTTPS' : 'HTTP';
+    console.log(`Signaling server (${protocol}) listening on port ${PORT}`);
   }
 });
 

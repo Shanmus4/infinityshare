@@ -22,7 +22,6 @@ File Send is a modern web application for secure, direct peer-to-peer (P2P) file
 
 - **Frontend:** React.js, react-dropzone, qrcode.react, socket.io-client, jszip, file-saver.
 - **Signaling Server:** Standalone Node.js + socket.io server (`/signaling-server`) handles room management and WebRTC signaling relay. **This is the only active backend component.**
-- **Backend (`/server`):** _Currently unused_ Node.js + Express directory. Needs review for potential removal.
 - **WebRTC:** Direct P2P communication via `RTCDataChannel`.
 - **Service Worker:** (`/client/public/service-worker.js`) Handles streaming downloads for single files.
 - **Testing:** Pytest structure exists (`/tests`), but tests for the signaling server are not yet implemented.
@@ -104,6 +103,40 @@ For production, set the `ALLOWED_ORIGINS` environment variable when running the 
 ```bash
 ALLOWED_ORIGINS=https://your-production-domain.com,https://www.your-production-domain.com node index.js
 ```
+### Signaling Server HTTPS/SSL (Optional)
+
+To run the signaling server over HTTPS (required for `wss://` connections, recommended for production), you need to provide paths to your SSL certificate and private key files via environment variables:
+
+-   `SSL_CERT_PATH`: Path to the SSL certificate file (e.g., `/etc/letsencrypt/live/yourdomain.com/fullchain.pem`).
+-   `SSL_KEY_PATH`: Path to the SSL private key file (e.g., `/etc/letsencrypt/live/yourdomain.com/privkey.pem`).
+
+Set these variables when starting the server:
+
+```bash
+SSL_CERT_PATH=/path/to/cert.pem SSL_KEY_PATH=/path/to/key.pem node index.js
+```
+
+If these variables are not set, the server will run using HTTP.
+### Client Signaling Server URL
+
+The React client needs to know the address of the running signaling server. This is currently hardcoded in `client/src/utils/signaling.js`:
+
+```javascript
+export const SIGNALING_SERVER_URL = "wss://b9c2-49-207-206-28.ngrok-free.app"; // Example URL
+```
+
+If you are hosting the signaling server yourself (not using the example ngrok URL), you **must** update this constant to point to your signaling server's WebSocket address (using `ws://` for local development without SSL or `wss://` for production with SSL).
+
+**Recommendation:** For better configuration, consider modifying the code to use an environment variable instead, similar to the Twilio credentials:
+
+1.  Update `client/src/utils/signaling.js`:
+    ```javascript
+    export const SIGNALING_SERVER_URL = process.env.REACT_APP_SIGNALING_SERVER_URL || "ws://localhost:3000"; // Default for local dev
+    ```
+2.  Add the variable to your `/client/.env` file:
+    ```dotenv
+    REACT_APP_SIGNALING_SERVER_URL=wss://your-signaling-server.com
+    ```
 ## Testing
 
 - **Signaling Server Tests:** Pytest structure is set up in `/tests`, but tests need to be implemented.

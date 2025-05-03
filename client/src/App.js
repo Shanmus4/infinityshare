@@ -53,31 +53,31 @@ function App() {
   // --- Register all socket event listeners at the top level ---
   useEffect(() => {
     function handleSignal({ fileId, data, room }) {
-      console.log(`[App] handleSignal received for fileId: ${fileId}`, data); // Add log
+      // console.log(`[App] handleSignal received for fileId: ${fileId}`, data); // Verbose: Log full signal data
       const pc = peerConns.current[fileId];
       if (!pc) {
-        console.log(`[App] handleSignal: No peer connection found for ${fileId}, buffering signal.`); // Add log
+        // console.log(`[App] handleSignal: No peer connection found for ${fileId}, buffering signal.`); // Keep for debugging buffering issues if needed
         // Buffer the signal for later
         if (!pendingSignals.current[fileId])
           pendingSignals.current[fileId] = [];
         pendingSignals.current[fileId].push({ data, room });
         return;
       }
-      console.log(`[App] handleSignal: Found peer connection for ${fileId}. Processing signal.`); // Add log
+      // console.log(`[App] handleSignal: Found peer connection for ${fileId}. Processing signal.`); // Verbose
       if (data && data.sdp) {
         if (data.sdp.type === "offer") {
-          console.log(`[App] handleSignal: Received OFFER for ${fileId}`); // Add log
+          // console.log(`[App] handleSignal: Received OFFER for ${fileId}`); // Verbose
           pc.setRemoteDescription(new RTCSessionDescription(data.sdp)).then(
             () => {
-              console.log(`[App] handleSignal: Remote description (offer) set for ${fileId}`); // Add log
+              // console.log(`[App] handleSignal: Remote description (offer) set for ${fileId}`); // Verbose
               pc.createAnswer().then((answer) => {
-                console.log(`[App] handleSignal: Created ANSWER for ${fileId}`); // Add log
+                // console.log(`[App] handleSignal: Created ANSWER for ${fileId}`); // Verbose
                 pc.setLocalDescription(answer);
-                console.log("[App] handleSignal: Emitting ANSWER for", {
-                  room: driveCode,
-                  fileId,
-                  sdp: answer,
-                });
+                // console.log("[App] handleSignal: Emitting ANSWER for", { // Verbose: Logs full SDP
+                //   room: driveCode,
+                //   fileId,
+                //   sdp: answer,
+                // });
                 socket.emit("signal", {
                   room: driveCode,
                   fileId,
@@ -87,22 +87,22 @@ function App() {
             }
           );
         } else if (data.sdp.type === "answer") {
-          console.log(`[App] handleSignal: Received ANSWER for ${fileId}`); // Add log
+          // console.log(`[App] handleSignal: Received ANSWER for ${fileId}`); // Verbose
           pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
         }
       } else if (data && data.candidate) {
-        console.log(`[App] handleSignal: Received ICE CANDIDATE for ${fileId}`); // Add log
+        // console.log(`[App] handleSignal: Received ICE CANDIDATE for ${fileId}`); // Verbose
         pc.addIceCandidate(new RTCIceCandidate(data.candidate))
-          .catch(e => console.error(`[App] handleSignal: Error adding ICE candidate for ${fileId}:`, e)); // Add error handling
+          .catch(e => console.error(`[App] handleSignal: Error adding ICE candidate for ${fileId}:`, e)); // Keep error handling
       }
     }
     socket.on("signal", handleSignal);
 
-    // Listener for zip download peer setup - Re-adding this logic
+    // Listener for zip download peer setup
     const handlePrepareZipPeer = ({ transferFileId }) => {
-      console.log(`[App] Received prepare-zip-download-peer for transferId: ${transferFileId}`);
+      // console.log(`[App] Received prepare-zip-download-peer for transferId: ${transferFileId}`); // Keep for debugging zip setup
       if (!zipDownloadCallbacks.current || !zipDownloadCallbacks.current.handleFileData) {
-        console.error("[App] Zip download callbacks ref not available or not populated!");
+        console.error("[App] Zip download callbacks ref not available or not populated!"); // Keep error
         // Handle error appropriately
         return;
       }
@@ -123,10 +123,10 @@ function App() {
       if (pc) {
           // Store the created peer connection in the shared ref IMMEDIATELY
           peerConns.current[transferFileId] = pc;
-          console.log(`[App] Stored peer connection for zip transferId: ${transferFileId}`);
+          // console.log(`[App] Stored peer connection for zip transferId: ${transferFileId}`); // Keep for debugging zip setup
           // Now the peer connection exists before handleSignal processes the offer/candidate
       } else {
-           console.error(`[App] Failed to setup zip receiver connection via utility for ${transferFileId}`);
+           console.error(`[App] Failed to setup zip receiver connection via utility for ${transferFileId}`); // Keep error
            // Optionally call error callback if setup fails
            if (zipDownloadCallbacks.current.handleFileError) {
                zipDownloadCallbacks.current.handleFileError(transferFileId, new Error("Failed to setup receiver connection"));
@@ -251,24 +251,24 @@ function App() {
       size,
       type,
       isZipRequest // Check for the zip request flag
-    }) => {
-      console.log(`[App] Sender: Received download-file request. Original fileId: ${requestedFileId}, Transfer fileId: ${transferFileId}, Name: ${name}, isZip: ${!!isZipRequest}`);
+   }) => {
+     // console.log(`[App] Sender: Received download-file request. Original fileId: ${requestedFileId}, Transfer fileId: ${transferFileId}, Name: ${name}, isZip: ${!!isZipRequest}`); // Keep for debugging requests
 
-      // Always use filesRef.current to find the file
+     // Always use filesRef.current to find the file
       const fileObj = filesRef.current.find(
         (f) => f.fileId === requestedFileId
       );
 
       if (!fileObj) {
-        console.error(`[App] Sender: File not found for requestedFileId: ${requestedFileId}. filesRef.current:`, filesRef.current);
+        console.error(`[App] Sender: File not found for requestedFileId: ${requestedFileId}. filesRef.current:`, filesRef.current); // Keep error
         setError("File not found for download. Please re-upload or refresh.");
         return;
       }
-      console.log(`[App] Sender: Found fileObj for ${requestedFileId}:`, fileObj.name);
+      // console.log(`[App] Sender: Found fileObj for ${requestedFileId}:`, fileObj.name); // Verbose
 
       const useTransferFileId = transferFileId || makeFileId(); // Should always have transferFileId from receiver
       if (!transferFileId) {
-          console.warn(`[App] Sender: Missing transferFileId in request for ${requestedFileId}, generated: ${useTransferFileId}`);
+          console.warn(`[App] Sender: Missing transferFileId in request for ${requestedFileId}, generated: ${useTransferFileId}`); // Keep warning
       }
 
       const fileIndex = filesRef.current.findIndex(
@@ -276,15 +276,15 @@ function App() {
       );
 
       if (fileIndex === -1) {
-        console.error(`[App] Sender: File index not found for fileId: ${fileObj.fileId}. filesRef.current:`, filesRef.current);
+        console.error(`[App] Sender: File index not found for fileId: ${fileObj.fileId}. filesRef.current:`, filesRef.current); // Keep error
         setError("File index not found for download.");
         return;
       }
-      console.log(`[App] Sender: Found fileIndex ${fileIndex} for ${requestedFileId}`);
+      // console.log(`[App] Sender: Found fileIndex ${fileIndex} for ${requestedFileId}`); // Verbose
 
       if (isZipRequest) {
         // --- Start Zip Sender ---
-        console.log("[App] Sender: Calling startZipSenderConnection for transferId:", useTransferFileId);
+        // console.log("[App] Sender: Calling startZipSenderConnection for transferId:", useTransferFileId); // Keep for debugging zip
         startZipSenderConnection({
           socket,
           transferFileId: useTransferFileId,
@@ -295,11 +295,11 @@ function App() {
           setError,
           cleanupWebRTCInstance
         });
-        console.log(`[App] Sender: Called startZipSenderConnection for transferFileId: ${useTransferFileId}`);
+        // console.log(`[App] Sender: Called startZipSenderConnection for transferFileId: ${useTransferFileId}`); // Keep for debugging zip
 
       } else {
         // --- Start Single File Sender (Original Logic) ---
-        console.log("[App] Sender: Calling startWebRTC for single file transferId:", useTransferFileId);
+        // console.log("[App] Sender: Calling startWebRTC for single file transferId:", useTransferFileId); // Keep for debugging single file
         startWebRTC({
           isSender: true,
           code: driveCode,
@@ -316,7 +316,7 @@ function App() {
           fileId: useTransferFileId,
           // No zip callbacks needed here
         });
-        console.log(`[App] Sender: Called startWebRTC for transferFileId: ${useTransferFileId}`);
+        // console.log(`[App] Sender: Called startWebRTC for transferFileId: ${useTransferFileId}`); // Keep for debugging single file
       }
     };
     socket.on("download-file", downloadHandler);
@@ -372,7 +372,7 @@ function App() {
     };
     setTimeout(() => {
       if (downloadingFiles.has(fileId)) {
-        console.warn(`[receiver] Download stuck in starting state for 10s`, {
+        console.warn(`[receiver] Download stuck in starting state for 10s`, { // Keep warning
           fileId,
           fileName: fileMeta.name,
           transferFileId,
@@ -390,14 +390,14 @@ function App() {
           filename: fileMeta.name,
           mimetype: fileMeta.type,
         });
-        console.log("[App] Receiver: emit download-file", {
-          room: driveCode,
-          fileId: fileMeta.fileId,
-          transferFileId,
-          name: fileMeta.name,
-          size: fileMeta.size,
-          type: fileMeta.type,
-        });
+        // console.log("[App] Receiver: emit download-file", { // Keep for debugging download start
+        //   room: driveCode,
+        //   fileId: fileMeta.fileId,
+        //   transferFileId,
+        //   name: fileMeta.name,
+        //   size: fileMeta.size,
+        //   type: fileMeta.type,
+        // });
         // Emit download request with original fileId and the transferFileId
         socket.emit("download-file", {
           room: driveCode,
@@ -410,13 +410,13 @@ function App() {
         const fileIndex = receiverFilesMeta.findIndex(
           (f) => f.fileId === fileMeta.fileId
         );
-        console.log("[App] Receiver: startWebRTC", {
-          isSender: false,
-          requestedFileId: fileMeta.fileId,
-          transferFileId,
-          fileIndex,
-          fileName: fileMeta.name,
-        });
+        // console.log("[App] Receiver: startWebRTC", { // Keep for debugging download start
+        //   isSender: false,
+        //   requestedFileId: fileMeta.fileId,
+        //   transferFileId,
+        //   fileIndex,
+        //   fileName: fileMeta.name,
+        // });
         // Ensure cleanup uses the correct transfer ID before starting
         cleanupWebRTCInstance(transferFileId);
         startWebRTC({
@@ -446,10 +446,10 @@ function App() {
         const debug =
           window.__downloadDebug && window.__downloadDebug[event.data.fileId];
         if (debug) {
-          console.info(`[receiver] Download complete`, {
-            fileId: event.data.fileId,
-            fileName: debug.fileName,
-          });
+          // console.info(`[receiver] Download complete`, { // Keep for debugging completion
+          //   fileId: event.data.fileId,
+          //   fileName: debug.fileName,
+          // });
         }
         setDownloadingFiles((prev) => {
           const s = new Set(prev);
@@ -468,7 +468,7 @@ function App() {
     const handler = (event) => {
       if (event.data.type === "download-ready") {
         const { fileId, url } = event.data;
-        console.log("[App] Download ready for", fileId, "at", url);
+        // console.log("[App] Download ready for", fileId, "at", url); // Keep for debugging SW interaction
         // Open the download in a new tab
         window.open(url, "_blank");
       }
@@ -534,21 +534,21 @@ function App() {
   // Update this function in your app - look for it in App.js or similar file
 
   function sendSWMetaAndChunk(fileId, chunk, filename, mimeType, fileSize, isZipping) {
-    if (isZipping) {
-      console.log('[App] sendSWMetaAndChunk called during zip, skipping SW');
-      return;
-    }
-    if (!navigator.serviceWorker.controller) {
-      console.error("[App] No service worker controller available");
-      return;
-    }
+   if (isZipping) {
+     // console.log('[App] sendSWMetaAndChunk called during zip, skipping SW'); // Keep for debugging zip/sw interaction
+     return;
+   }
+   if (!navigator.serviceWorker.controller) {
+     console.error("[App] No service worker controller available"); // Keep error
+     return;
+   }
 
-    if (filename && (!chunk || chunk === null)) {
-      // This is a metadata-only message
-      console.log("[App] Sending metadata to SW for", fileId, filename);
-      navigator.serviceWorker.controller.postMessage({
-        type: "meta",
-        fileId,
+   if (filename && (!chunk || chunk === null)) {
+     // This is a metadata-only message
+     // console.log("[App] Sending metadata to SW for", fileId, filename); // Keep for debugging SW interaction
+     navigator.serviceWorker.controller.postMessage({
+       type: "meta",
+       fileId,
         meta: {
           name: filename,
           type: mimeType || "application/octet-stream",
