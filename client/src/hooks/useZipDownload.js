@@ -3,7 +3,7 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { startWebRTC } from './useWebRTC'; // We will adapt this or use callbacks
 
-export function useZipDownload({ receiverFilesMeta, driveCode, socket, cleanupWebRTCInstance, makeFileId, sendSWMetaAndChunk }) {
+export function useZipDownload({ receiverFilesMeta, driveCode, socket, cleanupWebRTCInstance, makeFileId, sendSWMetaAndChunk, handleDownloadRequest }) {
   const [isZipping, setIsZipping] = useState(false);
   const [zipProgress, setZipProgress] = useState(0); // 0 to 100
   const [downloadProgress, setDownloadProgress] = useState({}); // { fileId: progress }

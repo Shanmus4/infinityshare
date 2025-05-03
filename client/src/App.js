@@ -197,32 +197,48 @@ function App() {
       size,
       type,
     }) => {
+      console.log(`[App] Sender: Received download-file request. Original fileId: ${requestedFileId}, Transfer fileId: ${transferFileId}, Name: ${name}`); // Enhanced log
+
       // Always use filesRef.current to find the file
       const fileObj = filesRef.current.find(
         (f) => f.fileId === requestedFileId
       );
+
       if (!fileObj) {
+        console.error(`[App] Sender: File not found for requestedFileId: ${requestedFileId}. filesRef.current:`, filesRef.current);
         setError("File not found for download. Please re-upload or refresh.");
         return;
       }
-      const useTransferFileId = transferFileId || makeFileId();
+      console.log(`[App] Sender: Found fileObj for ${requestedFileId}:`, fileObj.name);
+
+      const useTransferFileId = transferFileId || makeFileId(); // Should always have transferFileId from receiver
+      if (!transferFileId) {
+          console.warn(`[App] Sender: Missing transferFileId in request for ${requestedFileId}, generated: ${useTransferFileId}`);
+      }
+
       const fileIndex = filesRef.current.findIndex(
         (f) => f.fileId === fileObj.fileId
       );
+
       if (fileIndex === -1) {
+        console.error(`[App] Sender: File index not found for fileId: ${fileObj.fileId}. filesRef.current:`, filesRef.current);
         setError("File index not found for download.");
         return;
       }
-      console.log("[App] Sender: startWebRTC", {
+      console.log(`[App] Sender: Found fileIndex ${fileIndex} for ${requestedFileId}`);
+
+      console.log("[App] Sender: Calling startWebRTC", { // Changed log content slightly
         isSender: true,
-        fileId: requestedFileId,
-        transferFileId: useTransferFileId,
-        fileIndex,
+        // fileId: requestedFileId, // Original file ID - not used by startWebRTC directly
+        transferFileId: useTransferFileId, // The ID for this specific transfer
+        fileIndex, // Index in sender's list
         fileName: fileObj.name,
+        driveCode: driveCode,
       });
+
       startWebRTC({
         isSender: true,
-        code: driveCode,
+        code: driveCode, // code and driveCode are the same? Yes.
         fileIndex,
         filesRef,
         peerConns,
@@ -230,11 +246,12 @@ function App() {
         setError,
         driveCode,
         socket,
-        sendSWMetaAndChunk,
+        // sendSWMetaAndChunk, // Removed unnecessary param for sender
         cleanupWebRTCInstance,
         makeFileId,
         fileId: useTransferFileId, // Pass the consistent transferFileId for WebRTC
       });
+      console.log(`[App] Sender: Called startWebRTC for transferFileId: ${useTransferFileId}`);
     };
     socket.on("download-file", downloadHandler);
     return () => socket.off("download-file", downloadHandler);
@@ -628,6 +645,7 @@ function App() {
           onDownload={handleDownloadRequest} // Keep single file download
           isSender={false}
           isDownloading={isDownloading} // This state is for single downloads
+          isZipping={isZipping} // Pass isZipping state
         />
         {/* Display errors from both App state and zip hook */}
         <ErrorBanner error={error || zipError} />
