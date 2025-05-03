@@ -163,7 +163,8 @@ function App() {
         socket,
         sendSWMetaAndChunk,
         cleanupWebRTCInstance,
-        makeFileId
+        makeFileId,
+        fileId: useTransferFileId // Pass the consistent transferFileId for WebRTC
       });
     };
     socket.on('download-file', downloadHandler);
@@ -216,16 +217,20 @@ function App() {
     }, 10000);
     const swHandler = async (event) => {
       if (event.data.type === 'sw-ready' && event.data.fileId === transferFileId) {
+        // Post metadata to SW using the transferFileId
         postMessage({ fileId: transferFileId, filename: fileMeta.name, mimetype: fileMeta.type });
-        console.log('[App] Receiver: emit download-file', { room: driveCode, fileId, transferFileId, name: fileMeta.name, size: fileMeta.size, type: fileMeta.type });
-        socket.emit('download-file', { room: driveCode, fileId, transferFileId, name: fileMeta.name, size: fileMeta.size, type: fileMeta.type });
-        const fileIndex = receiverFilesMeta.findIndex(f => f.fileId === fileId);
-        console.log('[App] Receiver: startWebRTC', { isSender: false, fileId, transferFileId, fileIndex, fileName: fileMeta.name });
+        console.log('[App] Receiver: emit download-file', { room: driveCode, fileId: fileMeta.fileId, transferFileId, name: fileMeta.name, size: fileMeta.size, type: fileMeta.type });
+        // Emit download request with original fileId and the transferFileId
+        socket.emit('download-file', { room: driveCode, fileId: fileMeta.fileId, transferFileId, name: fileMeta.name, size: fileMeta.size, type: fileMeta.type });
+        const fileIndex = receiverFilesMeta.findIndex(f => f.fileId === fileMeta.fileId);
+        console.log('[App] Receiver: startWebRTC', { isSender: false, requestedFileId: fileMeta.fileId, transferFileId, fileIndex, fileName: fileMeta.name });
+        // Ensure cleanup uses the correct transfer ID before starting
+        cleanupWebRTCInstance(transferFileId);
         startWebRTC({
           isSender: false,
           code: driveCode,
-          fileIndex,
-          filesRef: { current: receiverFilesMeta },
+          fileIndex, // Note: fileIndex is based on receiverFilesMeta using original fileId
+          filesRef: { current: receiverFilesMeta }, // filesRef still uses original fileId
           peerConns,
           dataChannels,
           setError,
@@ -233,7 +238,8 @@ function App() {
           socket,
           sendSWMetaAndChunk,
           cleanupWebRTCInstance,
-          makeFileId
+          makeFileId,
+          fileId: transferFileId // Pass the consistent transferFileId for WebRTC
         });
         navigator.serviceWorker.removeEventListener('message', swHandler);
       }
@@ -255,6 +261,20 @@ function App() {
     return () => navigator.serviceWorker.removeEventListener('message', handler);
   }, []);
 
+  // --- Listen for download-ready from SW ---
+  useEffect(() => {
+    const handler = (event) => {
+      if (event.data.type === 'download-ready') {
+        const { fileId, url } = event.data;
+        console.log('[App] Download ready for', fileId, 'at', url);
+        // Open the download in a new tab
+        window.open(url, '_blank');
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', handler);
+    return () => navigator.serviceWorker.removeEventListener('message', handler);
+  }, []);
+
   // --- Minimal WebRTC logic helpers ---
   function cleanupWebRTCInstance(fileId) {
     const pc = peerConns.current[fileId];
@@ -265,14 +285,46 @@ function App() {
     delete dataChannels.current[fileId];
   }
 
-  function sendSWMetaAndChunk(fileId, chunk, filename, mimetype) {
-    if (filename && mimetype && !window.__sentSWMeta) window.__sentSWMeta = {};
-    if (filename && mimetype && !window.__sentSWMeta[fileId]) {
-      postMessage({ fileId, filename, mimetype });
-      window.__sentSWMeta[fileId] = true;
-    }
-    postMessage({ fileId, chunk });
+  // Update this function in your app - look for it in App.js or similar file
+
+function sendSWMetaAndChunk(fileId, chunk, filename, mimeType, fileSize) {
+  if (!navigator.serviceWorker.controller) {
+    console.error('[App] No service worker controller available');
+    return;
   }
+  
+  if (filename && (!chunk || chunk === null)) {
+    // This is a metadata-only message
+    console.log('[App] Sending metadata to SW for', fileId, filename);
+    navigator.serviceWorker.controller.postMessage({
+      type: 'meta',
+      fileId,
+      meta: {
+        name: filename,
+        type: mimeType || 'application/octet-stream',
+        size: fileSize || undefined
+      }
+    });
+    return;
+  }
+  
+  if (chunk) {
+    // Send a chunk of data
+    navigator.serviceWorker.controller.postMessage({
+      type: 'chunk',
+      fileId,
+      chunk,
+      done: false
+    }, [chunk instanceof ArrayBuffer ? chunk : undefined]);
+  }
+}
+
+// Add this to your service worker registration code
+// Typically in index.js or App.js
+// Look for where you register the service worker and add there
+
+// Add this event listener to your service worker registration
+
 
   function isDownloading(fileId) {
     return downloadingFiles.has(fileId);

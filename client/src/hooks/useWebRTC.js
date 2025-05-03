@@ -18,8 +18,13 @@ export function startWebRTC({
   fileId,
   onComplete
 }) {
-  if (fileId) cleanupWebRTCInstance(fileId);
-  fileId = fileId || makeFileId();
+  if (!fileId) {
+    console.error('[WebRTC] startWebRTC called without a fileId!');
+    setError && setError('WebRTC Error: Missing transfer ID.');
+    return;
+  }
+  // Cleanup any existing connection for this ID *before* creating a new one
+  cleanupWebRTCInstance(fileId);
   const pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS });
   peerConns.current[fileId] = pc;
   let remoteDescSet = false;
@@ -40,28 +45,40 @@ export function startWebRTC({
     dc.onopen = () => {
       console.log('[WebRTC] Sender: Data channel open for', fileId, file?.name);
       dc.send(`META:${file.name}:${file.size}`);
-      const chunkSize = 64 * 1024;
+      const chunkSize = 16 * 1024; // Reduced from 64KB to 16KB for better reliability
       let offset = 0;
-      const MAX_BUFFERED_AMOUNT = 8 * 1024 * 1024; // 8MB
+      const MAX_BUFFERED_AMOUNT = 1 * 1024 * 1024; // Reduced from 8MB to 1MB
+      dc.bufferedAmountLowThreshold = 256 * 1024; // 256KB threshold
+      
       function sendChunk() {
         if (offset < file.size) {
           if (dc.bufferedAmount > MAX_BUFFERED_AMOUNT) {
+            console.log('[WebRTC] Sender: Buffer full, waiting to drain for', fileId);
             dc.onbufferedamountlow = () => {
               dc.onbufferedamountlow = null;
-              sendChunk();
+              setTimeout(sendChunk, 10); // Add small delay to allow processing
             };
             return;
           }
-          const slice = file.file.slice(offset, offset + chunkSize);
+          const nextChunkSize = Math.min(chunkSize, file.size - offset);
+          const slice = file.file.slice(offset, offset + nextChunkSize);
           const reader = new FileReader();
           reader.onload = (e) => {
             try {
-              dc.send(e.target.result);
-              console.log('[WebRTC] Sender: Sent chunk for', fileId, file?.name, 'offset', offset, 'size', chunkSize);
-              offset += chunkSize;
-              sendChunk();
+              if (dc.readyState === 'open') {
+                dc.send(e.target.result);
+                console.log('[WebRTC] Sender: Sent chunk for', fileId, file?.name, 'offset', offset, 'size', nextChunkSize);
+                offset += nextChunkSize;
+                setTimeout(sendChunk, 0); // Use setTimeout to prevent call stack overflow
+              } else {
+                console.error('[WebRTC] Sender: Data channel not open:', dc.readyState);
+                setError && setError('Sender: DataChannel closed unexpectedly');
+              }
             } catch (err) {
               setError && setError('Sender: DataChannel send failed: ' + err.message);
+              console.error('[WebRTC] Sender: DataChannel send error', err);
+              // Try to recover with a delay
+              setTimeout(sendChunk, 1000);
             }
           };
           reader.readAsArrayBuffer(slice);
@@ -90,23 +107,43 @@ export function startWebRTC({
     let expectedSize = 0;
     let receivedBytes = 0;
     let receivedChunks = [];
+    let metaSent = false;
     console.log('[WebRTC] Receiver: Data channel received for', fileId);
+    
     dc.onmessage = async (e) => {
       console.log('[WebRTC] Receiver: onmessage for', fileId, typeof e.data, e.data?.byteLength || e.data?.length || e.data);
+      
       if (typeof e.data === 'string' && e.data.startsWith('META:')) {
         const parts = e.data.split(':');
         filename = parts.slice(1, -1).join(':');
         expectedSize = parseInt(parts[parts.length - 1], 10);
         console.log('[WebRTC] Receiver: META received', filename, expectedSize);
+        
+        // Send metadata to service worker if available
+        if (fileId && navigator.serviceWorker.controller) {
+          metaSent = true;
+          // Send metadata only
+          sendSWMetaAndChunk(fileId, null, filename, 'application/octet-stream', expectedSize);
+        }
       } else if (typeof e.data === 'string' && e.data.startsWith('EOF:')) {
         if (fileId && navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage({ fileId: fileId, done: true });
-          setTimeout(() => {}, 1000);
-          cleanupWebRTCInstance(fileId);
-          if (onComplete) onComplete();
-          console.log('[WebRTC] Receiver: EOF received, closing for', fileId, filename);
+          // Signal EOF to service worker
+          navigator.serviceWorker.controller.postMessage({ 
+            type: 'chunk',
+            fileId: fileId, 
+            done: true 
+          });
+          
+          console.log('[WebRTC] Receiver: EOF sent to SW for', fileId, filename);
+          
+          // Give service worker time to process
+          setTimeout(() => {
+            cleanupWebRTCInstance(fileId);
+            if (onComplete) onComplete();
+          }, 500);
           return;
         }
+        
         const blob = new Blob(receivedChunks);
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -122,8 +159,15 @@ export function startWebRTC({
         if (onComplete) onComplete();
       } else {
         if (fileId && navigator.serviceWorker.controller) {
-          sendSWMetaAndChunk(fileId, e.data, filename, expectedSize ? 'application/octet-stream' : undefined);
-          console.log('[WebRTC] Receiver: Chunk received for', fileId, filename, e.data?.byteLength || e.data?.length || e.data);
+          // Make sure metadata was sent first
+          if (!metaSent && filename) {
+            metaSent = true;
+            sendSWMetaAndChunk(fileId, null, filename, 'application/octet-stream', expectedSize);
+          }
+          
+          // Send chunk to service worker
+          sendSWMetaAndChunk(fileId, e.data); // Only send fileId and chunk
+          console.log('[WebRTC] Receiver: Chunk sent to SW for', fileId, filename, e.data?.byteLength || e.data?.length || e.data);
         } else {
           receivedChunks.push(e.data);
         }
@@ -152,4 +196,4 @@ export function startWebRTC({
     });
     delete window.pendingSignals[fileId];
   }
-} 
+}
