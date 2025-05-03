@@ -5,15 +5,16 @@
 - [ ] **BUG/Improvement:** Investigate and fix potential issues with "Download All" ZIP functionality (User Request)
 - [ ] **Feature:** Add mobile-optimized UI
 - [x] **Refactor:** Review and remove unused dependencies across `client`, `server`, and `signaling-server` (User Request) - Checked all package.json files and searched code; all declared dependencies seem to be used. Note: `/server` itself might be unused (see Discovered Tasks). (2025-05-03 8:52 PM)
-- [ ] **Security/Prep:** Perform Security/Privacy review for open-sourcing (User Request)
-- [ ] **Security/Prep:** Address `npm audit` vulnerabilities in `/client` (8 vulnerabilities: 2 moderate, 6 high from `react-scripts` transitive dependencies - `nth-check`, `postcss`). Requires careful update/override, `npm audit fix --force` is breaking. (Discovered 2025-05-03)
-- [ ] **Security/Prep:** Check dependency licenses and add necessary notices for open-sourcing (User Request)
+- [x] **Security/Prep:** Perform Security/Privacy review for open-sourcing (User Request) - **Done (2025-05-04):** Hardcoded Twilio credentials removed from client (`client/src/utils/signaling.js`). Signaling server logging reviewed (seems okay). CORS restricted. Input validation added. XSS checked in `FileList`, `App`, `ErrorBanner` (React escaping handles it). Lack of rate limiting on signaling server noted as potential improvement area.
+- [ ] **Improvement/Security:** Implement rate limiting on `signaling-server` events (e.g., `create-room`, `join-room`) to prevent abuse. (Discovered 2025-05-04)
+- [ ] **Security/Prep:** Address `npm audit` vulnerabilities in `/client` (8 vulnerabilities: 2 moderate, 6 high from `react-scripts` transitive dependencies - `nth-check`, `postcss`). **Mitigation Applied (2025-05-04):** Added `overrides` for `nth-check@2.0.1` and `postcss@8.4.31` in `client/package.json` and reinstalled. `npm audit` still reports the vulnerabilities, but the overrides should force the use of patched versions. `npm audit fix --force` is breaking and was avoided.
+- [x] **Security/Prep:** Check dependency licenses for open-sourcing (User Request) - **Done (2025-05-04):** Manually reviewed direct dependencies in `client` and `signaling-server`. All use permissive licenses (MIT, ISC). `license-checker` tool failed to scan.
+- [x] **Prep:** Choose and add an open-source license file (e.g., MIT) to the project root. (Done 2025-05-04)
 - [ ] **Deployment:** Configure TLS/SSL for production deployment (Mentioned in docs)
 - [ ] **Deployment/Security:** Restrict CORS origins in `signaling-server/index.js` for production (currently `*`). (Discovered 2025-05-03)
-- [ ] **Deployment/Security:** Restrict CORS origins in `server/index.js` for production (currently `*`) *if* this server is kept/used. (Discovered 2025-05-03)
-- [ ] **Improvement/Security:** Add basic input validation on `signaling-server` for incoming socket messages (e.g., check data types/structure). (Discovered 2025-05-03)
+- [x] **Improvement/Security:** Add basic input validation on `signaling-server` for incoming socket messages (e.g., check data types/structure). (Done 2025-05-04)
 
-## Completed Tasks (Verified 2025-05-03)
+## Completed Tasks (Verified 2025-05-04)
 - [x] Set up project skeleton (client, server, signaling-server, tests)
 - [x] Generate `package-lock.json` for `client`, `server`, `signaling-server`
 - [x] Remove unused `jsonwebtoken` dependency from `/server`
@@ -35,14 +36,14 @@
 - [x] BUG FIX: Download of newly appended files is slow or stuck unless page is refreshed (fixed YYYY-MM-DD HH:MM, ensured SW is ready before starting download)
 
 ## Discovered During Work (2025-05-03)
-- The `/server` directory and its dependencies (`express`, `cors`, `socket.io`) appear unused by the current client implementation which connects directly to the `signaling-server`. Investigate if this directory can be removed.
-- `npm audit` reported 8 vulnerabilities (2 moderate, 6 high) in `/client` due to `react-scripts` transitive dependencies (`nth-check`, `postcss`). Requires investigation.
+- **RESOLVED (2025-05-04):** The `/server` directory was confirmed unused and has been removed.
+- **MITIGATED (2025-05-04):** `npm audit` reported 8 vulnerabilities (2 moderate, 6 high) in `/client` due to `react-scripts` transitive dependencies (`nth-check`, `postcss`). Added `overrides` in `client/package.json` as mitigation, although `npm audit` continues to report them.
 
-- CORS origins are currently set to `*` (allow all) in `signaling-server` and `server`, which is insecure for production.
+- **RESOLVED (2025-05-04):** CORS origins are now configurable via environment variable (`ALLOWED_ORIGINS`) in `signaling-server`. `/server` was removed.
 
-- Signaling server lacks input validation for socket messages.
+- **RESOLVED (2025-05-04):** Basic input validation added to signaling server socket event handlers.
 
 ---
 *Last updated: 2025-05-03T18:03:30+05:30*
 
-- [x] 2025-05-04 04:05 AM: Update URL when drive code is entered manually, so refresh keeps the user on the receiver page.
+- [x] **UI:** Update URL when drive code is entered manually, so refresh keeps the user on the receiver page. (2025-05-04 04:05 AM)

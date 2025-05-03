@@ -75,6 +75,35 @@ File Send is a modern web application for secure, direct peer-to-peer (P2P) file
     ```
 5.  Open your browser to the address provided by the frontend (usually `http://localhost:3000` or similar).
 
+## Configuration
+
+### TURN Server Credentials (Optional but Recommended)
+
+For file transfers to work reliably across different network types (especially those with strict firewalls), TURN servers are often required. This application is configured to use Twilio's TURN servers.
+
+1.  **Sign up** for a free or paid Twilio account at [https://www.twilio.com/](https://www.twilio.com/).
+2.  Find your **Account SID** and **Auth Token** in your Twilio console dashboard.
+3.  Create a file named `.env` in the `/client` directory.
+4.  Add your credentials to the `.env` file like this:
+
+    ```dotenv
+    REACT_APP_TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    REACT_APP_TWILIO_AUTH_TOKEN=your_auth_token_here
+    ```
+
+5.  Restart the client development server (`npm start` in the `/client` directory) if it's already running to load the new environment variables.
+
+If these environment variables are not set, the application will still function using STUN servers only, but file transfers might fail in some network conditions. The `.gitignore` file is configured to prevent `.env` files from being committed to Git.
+
+### Signaling Server CORS Origins
+
+The signaling server (`/signaling-server/index.js`) restricts connections to specific origins for security. By default in development, it allows `http://localhost:3001` (assuming the React client runs on port 3001).
+
+For production, set the `ALLOWED_ORIGINS` environment variable when running the signaling server. It should be a comma-separated list of allowed URLs:
+
+```bash
+ALLOWED_ORIGINS=https://your-production-domain.com,https://www.your-production-domain.com node index.js
+```
 ## Testing
 
 - **Signaling Server Tests:** Pytest structure is set up in `/tests`, but tests need to be implemented.
