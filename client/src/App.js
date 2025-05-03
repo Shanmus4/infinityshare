@@ -79,30 +79,68 @@ function App() {
     return origSWPostMessage.apply(this, arguments);
   };
 
-  // --- SENDER: Upload files and create drive, or add more files ---
+  // --- Helper: Build file tree from dropped files/folders ---
+  function buildFileTree(fileList) {
+    const root = [];
+    for (const item of fileList) {
+      const pathParts = (item.webkitRelativePath || item.path || item.file.name).split('/').filter(Boolean);
+      let current = root;
+      for (let i = 0; i < pathParts.length; i++) {
+        const part = pathParts[i];
+        if (i === pathParts.length - 1) {
+          // File
+          current.push({
+            type: 'file',
+            name: part,
+            file: item.file,
+            fileId: item.fileId || makeFileId(),
+            size: item.file.size,
+            mimetype: item.file.type
+          });
+        } else {
+          // Folder
+          let folder = current.find(f => f.type === 'folder' && f.name === part);
+          if (!folder) {
+            folder = { type: 'folder', name: part, children: [], folderId: makeFileId() };
+            current.push(folder);
+          }
+          current = folder.children;
+        }
+      }
+    }
+    return root;
+  }
+
+  // --- Helper: Flatten tree for meta (for socket sync) ---
+  function flattenTree(tree, parentPath = '') {
+    let out = [];
+    for (const node of tree) {
+      if (node.type === 'file') {
+        out.push({ name: parentPath + node.name, size: node.size, type: node.mimetype, fileId: node.fileId });
+      } else if (node.type === 'folder') {
+        out = out.concat(flattenTree(node.children, parentPath + node.name + '/'));
+      }
+    }
+    return out;
+  }
+
+  // --- SENDER: Upload files and create drive, or add more files (tree version) ---
   const handleDrop = (acceptedFiles) => {
     if (!acceptedFiles.length) return;
+    const filesWithPaths = acceptedFiles.map(f => ({ file: f, webkitRelativePath: f.webkitRelativePath, fileId: makeFileId() }));
+    const fileTree = buildFileTree(filesWithPaths);
+    console.log('[DEBUG] Built file tree:', fileTree);
+    setFiles(fileTree);
+    filesRef.current = fileTree;
+    setFilesMeta(flattenTree(fileTree));
     if (!driveCode) {
-      // First upload: create drive
-      const filesWithIds = acceptedFiles.map(f => ({ file: f, fileId: makeFileId() }));
-      setFiles(filesWithIds);
-      filesRef.current = filesWithIds;
-      setFilesMeta(filesWithIds.map(f => ({ name: f.file.name, size: f.file.size, type: f.file.type, fileId: f.fileId })));
       const code = Math.random().toString(16).slice(2, 8).toUpperCase();
       setDriveCode(code);
       setQrValue(window.location.origin + '/#' + code);
       socket.emit('create-room', code);
       setStep('uploaded');
     } else {
-      // Add more files to existing drive, filter out duplicates by name+size+type
-      const uniqueNewFiles = acceptedFiles.filter(f => !files.some(existing => existing.file.name === f.name && existing.file.size === f.size && existing.file.type === f.type));
-      if (uniqueNewFiles.length === 0) return;
-      const newFilesWithIds = uniqueNewFiles.map(f => ({ file: f, fileId: makeFileId() }));
-      const newFiles = files.concat(newFilesWithIds);
-      setFiles(newFiles);
-      filesRef.current = newFiles;
-      setFilesMeta(newFiles.map(f => ({ name: f.file.name, size: f.file.size, type: f.file.type, fileId: f.fileId })));
-      socket.emit('file-list', { room: driveCode, filesMeta: newFiles.map(f => ({ name: f.file.name, size: f.file.size, type: f.file.type, fileId: f.fileId })) });
+      socket.emit('file-list', { room: driveCode, filesMeta: flattenTree(fileTree), fileTree });
     }
   };
 
@@ -434,6 +472,40 @@ function App() {
     }
   };
 
+  // --- Tree Accordion UI (for both sender and receiver) ---
+  function FileTreeAccordion({ tree, onFile, onFolder, parentPath = '', isSender }) {
+    return (
+      <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
+        {tree.map(node => (
+          node.type === 'folder' ? (
+            <li key={node.folderId} style={{ marginBottom: 8 }}>
+              <details>
+                <summary style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
+                  <span style={{ flex: 1 }}>{node.name}</span>
+                  {isSender ? (
+                    <button style={{ marginLeft: 8 }} onClick={e => { e.stopPropagation(); onFolder(node, 'folder'); }}>Delete Folder</button>
+                  ) : (
+                    <button style={{ marginLeft: 8 }} onClick={e => { e.stopPropagation(); onFolder(node, 'folder', parentPath); }}>Download Folder</button>
+                  )}
+                </summary>
+                <FileTreeAccordion tree={node.children} onFile={onFile} onFolder={onFolder} parentPath={parentPath + node.name + '/'} isSender={isSender} />
+              </details>
+            </li>
+          ) : (
+            <li key={node.fileId} style={{ marginLeft: 16, display: 'flex', alignItems: 'center' }}>
+              <span style={{ flex: 1 }}>{node.name} ({node.size.toLocaleString()} bytes)</span>
+              {isSender ? (
+                <button style={{ marginLeft: 8 }} onClick={() => onFile(node, 'file')}>Delete</button>
+              ) : (
+                <button style={{ marginLeft: 8 }} onClick={() => onFile(node, 'file', parentPath)}>Download</button>
+              )}
+            </li>
+          )
+        ))}
+      </ul>
+    );
+  }
+
   // --- UI ---
   if (step === 'init') {
     return (
@@ -476,34 +548,19 @@ function App() {
           <a href={receiverUrl} target="_blank" rel="noopener noreferrer">Open Drive Link</a>
         </div>
         <div style={{ marginTop: 20 }}>
-          <Dropzone onDrop={handleDrop} multiple>
+          <Dropzone onDrop={handleDrop} multiple webkitdirectory="true" directory="true">
             {({ getRootProps, getInputProps }) => (
               <div {...getRootProps()} style={{ border: '2px dashed #ccc', padding: 40, cursor: 'pointer', marginBottom: 20 }}>
-                <input {...getInputProps()} />
-                <p>Drag and drop more files here, or click to select more files</p>
+                <input {...getInputProps()} webkitdirectory="true" directory="true" />
+                <p>Drag and drop more files or folders here, or click to select</p>
               </div>
             )}
           </Dropzone>
-          <table style={{ width: '100%', marginBottom: '1em', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th>File Name</th>
-                <th>Size</th>
-                <th>Type</th>
-                <th>Delete</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filesMeta.map((f, i) => (
-                <tr key={i}>
-                  <td>{f.name}</td>
-                  <td>{f.size.toLocaleString()} bytes</td>
-                  <td>{f.type}</td>
-                  <td><button onClick={() => handleDeleteFile(f.fileId)}>Delete</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {files.length === 0 ? (
+            <div style={{ color: '#e74c3c', fontWeight: 'bold' }}>[No files or folders detected. Try uploading a folder, not just files.]</div>
+          ) : (
+            <FileTreeAccordion tree={files} onFile={handleDeleteFile} onFolder={handleDeleteFile} isSender={true} />
+          )}
         </div>
         <div style={{ color: '#e74c3c', marginBottom: '1em', fontWeight: 'bold' }}>
           Do NOT reload or close this tab, or your files will be lost and the drive will stop working!
