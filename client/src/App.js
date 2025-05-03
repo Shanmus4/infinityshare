@@ -28,6 +28,7 @@ function App() {
   const [step, setStep] = useState(initial.step);
   const [files, setFiles] = useState([]); // Flat array: {name, size, type, file, fileId}
   const [driveCode, setDriveCode] = useState(initial.driveCode);
+  const [joinDriveCodeInput, setJoinDriveCodeInput] = useState(''); // State for join input
   const [qrValue, setQrValue] = useState("");
   const [receiverFilesMeta, setReceiverFilesMeta] = useState([]); // Flat array for receiver
   const [error, setError] = useState("");
@@ -407,6 +408,24 @@ function App() {
     delete dataChannels.current[fileId];
   }
 
+  // --- SENDER: Warn before leaving/reloading ---
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      if (step === 'uploaded' && files.length > 0) {
+        event.preventDefault();
+        // Standard way to show browser confirmation dialog
+        event.returnValue = 'Leaving or reloading this page will stop the file sharing. Are you sure?';
+        return event.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [step, files]); // Re-run if step or files change
+
   // Update this function in your app - look for it in App.js or similar file
 
   function sendSWMetaAndChunk(fileId, chunk, filename, mimeType, fileSize) {
@@ -469,6 +488,18 @@ function App() {
     }
   };
 
+  const handleJoinDrive = (codeToJoin) => {
+    const upperCode = codeToJoin.toUpperCase();
+    // Basic validation
+    if (upperCode && upperCode.length === 6 && /^[A-Z0-9]+$/.test(upperCode)) {
+      setDriveCode(upperCode);
+      setStep('receiver'); // Go directly to receiver step
+    } else {
+      setError('Invalid drive code. Must be 6 alphanumeric characters.');
+      setJoinDriveCodeInput(''); // Clear invalid input
+    }
+  };
+
   // --- UI ---
   if (step === "init") {
     return (
@@ -487,18 +518,16 @@ function App() {
         <h3>Or join a drive to receive files:</h3>
         <input
           type="text"
-          placeholder="Enter drive code"
+          placeholder="Enter 6-char drive code"
+          value={joinDriveCodeInput}
+          onChange={(e) => setJoinDriveCodeInput(e.target.value.toUpperCase())}
+          maxLength={6}
           onKeyDown={(e) => {
-            if (e.key === "Enter") setDriveCode(e.target.value.toUpperCase());
+            if (e.key === "Enter") handleJoinDrive(joinDriveCodeInput);
           }}
-          style={{ marginRight: 10 }}
+          style={{ marginRight: 10, textTransform: 'uppercase' }}
         />
-        <button
-          onClick={() => {
-            const code = prompt("Enter drive code:");
-            if (code) setDriveCode(code.toUpperCase());
-          }}
-        >
+        <button onClick={() => handleJoinDrive(joinDriveCodeInput)}>
           Join Drive
         </button>
       </div>
@@ -538,10 +567,9 @@ function App() {
           isSender={false}
           isDownloading={isDownloading}
         />
+        <p><strong>Drive Code:</strong> {driveCode}</p>
         <ErrorBanner error={error} />
-        <button onClick={() => window.location.reload()}>
-          Enter New Drive Code
-        </button>
+        {/* Removed "Enter New Drive Code" button */}
       </div>
     );
   }

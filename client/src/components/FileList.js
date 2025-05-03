@@ -13,7 +13,7 @@ function FileList({ files, onDelete, onDownload, isSender, isDownloading }) {
             <button style={{ marginLeft: 8 }} onClick={() => onDelete(file.fileId)}>Delete</button>
           ) : (
             <button style={{ marginLeft: 8 }} onClick={() => onDownload(file.fileId)} disabled={isDownloading && isDownloading(file.fileId)}>
-              {isDownloading && isDownloading(file.fileId) ? 'Starting…' : 'Download'}
+              {isDownloading && isDownloading(file.fileId) ? 'Downloading…' : 'Download'}
             </button>
           )}
         </li>
