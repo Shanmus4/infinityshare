@@ -65,3 +65,6 @@ Develop a web-based application for direct peer-to-peer (P2P) file transfers bet
 - Update `README.md` for new features, dependencies, or setup changes
 - Mark completed tasks in `TASK.md` and add new sub-tasks as discovered
 - See `TASK.md` for active and completed tasks
+
+## Gotchas / Troubleshooting
+* When supporting dynamic file appends, always synchronize download start with service worker readiness to avoid slow or stuck downloads.

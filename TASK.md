@@ -23,3 +23,5 @@
 
 ---
 *Last updated: 2024-06-06T00:00:00+00:00*
+
+- [x] BUG: Download of newly appended files is slow or stuck unless page is refreshed (fixed YYYY-MM-DD HH:MM, ensured SW is ready before starting download)

@@ -66,5 +66,8 @@ File Send is a modern web application for secure, direct peer-to-peer (P2P) file
 - Please see `PLANNING.md` and `TASK.md` for architecture, features, and active tasks.
 - Follow the code style and modularity rules in `PLANNING.md`.
 
+## Changelog
+* Fixed a race condition by ensuring the service worker is ready before starting downloads for newly added files.
+
 ---
 For questions or issues, open an issue or see the project planning docs.

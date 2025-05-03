@@ -3,7 +3,7 @@ import { io } from 'socket.io-client';
 import Dropzone from 'react-dropzone';
 import QRCode from 'qrcode.react';
 
-const SIGNALING_SERVER_URL = 'wss://72f0-49-207-206-28.ngrok-free.app';
+const SIGNALING_SERVER_URL = 'wss://4cc1-49-207-206-28.ngrok-free.app';
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   {
