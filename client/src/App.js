@@ -6,7 +6,9 @@ import DriveLinkBlock from "./components/DriveLinkBlock";
 import ErrorBanner from "./components/ErrorBanner";
 import { useSocket } from "./hooks/useSocket";
 import { useServiceWorker } from "./hooks/useServiceWorker";
-import { startWebRTC } from "./hooks/useWebRTC";
+import { startWebRTC } from "./hooks/useWebRTC"; // For single file downloads
+import { startZipSenderConnection } from "./utils/startZipSenderConnection"; // For zip sender
+// setupZipReceiverConnection is used inside useZipDownload now
 import { makeFileId } from "./utils/fileHelpers";
 import { useZipDownload } from "./hooks/useZipDownload"; // Import the new hook
 
@@ -41,7 +43,8 @@ function App() {
   const socket = useSocket();
   const { postMessage } = useServiceWorker();
   const pendingSignals = useRef({});
-  window.pendingSignals = pendingSignals.current;
+  window.pendingSignals = pendingSignals.current; // For debugging maybe?
+  const zipDownloadCallbacks = useRef({}); // Ref to hold callbacks from useZipDownload
 
   useEffect(() => {
     filesRef.current = files;
@@ -50,21 +53,27 @@ function App() {
   // --- Register all socket event listeners at the top level ---
   useEffect(() => {
     function handleSignal({ fileId, data, room }) {
+      console.log(`[App] handleSignal received for fileId: ${fileId}`, data); // Add log
       const pc = peerConns.current[fileId];
       if (!pc) {
+        console.log(`[App] handleSignal: No peer connection found for ${fileId}, buffering signal.`); // Add log
         // Buffer the signal for later
         if (!pendingSignals.current[fileId])
           pendingSignals.current[fileId] = [];
         pendingSignals.current[fileId].push({ data, room });
         return;
       }
+      console.log(`[App] handleSignal: Found peer connection for ${fileId}. Processing signal.`); // Add log
       if (data && data.sdp) {
         if (data.sdp.type === "offer") {
+          console.log(`[App] handleSignal: Received OFFER for ${fileId}`); // Add log
           pc.setRemoteDescription(new RTCSessionDescription(data.sdp)).then(
             () => {
+              console.log(`[App] handleSignal: Remote description (offer) set for ${fileId}`); // Add log
               pc.createAnswer().then((answer) => {
+                console.log(`[App] handleSignal: Created ANSWER for ${fileId}`); // Add log
                 pc.setLocalDescription(answer);
-                console.log("[App] socket.emit signal (answer)", {
+                console.log("[App] handleSignal: Emitting ANSWER for", {
                   room: driveCode,
                   fileId,
                   sdp: answer,
@@ -78,15 +87,60 @@ function App() {
             }
           );
         } else if (data.sdp.type === "answer") {
+          console.log(`[App] handleSignal: Received ANSWER for ${fileId}`); // Add log
           pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
         }
       } else if (data && data.candidate) {
-        pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+        console.log(`[App] handleSignal: Received ICE CANDIDATE for ${fileId}`); // Add log
+        pc.addIceCandidate(new RTCIceCandidate(data.candidate))
+          .catch(e => console.error(`[App] handleSignal: Error adding ICE candidate for ${fileId}:`, e)); // Add error handling
       }
     }
     socket.on("signal", handleSignal);
-    return () => socket.off("signal", handleSignal);
-  }, [socket, peerConns, driveCode]);
+
+    // Listener for zip download peer setup - Re-adding this logic
+    const handlePrepareZipPeer = ({ transferFileId }) => {
+      console.log(`[App] Received prepare-zip-download-peer for transferId: ${transferFileId}`);
+      if (!zipDownloadCallbacks.current || !zipDownloadCallbacks.current.handleFileData) {
+        console.error("[App] Zip download callbacks ref not available or not populated!");
+        // Handle error appropriately
+        return;
+      }
+
+      cleanupWebRTCInstance(transferFileId); // Ensure clean state
+
+      // Use the utility to setup the receiver connection
+      // It returns the pc object
+      const pc = setupZipReceiverConnection({
+          transferFileId,
+          peerConns, // Pass the main peerConns ref
+          dataChannels, // Pass the main dataChannels ref
+          zipCallbacksRef: zipDownloadCallbacks, // Pass the ref containing callbacks
+          socket,
+          driveCode
+      });
+
+      if (pc) {
+          // Store the created peer connection in the shared ref IMMEDIATELY
+          peerConns.current[transferFileId] = pc;
+          console.log(`[App] Stored peer connection for zip transferId: ${transferFileId}`);
+          // Now the peer connection exists before handleSignal processes the offer/candidate
+      } else {
+           console.error(`[App] Failed to setup zip receiver connection via utility for ${transferFileId}`);
+           // Optionally call error callback if setup fails
+           if (zipDownloadCallbacks.current.handleFileError) {
+               zipDownloadCallbacks.current.handleFileError(transferFileId, new Error("Failed to setup receiver connection"));
+           }
+      }
+    };
+
+    socket.on('prepare-zip-download-peer', handlePrepareZipPeer);
+
+    return () => {
+      socket.off("signal", handleSignal);
+      socket.off('prepare-zip-download-peer', handlePrepareZipPeer); // Cleanup listener
+    };
+  }, [socket, peerConns, dataChannels, driveCode, zipDownloadCallbacks]); // Add zipDownloadCallbacks dependency
 
   // --- SENDER: Upload files and create drive, or add more files (flat version) ---
   const handleDrop = (acceptedFiles) => {
@@ -187,7 +241,7 @@ function App() {
     return () => socket.off("connect", handler);
   }, [driveCode, files, socket]);
 
-  // --- SENDER: Listen for download-file and start per-download WebRTC ---
+  // --- SENDER: Listen for download-file and start appropriate WebRTC ---
   useEffect(() => {
     const downloadHandler = ({
       fileId: requestedFileId,
@@ -196,8 +250,9 @@ function App() {
       name,
       size,
       type,
+      isZipRequest // Check for the zip request flag
     }) => {
-      console.log(`[App] Sender: Received download-file request. Original fileId: ${requestedFileId}, Transfer fileId: ${transferFileId}, Name: ${name}`); // Enhanced log
+      console.log(`[App] Sender: Received download-file request. Original fileId: ${requestedFileId}, Transfer fileId: ${transferFileId}, Name: ${name}, isZip: ${!!isZipRequest}`);
 
       // Always use filesRef.current to find the file
       const fileObj = filesRef.current.find(
@@ -227,31 +282,42 @@ function App() {
       }
       console.log(`[App] Sender: Found fileIndex ${fileIndex} for ${requestedFileId}`);
 
-      console.log("[App] Sender: Calling startWebRTC", { // Changed log content slightly
-        isSender: true,
-        // fileId: requestedFileId, // Original file ID - not used by startWebRTC directly
-        transferFileId: useTransferFileId, // The ID for this specific transfer
-        fileIndex, // Index in sender's list
-        fileName: fileObj.name,
-        driveCode: driveCode,
-      });
+      if (isZipRequest) {
+        // --- Start Zip Sender ---
+        console.log("[App] Sender: Calling startZipSenderConnection for transferId:", useTransferFileId);
+        startZipSenderConnection({
+          socket,
+          transferFileId: useTransferFileId,
+          driveCode,
+          file: fileObj, // Pass the full file object
+          peerConns,
+          dataChannels,
+          setError,
+          cleanupWebRTCInstance
+        });
+        console.log(`[App] Sender: Called startZipSenderConnection for transferFileId: ${useTransferFileId}`);
 
-      startWebRTC({
-        isSender: true,
-        code: driveCode, // code and driveCode are the same? Yes.
-        fileIndex,
-        filesRef,
-        peerConns,
-        dataChannels,
-        setError,
-        driveCode,
-        socket,
-        // sendSWMetaAndChunk, // Removed unnecessary param for sender
-        cleanupWebRTCInstance,
-        makeFileId,
-        fileId: useTransferFileId, // Pass the consistent transferFileId for WebRTC
-      });
-      console.log(`[App] Sender: Called startWebRTC for transferFileId: ${useTransferFileId}`);
+      } else {
+        // --- Start Single File Sender (Original Logic) ---
+        console.log("[App] Sender: Calling startWebRTC for single file transferId:", useTransferFileId);
+        startWebRTC({
+          isSender: true,
+          code: driveCode,
+          fileIndex,
+          filesRef,
+          peerConns,
+          dataChannels,
+          setError,
+          driveCode,
+          socket,
+          sendSWMetaAndChunk, // Needed for single file
+          cleanupWebRTCInstance,
+          makeFileId,
+          fileId: useTransferFileId,
+          // No zip callbacks needed here
+        });
+        console.log(`[App] Sender: Called startWebRTC for transferFileId: ${useTransferFileId}`);
+      }
     };
     socket.on("download-file", downloadHandler);
     return () => socket.off("download-file", downloadHandler);
@@ -440,7 +506,10 @@ function App() {
     cleanupWebRTCInstance,
     makeFileId,
     sendSWMetaAndChunk, // Pass the SW function for single file fallback
-    handleDownloadRequest // Pass the single file download handler
+    handleDownloadRequest, // Pass the single file download handler
+    peerConns, // Pass refs needed by useZipDownload
+    dataChannels,
+    zipCallbacksRef: zipDownloadCallbacks // Pass the ref to the hook
   });
 
   // --- SENDER: Warn before leaving/reloading ---

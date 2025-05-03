@@ -1,17 +1,30 @@
 import { useState, useRef } from 'react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { startWebRTC } from './useWebRTC'; // We will adapt this or use callbacks
+// import { startWebRTC } from './useWebRTC'; // No longer used directly here for receiver
+import { setupZipReceiverConnection } from '../utils/setupZipReceiverConnection'; // Import the new utility
 
-export function useZipDownload({ receiverFilesMeta, driveCode, socket, cleanupWebRTCInstance, makeFileId, sendSWMetaAndChunk, handleDownloadRequest }) {
+export function useZipDownload({
+  receiverFilesMeta,
+  driveCode,
+  socket,
+  cleanupWebRTCInstance,
+  makeFileId,
+  // sendSWMetaAndChunk, // Not needed for zip receiver logic
+  handleDownloadRequest, // Still needed for single file fallback
+  peerConns, // Need peerConns ref from App.js
+  dataChannels, // Need dataChannels ref from App.js
+  zipCallbacksRef // Need ref to pass callbacks to App.js/setupZipReceiverConnection
+}) {
   const [isZipping, setIsZipping] = useState(false);
   const [zipProgress, setZipProgress] = useState(0); // 0 to 100
-  const [downloadProgress, setDownloadProgress] = useState({}); // { fileId: progress }
+  const [downloadProgress, setDownloadProgress] = useState({}); // { fileId: progress } - keyed by originalFileId
   const [error, setError] = useState('');
 
   const fileData = useRef({}); // To store received file chunks/Blobs before zipping
-  const peerConns = useRef({}); // Need to manage peer connections for multiple files
-  const dataChannels = useRef({}); // Need to manage data channels for multiple files
+  // REMOVED internal refs - use refs passed from App.js via props
+  // const peerConns = useRef({});
+  // const dataChannels = useRef({});
 
   const startDownloadAll = async () => {
     if (!receiverFilesMeta || receiverFilesMeta.length === 0) {
@@ -42,8 +55,8 @@ export function useZipDownload({ receiverFilesMeta, driveCode, socket, cleanupWe
     const zip = new JSZip();
     let filesDownloaded = 0;
 
-    // Function to handle receiving data for a single file (receives transferFileId)
-    const handleFileData = (transferFileId, chunk) => {
+    // Define callbacks locally
+    const handleFileDataCallback = (transferFileId, chunk) => {
       const originalFileId = transferIdToOriginalIdMap.get(transferFileId);
       if (!originalFileId) {
         console.error(`[useZipDownload] handleFileData: No originalFileId found for transferFileId ${transferFileId}`);
@@ -72,8 +85,7 @@ export function useZipDownload({ receiverFilesMeta, driveCode, socket, cleanupWe
       }
     };
 
-    // Receives transferFileId
-    const handleFileComplete = (transferFileId) => {
+    const handleFileCompleteCallback = (transferFileId) => {
        const originalFileId = transferIdToOriginalIdMap.get(transferFileId);
        if (!originalFileId) {
          console.error(`[useZipDownload] handleFileComplete: No originalFileId found for transferFileId ${transferFileId}`);
@@ -127,8 +139,7 @@ export function useZipDownload({ receiverFilesMeta, driveCode, socket, cleanupWe
        }
     };
 
-    // Receives transferFileId
-    const handleFileError = (transferFileId, err) => {
+    const handleFileErrorCallback = (transferFileId, err) => {
       const originalFileId = transferIdToOriginalIdMap.get(transferFileId);
       const fileName = receiverFilesMeta.find(f => f.fileId === originalFileId)?.name || originalFileId || transferFileId;
       console.error(`[useZipDownload] Error downloading file (originalId: ${originalFileId}, transferId: ${transferFileId}, name: ${fileName}):`, err);
@@ -143,6 +154,19 @@ export function useZipDownload({ receiverFilesMeta, driveCode, socket, cleanupWe
       // Consider cleaning up all active connections if one fails.
     };
 
+    // Update the ref in App.js with these callbacks when starting
+    if (zipCallbacksRef) {
+      zipCallbacksRef.current = {
+        handleFileData: handleFileDataCallback,
+        handleFileComplete: handleFileCompleteCallback,
+        handleFileError: handleFileErrorCallback,
+      };
+    } else {
+      console.error("[useZipDownload] zipCallbacksRef is not provided!");
+      setIsZipping(false);
+      setError("Internal error: Zip callbacks reference missing.");
+      return;
+    }
 
     // Initiate download for each file
     console.log('[useZipDownload] startDownloadAll: initiating download for', receiverFilesMeta.length, 'files');
@@ -150,39 +174,38 @@ export function useZipDownload({ receiverFilesMeta, driveCode, socket, cleanupWe
       const transferFileId = makeFileId(); // Generate a unique ID for this transfer attempt
       transferIdToOriginalIdMap.set(transferFileId, fileMeta.fileId); // Store the mapping
       activeTransferIds.push(transferFileId); // Store for cleanup
-      //console.log(`[useZipDownload] Initiating WebRTC for file: ${fileMeta.name} (originalId: ${fileMeta.fileId}, transferId: ${transferFileId})`);
+      console.log(`[useZipDownload] Setting up Zip Receiver for file: ${fileMeta.name} (originalId: ${fileMeta.fileId}, transferId: ${transferFileId})`);
 
-      // Emit download request via signaling server
-      socket.emit('download-file', {
-        room: driveCode,
-        fileId: fileMeta.fileId, // Original file ID
-        transferFileId: transferFileId, // New transfer ID
-        name: fileMeta.name,
-        size: fileMeta.size,
-        type: fileMeta.type,
+      // Call the new utility function to set up the receiver connection
+      const pc = setupZipReceiverConnection({
+          transferFileId,
+          peerConns, // Pass the main peerConns ref from App.js
+          dataChannels, // Pass the main dataChannels ref from App.js
+          zipCallbacksRef, // Pass the ref containing our callbacks
+          socket,
+          driveCode
       });
 
-      // Start WebRTC connection for this file
-      startWebRTC({
-        isSender: false, // We are the receiver
-        code: driveCode,
-        fileIndex: receiverFilesMeta.findIndex(f => f.fileId === fileMeta.fileId), // Index might not be needed if we use fileId consistently
-        filesRef: { current: receiverFilesMeta }, // Pass receiver's file list
-        peerConns, // Pass refs for managing connections
-        dataChannels, // Pass refs for managing data channels
-        setError: (msg) => handleFileError(transferFileId, msg), // Use local error handler
-        driveCode,
-        socket,
-        cleanupWebRTCInstance, // Pass cleanup function
-        makeFileId, // Pass makeFileId
-        fileId: transferFileId, // Use the consistent transfer ID for WebRTC
-        // Provide callbacks for data handling instead of using service worker
-        onChunk: (chunk) => handleFileData(transferFileId, chunk),
-        onComplete: () => handleFileComplete(transferFileId),
-        onError: (err) => handleFileError(transferFileId, err),
-        isZipping, // Pass isZipping flag
-        // Do NOT pass sendSWMetaAndChunk, externalWriter, downloadTab
-      });
+      if (pc) {
+          // Store the created peer connection in the shared ref IMMEDIATELY
+          peerConns.current[transferFileId] = pc;
+          console.log(`[useZipDownload] Stored peer connection for zip transferId: ${transferFileId}`);
+
+          // NOW Emit download request via signaling server AFTER peer connection is set up and stored
+          console.log(`[useZipDownload] Emitting download-file request for transferId: ${transferFileId}`);
+          socket.emit('download-file', {
+            room: driveCode,
+            fileId: fileMeta.fileId, // Original file ID
+            transferFileId: transferFileId, // New transfer ID
+            name: fileMeta.name,
+            size: fileMeta.size,
+            type: fileMeta.type,
+            isZipRequest: true // Add flag to indicate zip request
+          });
+      } else {
+          console.error(`[useZipDownload] Failed to setup zip receiver connection for ${transferFileId}`);
+          handleFileErrorCallback(transferFileId, new Error("Failed to setup receiver connection"));
+      }
     });
   };
 
