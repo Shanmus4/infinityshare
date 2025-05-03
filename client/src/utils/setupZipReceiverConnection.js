@@ -10,16 +10,16 @@ import { ICE_SERVERS } from './signaling';
 export function setupZipReceiverConnection({
   transferFileId,
   dataChannels, // Ref from App.js { current: { transferId: dc } }
-  zipCallbacks, // Ref from App.js { current: { handleFileData, handleFileComplete, handleFileError } }
+  zipCallbacks, // Direct object with { handleFileData, handleFileComplete, handleFileError }
   socket, // Needed for emitting ICE candidates
   driveCode // Needed for emitting ICE candidates
 }) {
   console.log(`[ZipReceiver] Setting up peer connection for transferId: ${transferFileId}`);
 
-  if (!zipCallbacks || !zipCallbacks.current || !zipCallbacks.current.handleFileData) {
-    console.error("[ZipReceiver] Zip download callbacks ref not available or not populated!");
-    // Handle error appropriately - maybe return null or throw?
-    return null;
+  // Check if the passed callbacks object and required functions exist
+  if (!zipCallbacks || typeof zipCallbacks.handleFileData !== 'function') {
+    console.error("[ZipReceiver] Zip download callbacks object not available or missing handleFileData!");
+    return null; // Indicate failure
   }
 
   const pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS });
@@ -38,17 +38,16 @@ export function setupZipReceiverConnection({
     dataChannels.current[transferFileId] = dc; // Store data channel
 
     dc.onmessage = async (e) => {
-      // Directly use callbacks stored in the ref
+      // Directly use callbacks from the passed object
       if (typeof e.data === 'string' && e.data.startsWith('EOF:')) {
         console.log(`[ZipReceiver] EOF received for zip transferId: ${transferFileId}`);
-        if (zipCallbacks.current.handleFileComplete) {
-          zipCallbacks.current.handleFileComplete(transferFileId);
+        if (zipCallbacks.handleFileComplete) {
+          zipCallbacks.handleFileComplete(transferFileId);
         }
       } else if (e.data instanceof ArrayBuffer) {
         //console.log(`[ZipReceiver] Chunk received for zip transferId: ${transferFileId}`);
-        if (zipCallbacks.current.handleFileData) {
-          zipCallbacks.current.handleFileData(transferFileId, e.data);
-        }
+        // handleFileData is already checked for existence above
+        zipCallbacks.handleFileData(transferFileId, e.data);
       } else if (typeof e.data === 'string' && e.data.startsWith('META:')) {
         console.log(`[ZipReceiver] META received for zip transferId: ${transferFileId}`);
         // Meta is handled implicitly by useZipDownload logic based on receiverFilesMeta
@@ -57,8 +56,8 @@ export function setupZipReceiverConnection({
 
     dc.onerror = (err) => {
       console.error(`[ZipReceiver] DataChannel error for zip transferId: ${transferFileId}`, err);
-      if (zipCallbacks.current.handleFileError) {
-        zipCallbacks.current.handleFileError(transferFileId, err);
+      if (zipCallbacks.handleFileError) {
+        zipCallbacks.handleFileError(transferFileId, err);
       }
     };
 

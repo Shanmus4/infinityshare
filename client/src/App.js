@@ -44,7 +44,7 @@ function App() {
   const { postMessage } = useServiceWorker();
   const pendingSignals = useRef({});
   window.pendingSignals = pendingSignals.current; // For debugging maybe?
-  const zipDownloadCallbacks = useRef({}); // Ref to hold callbacks from useZipDownload
+  // REMOVED zipDownloadCallbacks ref - no longer needed
 
   useEffect(() => {
     filesRef.current = files;
@@ -113,9 +113,9 @@ function App() {
       // It returns the pc object
       const pc = setupZipReceiverConnection({
           transferFileId,
-          peerConns, // Pass the main peerConns ref
+          // peerConns, // setupZipReceiverConnection doesn't need this ref
           dataChannels, // Pass the main dataChannels ref
-          zipCallbacksRef: zipDownloadCallbacks, // Pass the ref containing callbacks
+          zipCallbacks: zipDownloadCallbacks.current, // Pass the actual callbacks object
           socket,
           driveCode
       });
@@ -140,7 +140,7 @@ function App() {
       socket.off("signal", handleSignal);
       socket.off('prepare-zip-download-peer', handlePrepareZipPeer); // Cleanup listener
     };
-  }, [socket, peerConns, dataChannels, driveCode, zipDownloadCallbacks]); // Add zipDownloadCallbacks dependency
+  }, [socket, peerConns, dataChannels, driveCode]); // REMOVED zipDownloadCallbacks dependency
 
   // --- SENDER: Upload files and create drive, or add more files (flat version) ---
   const handleDrop = (acceptedFiles) => {
@@ -508,8 +508,8 @@ function App() {
     sendSWMetaAndChunk, // Pass the SW function for single file fallback
     handleDownloadRequest, // Pass the single file download handler
     peerConns, // Pass refs needed by useZipDownload
-    dataChannels,
-    zipCallbacksRef: zipDownloadCallbacks // Pass the ref to the hook
+    dataChannels
+    // REMOVED zipCallbacksRef prop
   });
 
   // --- SENDER: Warn before leaving/reloading ---

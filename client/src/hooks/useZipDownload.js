@@ -10,11 +10,10 @@ export function useZipDownload({
   socket,
   cleanupWebRTCInstance,
   makeFileId,
-  // sendSWMetaAndChunk, // Not needed for zip receiver logic
   handleDownloadRequest, // Still needed for single file fallback
   peerConns, // Need peerConns ref from App.js
-  dataChannels, // Need dataChannels ref from App.js
-  zipCallbacksRef // Need ref to pass callbacks to App.js/setupZipReceiverConnection
+  dataChannels // Need dataChannels ref from App.js
+  // zipCallbacksRef // REMOVED - passing functions directly
 }) {
   const [isZipping, setIsZipping] = useState(false);
   const [zipProgress, setZipProgress] = useState(0); // 0 to 100
@@ -154,19 +153,14 @@ export function useZipDownload({
       // Consider cleaning up all active connections if one fails.
     };
 
-    // Update the ref in App.js with these callbacks when starting
-    if (zipCallbacksRef) {
-      zipCallbacksRef.current = {
+    // REMOVED logic to update zipCallbacksRef
+
+    // Define the callbacks object to pass directly
+    const zipCallbacks = {
         handleFileData: handleFileDataCallback,
         handleFileComplete: handleFileCompleteCallback,
         handleFileError: handleFileErrorCallback,
-      };
-    } else {
-      console.error("[useZipDownload] zipCallbacksRef is not provided!");
-      setIsZipping(false);
-      setError("Internal error: Zip callbacks reference missing.");
-      return;
-    }
+    };
 
     // Initiate download for each file
     console.log('[useZipDownload] startDownloadAll: initiating download for', receiverFilesMeta.length, 'files');
@@ -181,7 +175,7 @@ export function useZipDownload({
           transferFileId,
           peerConns, // Pass the main peerConns ref from App.js
           dataChannels, // Pass the main dataChannels ref from App.js
-          zipCallbacksRef, // Pass the ref containing our callbacks
+          zipCallbacks, // Pass the actual callback functions
           socket,
           driveCode
       });
