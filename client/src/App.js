@@ -33,6 +33,8 @@ function App() {
   const filesRef = useRef(files);
   const socket = useSocket();
   const { postMessage } = useServiceWorker();
+  const pendingSignals = useRef({});
+  window.pendingSignals = pendingSignals.current;
 
   useEffect(() => { filesRef.current = files; }, [files]);
 
@@ -40,7 +42,12 @@ function App() {
   useEffect(() => {
     function handleSignal({ fileId, data, room }) {
       const pc = peerConns.current[fileId];
-      if (!pc) return;
+      if (!pc) {
+        // Buffer the signal for later
+        if (!pendingSignals.current[fileId]) pendingSignals.current[fileId] = [];
+        pendingSignals.current[fileId].push({ data, room });
+        return;
+      }
       if (data && data.sdp) {
         if (data.sdp.type === 'offer') {
           pc.setRemoteDescription(new RTCSessionDescription(data.sdp)).then(() => {

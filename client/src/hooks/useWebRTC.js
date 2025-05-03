@@ -132,4 +132,24 @@ export function startWebRTC({
     };
     dc.onerror = (err) => { console.error('[WebRTC] Receiver: DataChannel error', err); };
   };
+  // Process any buffered signals for this fileId (receiver side)
+  if (!isSender && window.pendingSignals && window.pendingSignals[fileId]) {
+    window.pendingSignals[fileId].forEach(({ data, room }) => {
+      if (data && data.sdp) {
+        if (data.sdp.type === 'offer') {
+          pc.setRemoteDescription(new RTCSessionDescription(data.sdp)).then(() => {
+            pc.createAnswer().then(answer => {
+              pc.setLocalDescription(answer);
+              socket.emit('signal', { room: driveCode, fileId, data: { sdp: answer } });
+            });
+          });
+        } else if (data.sdp.type === 'answer') {
+          pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        }
+      } else if (data && data.candidate) {
+        pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+      }
+    });
+    delete window.pendingSignals[fileId];
+  }
 } 
