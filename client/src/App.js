@@ -73,11 +73,15 @@ function App() {
       console.log('[App] Sending meta to SW', msg.fileId, msg.filename, msg.mimetype);
     }
   }
-  const origSWPostMessage = navigator.serviceWorker.controller && navigator.serviceWorker.controller.postMessage;
-  navigator.serviceWorker.controller.postMessage = function(msg) {
-    logSWPostMessage(msg);
-    return origSWPostMessage.apply(this, arguments);
-  };
+  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+    const origSWPostMessage = navigator.serviceWorker.controller.postMessage;
+    navigator.serviceWorker.controller.postMessage = function(msg) {
+      logSWPostMessage(msg);
+      return origSWPostMessage.apply(this, arguments);
+    };
+  } else {
+    console.warn('[App] Service Worker controller not ready. Logging will be skipped.');
+  }
 
   // --- Helper: Build file tree from dropped files/folders ---
   function buildFileTree(fileList) {
@@ -231,11 +235,14 @@ function App() {
     return () => socket.off('connect', joinAndRequest);
   }, [step, driveCode]);
 
-  // --- RECEIVER: Listen for file list ---
+  // --- RECEIVER: Listen for file list and tree ---
   useEffect(() => {
-    const handler = ({ filesMeta }) => {
-      console.log('[receiver] Received file-list', filesMeta);
-      setReceiverFilesMeta(filesMeta || []);
+    const handler = ({ filesMeta, fileTree }) => {
+      if (fileTree) {
+        setReceiverFilesMeta(fileTree);
+      } else {
+        setReceiverFilesMeta(filesMeta || []);
+      }
     };
     socket.on('file-list', handler);
     return () => socket.off('file-list', handler);
@@ -445,32 +452,27 @@ function App() {
   }
 
   // Add a delete handler for sender
-  const handleDeleteFile = (fileId) => {
-    // Check if file is being downloaded (by any receiver)
-    // For now, check if this file is being downloaded locally (sender-side)
-    // In a real app, you might want to track download state via backend or socket events
-    const isDownloadingLocally = false; // Placeholder, as sender doesn't track receiver downloads
-    if (downloadingFiles.has(fileId)) {
-      if (!window.confirm('This file is currently being downloaded. Are you sure you want to delete it? The download will be aborted.')) {
-        return;
-      }
-      // Stop the download locally (receiver will handle abort on their side)
-      setDownloadingFiles(prev => { const s = new Set(prev); s.delete(fileId); return s; });
-      // Send cancel message to service worker to abort and clean up
-      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({ fileId, cancel: true });
-      }
-    }
-    // Remove file from state
-    const newFiles = files.filter(f => f.fileId !== fileId);
-    setFiles(newFiles);
-    filesRef.current = newFiles;
-    const newFilesMeta = filesMeta.filter(f => f.fileId !== fileId);
-    setFilesMeta(newFilesMeta);
+  const handleDeleteNode = (node, type) => {
+    const newTree = deleteNodeFromTree(files, type === 'file' ? node.fileId : node.folderId, type);
+    setFiles(newTree);
+    filesRef.current = newTree;
+    setFilesMeta(flattenTree(newTree));
     if (driveCode) {
-      socket.emit('file-list', { room: driveCode, filesMeta: newFilesMeta });
+      socket.emit('file-list', { room: driveCode, filesMeta: flattenTree(newTree), fileTree: newTree });
     }
   };
+
+  // --- Recursive delete for files/folders in tree ---
+  function deleteNodeFromTree(tree, nodeId, type) {
+    return tree.filter(node => {
+      if (type === 'file' && node.type === 'file' && node.fileId === nodeId) return false;
+      if (type === 'folder' && node.type === 'folder' && node.folderId === nodeId) return false;
+      if (node.type === 'folder') {
+        node.children = deleteNodeFromTree(node.children, nodeId, type);
+      }
+      return true;
+    });
+  }
 
   // --- Tree Accordion UI (for both sender and receiver) ---
   function FileTreeAccordion({ tree, onFile, onFolder, parentPath = '', isSender }) {
@@ -559,7 +561,7 @@ function App() {
           {files.length === 0 ? (
             <div style={{ color: '#e74c3c', fontWeight: 'bold' }}>[No files or folders detected. Try uploading a folder, not just files.]</div>
           ) : (
-            <FileTreeAccordion tree={files} onFile={handleDeleteFile} onFolder={handleDeleteFile} isSender={true} />
+            <FileTreeAccordion tree={files} onFile={handleDeleteNode} onFolder={handleDeleteNode} isSender={true} />
           )}
         </div>
         <div style={{ color: '#e74c3c', marginBottom: '1em', fontWeight: 'bold' }}>
@@ -572,26 +574,16 @@ function App() {
     return (
       <div className="container">
         <h2>Files in Drive</h2>
-        <table style={{ width: '100%', marginBottom: '1em', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th>File Name</th>
-              <th>Size</th>
-              <th>Type</th>
-              <th>Download</th>
-            </tr>
-          </thead>
-          <tbody>
-            {receiverFilesMeta.map((f, i) => (
-              <tr key={i}>
-                <td>{f.name}</td>
-                <td>{f.size.toLocaleString()} bytes</td>
-                <td>{f.type}</td>
-                <td><button onClick={() => handleDownloadRequest(f.fileId)} disabled={isDownloading(f.fileId)}>{isDownloading(f.fileId) ? 'Downloading...' : 'Download'}</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {receiverFilesMeta.length === 0 ? (
+          <div style={{ color: '#e74c3c', fontWeight: 'bold' }}>[No files or folders detected. Try uploading a folder, not just files.]</div>
+        ) : (
+          <FileTreeAccordion
+            tree={receiverFilesMeta}
+            onFile={(node) => handleDownloadRequest(node.fileId)}
+            onFolder={(node, type, parentPath) => alert('Download folder as zip: ' + (parentPath || '') + node.name)}
+            isSender={false}
+          />
+        )}
         {error && <div style={{ color: '#e74c3c', fontWeight: 'bold' }}>{error}</div>}
         <button onClick={() => window.location.reload()}>Enter New Drive Code</button>
       </div>
