@@ -16,11 +16,16 @@ export function startWebRTC({
   externalWriter,
   downloadTab,
   fileId,
-  onComplete
+  onComplete, // Keep existing onComplete for single file download cleanup
+  onChunk, // New callback for receiving chunks (used by zip download)
+  onComplete: onDownloadComplete, // New callback for download completion (used by zip download)
+  onError: onDownloadError // New callback for download errors (used by zip download)
 }) {
   if (!fileId) {
     console.error('[WebRTC] startWebRTC called without a fileId!');
     setError && setError('WebRTC Error: Missing transfer ID.');
+    // Call the new error callback if provided
+    if (onDownloadError) onDownloadError('WebRTC Error: Missing transfer ID.');
     return;
   }
   // Cleanup any existing connection for this ID *before* creating a new one
@@ -111,70 +116,93 @@ export function startWebRTC({
     console.log('[WebRTC] Receiver: Data channel received for', fileId);
     
     dc.onmessage = async (e) => {
-      console.log('[WebRTC] Receiver: onmessage for', fileId, typeof e.data, e.data?.byteLength || e.data?.length || e.data);
-      
+      // console.log('[WebRTC] Receiver: onmessage for', fileId, typeof e.data, e.data?.byteLength || e.data?.length || e.data); // Verbose log
+
       if (typeof e.data === 'string' && e.data.startsWith('META:')) {
         const parts = e.data.split(':');
         filename = parts.slice(1, -1).join(':');
         expectedSize = parseInt(parts[parts.length - 1], 10);
         console.log('[WebRTC] Receiver: META received', filename, expectedSize);
-        
-        // Send metadata to service worker if available
-        if (fileId && navigator.serviceWorker.controller) {
+
+        // If using callbacks (zip download), don't interact with SW here.
+        // Otherwise (single download), send metadata to SW.
+        if (!onChunk && fileId && navigator.serviceWorker.controller) {
           metaSent = true;
-          // Send metadata only
           sendSWMetaAndChunk(fileId, null, filename, 'application/octet-stream', expectedSize);
         }
       } else if (typeof e.data === 'string' && e.data.startsWith('EOF:')) {
-        if (fileId && navigator.serviceWorker.controller) {
-          // Signal EOF to service worker
-          navigator.serviceWorker.controller.postMessage({ 
+        console.log('[WebRTC] Receiver: EOF received for', fileId, filename);
+
+        // If using callbacks (zip download), call the completion callback.
+        if (onDownloadComplete) {
+          onDownloadComplete();
+          // Note: Cleanup for zip downloads is handled by the useZipDownload hook after all files complete.
+        }
+        // Else if using Service Worker (single download)
+        else if (fileId && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
             type: 'chunk',
-            fileId: fileId, 
-            done: true 
+            fileId: fileId,
+            done: true
           });
-          
           console.log('[WebRTC] Receiver: EOF sent to SW for', fileId, filename);
-          
-          // Give service worker time to process
+          // Give SW time to process before cleaning up this specific connection
           setTimeout(() => {
             cleanupWebRTCInstance(fileId);
-            if (onComplete) onComplete();
+            if (onComplete) onComplete(); // Call original onComplete if provided
           }, 500);
-          return;
         }
-        
-        const blob = new Blob(receivedChunks);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-          URL.revokeObjectURL(url);
-          document.body.removeChild(a);
-        }, 5000);
-        cleanupWebRTCInstance(fileId);
-        if (onComplete) onComplete();
+        // Else (fallback, should not happen with SW)
+        else {
+           const blob = new Blob(receivedChunks);
+           const url = URL.createObjectURL(blob);
+           const a = document.createElement('a');
+           a.href = url;
+           a.download = filename;
+           document.body.appendChild(a);
+           a.click();
+           setTimeout(() => {
+             URL.revokeObjectURL(url);
+             document.body.removeChild(a);
+           }, 5000);
+           cleanupWebRTCInstance(fileId);
+           if (onComplete) onComplete();
+        }
       } else {
-        if (fileId && navigator.serviceWorker.controller) {
-          // Make sure metadata was sent first
+        // Received a data chunk (ArrayBuffer)
+        if (onChunk) {
+          // If using callbacks (zip download), pass chunk to the callback.
+          onChunk(e.data);
+          // console.log('[WebRTC] Receiver: Chunk passed to callback for', fileId, filename); // Verbose log
+        }
+        // Else if using Service Worker (single download)
+        else if (fileId && navigator.serviceWorker.controller) {
+          // Ensure metadata was sent first (fallback)
           if (!metaSent && filename) {
             metaSent = true;
             sendSWMetaAndChunk(fileId, null, filename, 'application/octet-stream', expectedSize);
           }
-          
-          // Send chunk to service worker
-          sendSWMetaAndChunk(fileId, e.data); // Only send fileId and chunk
-          console.log('[WebRTC] Receiver: Chunk sent to SW for', fileId, filename, e.data?.byteLength || e.data?.length || e.data);
-        } else {
-          receivedChunks.push(e.data);
+          sendSWMetaAndChunk(fileId, e.data);
+          // console.log('[WebRTC] Receiver: Chunk sent to SW for', fileId, filename); // Verbose log
+        }
+        // Else (fallback, should not happen with SW)
+        else {
+           receivedChunks.push(e.data);
         }
         receivedBytes += (e.data.byteLength || e.data.size || 0);
       }
     };
-    dc.onerror = (err) => { console.error('[WebRTC] Receiver: DataChannel error', err); };
+    dc.onerror = (err) => {
+      console.error('[WebRTC] Receiver: DataChannel error', err);
+      // If using callbacks (zip download), call the error callback.
+      if (onDownloadError) {
+        onDownloadError(err);
+      }
+      // Otherwise (single download), use the default setError.
+      else {
+        setError && setError('Receiver: DataChannel error.');
+      }
+    };
   };
   // Process any buffered signals for this fileId (receiver side)
   if (!isSender && window.pendingSignals && window.pendingSignals[fileId]) {

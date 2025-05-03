@@ -8,6 +8,7 @@ import { useSocket } from "./hooks/useSocket";
 import { useServiceWorker } from "./hooks/useServiceWorker";
 import { startWebRTC } from "./hooks/useWebRTC";
 import { makeFileId } from "./utils/fileHelpers";
+import { useZipDownload } from "./hooks/useZipDownload"; // Import the new hook
 
 function App() {
   function getInitialStepAndDriveCode() {
@@ -408,6 +409,24 @@ function App() {
     delete dataChannels.current[fileId];
   }
 
+  // Integrate the useZipDownload hook
+  const {
+    startDownloadAll,
+    isZipping,
+    zipProgress,
+    downloadProgress,
+    error: zipError // Alias to avoid state name conflict
+  } = useZipDownload({
+    receiverFilesMeta,
+    driveCode,
+    socket,
+    cleanupWebRTCInstance,
+    makeFileId,
+    sendSWMetaAndChunk, // Pass the SW function for single file fallback
+    handleDownloadRequest // Pass the single file download handler
+  });
+
+
   // --- SENDER: Warn before leaving/reloading ---
   useEffect(() => {
     const handleBeforeUnload = (event) => {
@@ -559,17 +578,59 @@ function App() {
     );
   }
   if (step === "receiver") {
+    // Determine if "Download All" button should be disabled
+    const isDownloadAllDisabled = receiverFilesMeta.length === 0 || isZipping;
+
     return (
       <div className="container">
         <h2>Files in Drive</h2>
+        <p><strong>Drive Code:</strong> {driveCode}</p> {/* Display drive code at the top */}
+        <button
+          onClick={startDownloadAll}
+          disabled={isDownloadAllDisabled}
+          style={{ marginBottom: '1em' }}
+        >
+          {isZipping ? `Preparing Zip (${Math.round(zipProgress)}%)` : 'Download All'}
+        </button>
+
+        {isZipping && (
+          <div style={{ marginBottom: '1em' }}>
+            <p>Downloading and Zipping Files...</p>
+            {/* Basic progress bar */}
+            <div style={{ width: '100%', backgroundColor: '#ddd', height: '20px' }}>
+              <div style={{
+                width: `${zipProgress}%`,
+                backgroundColor: '#4CAF50',
+                height: '20px',
+                textAlign: 'center',
+                lineHeight: '20px',
+                color: 'white'
+              }}>
+                {Math.round(zipProgress)}%
+              </div>
+            </div>
+            {/* Optional: Display individual file progress */}
+            {Object.keys(downloadProgress).length > 0 && (
+              <div style={{ marginTop: '0.5em', fontSize: '0.9em' }}>
+                {Object.entries(downloadProgress).map(([fileId, progress]) => {
+                  const file = receiverFilesMeta.find(f => f.fileId === fileId);
+                  return (
+                    <div key={fileId}>{file?.name || fileId}: {Math.round(progress)}%</div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         <FileList
           files={receiverFilesMeta}
-          onDownload={handleDownloadRequest}
+          onDownload={handleDownloadRequest} // Keep single file download
           isSender={false}
-          isDownloading={isDownloading}
+          isDownloading={isDownloading} // This state is for single downloads
         />
-        <p><strong>Drive Code:</strong> {driveCode}</p>
-        <ErrorBanner error={error} />
+        {/* Display errors from both App state and zip hook */}
+        <ErrorBanner error={error || zipError} />
         {/* Removed "Enter New Drive Code" button */}
       </div>
     );
