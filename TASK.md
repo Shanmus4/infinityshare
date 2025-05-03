@@ -44,3 +44,5 @@
 
 ---
 *Last updated: 2025-05-03T18:03:30+05:30*
+
+- [x] 2025-05-04 04:05 AM: Update URL when drive code is entered manually, so refresh keeps the user on the receiver page.

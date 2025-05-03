@@ -27,13 +27,41 @@ export function startWebRTC({
   cleanupWebRTCInstance(fileId);
   const pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS });
   peerConns.current[fileId] = pc;
+
+  // --- Detailed Logging ---
+  pc.oniceconnectionstatechange = () => {
+    console.log(`[WebRTC Single] ICE connection state change for ${fileId}: ${pc.iceConnectionState}`);
+    // Error handling based on this state might be redundant if onconnectionstatechange is used
+  };
+  pc.onconnectionstatechange = () => { // Newer, more comprehensive state
+    console.log(`[WebRTC Single] Connection state change for ${fileId}: ${pc.connectionState}`);
+     if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
+      setError && setError(`WebRTC connection failed or disconnected for ${fileId}. State: ${pc.connectionState}`);
+      // Consider cleanup here? cleanupWebRTCInstance(fileId);
+    }
+  };
+  pc.onsignalingstatechange = () => {
+    console.log(`[WebRTC Single] Signaling state change for ${fileId}: ${pc.signalingState}`);
+  };
+  pc.onicecandidateerror = (event) => {
+    // This event is often more informative than the Trickle ICE tool errors
+    console.error(`[WebRTC Single] ICE candidate error for ${fileId}:`, event);
+    if (event.errorCode) {
+       console.error(`  Error Code: ${event.errorCode}, Host Candidate: ${event.hostCandidate}, Server URL: ${event.url}, Text: ${event.errorText}`);
+    }
+    setError && setError(`ICE candidate gathering error for ${fileId}. Code: ${event.errorCode || 'N/A'}`);
+  };
+  // --- End Detailed Logging ---
+
   let remoteDescSet = false;
   let pendingCandidates = [];
   // Always set onicecandidate for both sender and receiver
   pc.onicecandidate = (event) => {
     if (event.candidate) {
-      //console.log('[WebRTC] socket.emit signal (ICE)', { room: driveCode, fileId, candidate: event.candidate });
+      //console.log('[WebRTC Single] Found ICE candidate for', fileId, event.candidate.type);
       socket.emit('signal', { room: driveCode, fileId, data: { candidate: event.candidate } });
+    } else {
+      console.log(`[WebRTC Single] End of ICE candidates for ${fileId}.`);
     }
   };
   if (isSender) {

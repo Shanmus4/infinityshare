@@ -601,8 +601,10 @@ function App() {
     const upperCode = codeToJoin.toUpperCase();
     // Basic validation
     if (upperCode && upperCode.length === 6 && /^[A-Z0-9]+$/.test(upperCode)) {
-      setDriveCode(upperCode);
-      setStep('receiver'); // Go directly to receiver step
+      // Navigate to the receiver URL for this code
+      // This leverages the existing URL parsing logic on page load
+      window.location.href = `/${upperCode}?as=receiver`;
+      // No need to set state here, the page reload will handle it
     } else {
       setError('Invalid drive code. Must be 6 alphanumeric characters.');
       setJoinDriveCodeInput(''); // Clear invalid input

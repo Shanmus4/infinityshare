@@ -29,10 +29,36 @@ export function startZipSenderConnection({
   const pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS });
   peerConns.current[transferFileId] = pc; // Store sender PC
 
+  // --- Detailed Logging ---
+  pc.oniceconnectionstatechange = () => {
+    console.log(`[ZipSender] ICE connection state change for ${transferFileId}: ${pc.iceConnectionState}`);
+  };
+  pc.onconnectionstatechange = () => {
+    console.log(`[ZipSender] Connection state change for ${transferFileId}: ${pc.connectionState}`);
+     if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
+      setError && setError(`ZipSender: WebRTC connection failed/disconnected for ${file.name}. State: ${pc.connectionState}`);
+      cleanupWebRTCInstance(transferFileId); // Cleanup on failure
+    }
+  };
+  pc.onsignalingstatechange = () => {
+    console.log(`[ZipSender] Signaling state change for ${transferFileId}: ${pc.signalingState}`);
+  };
+  pc.onicecandidateerror = (event) => {
+    console.error(`[ZipSender] ICE candidate error for ${transferFileId}:`, event);
+    if (event.errorCode) {
+       console.error(`  Error Code: ${event.errorCode}, Host Candidate: ${event.hostCandidate}, Server URL: ${event.url}, Text: ${event.errorText}`);
+    }
+    setError && setError(`ZipSender: ICE candidate gathering error for ${file.name}. Code: ${event.errorCode || 'N/A'}`);
+    cleanupWebRTCInstance(transferFileId); // Cleanup on candidate error
+  };
+  // --- End Detailed Logging ---
+
   pc.onicecandidate = (event) => {
     if (event.candidate) {
       // Use the main 'signal' event
       socket.emit('signal', { room: driveCode, fileId: transferFileId, data: { candidate: event.candidate } });
+    } else {
+       console.log(`[ZipSender] End of ICE candidates for ${transferFileId}.`);
     }
   };
 
