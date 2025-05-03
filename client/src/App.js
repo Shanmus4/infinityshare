@@ -413,9 +413,10 @@ function App() {
     const handleBeforeUnload = (event) => {
       if (step === 'uploaded' && files.length > 0) {
         event.preventDefault();
-        // Standard way to show browser confirmation dialog
-        event.returnValue = 'Leaving or reloading this page will stop the file sharing. Are you sure?';
-        return event.returnValue;
+        // Standard way to show browser confirmation dialog with a custom message
+        const confirmationMessage = 'Leaving or reloading will stop the file transfer. Keep this page open to continue sharing.';
+        event.returnValue = confirmationMessage; // For older browsers
+        return confirmationMessage; // For modern browsers
       }
     };
 
