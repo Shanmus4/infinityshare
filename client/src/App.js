@@ -1,21 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { io } from 'socket.io-client';
-import Dropzone from 'react-dropzone';
-import QRCode from 'qrcode.react';
-
-const SIGNALING_SERVER_URL = 'wss://4cc1-49-207-206-28.ngrok-free.app';
-const ICE_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  {
-    urls: 'turn:openrelay.metered.ca:80',
-    username: 'openrelayproject',
-    credential: 'openrelayproject'
-  }
-];
-const socket = io(SIGNALING_SERVER_URL, { transports: ['websocket'] });
+import FileList from './components/FileList';
+import DropzoneArea from './components/DropzoneArea';
+import QRCodeBlock from './components/QRCodeBlock';
+import DriveLinkBlock from './components/DriveLinkBlock';
+import ErrorBanner from './components/ErrorBanner';
+import { useSocket } from './hooks/useSocket';
+import { useServiceWorker } from './hooks/useServiceWorker';
+import { startWebRTC } from './hooks/useWebRTC';
+import { makeFileId } from './utils/fileHelpers';
 
 function App() {
-  // --- Initialize state based on URL (for receiver deep link) ---
   function getInitialStepAndDriveCode() {
     const pathDriveCode = window.location.pathname.slice(1).toUpperCase();
     const asReceiver = new URLSearchParams(window.location.search).get('as') === 'receiver';
@@ -27,197 +21,147 @@ function App() {
 
   const initial = getInitialStepAndDriveCode();
   const [step, setStep] = useState(initial.step);
-  const [files, setFiles] = useState([]); // File objects with fileId
-  const [filesMeta, setFilesMeta] = useState([]); // {name, size, type, fileId}
+  const [files, setFiles] = useState([]); // Flat array: {name, size, type, file, fileId}
   const [driveCode, setDriveCode] = useState(initial.driveCode);
   const [qrValue, setQrValue] = useState('');
-  const [receiverFilesMeta, setReceiverFilesMeta] = useState([]); // For receiver
+  const [receiverFilesMeta, setReceiverFilesMeta] = useState([]); // Flat array for receiver
   const [error, setError] = useState('');
   const [downloadingFiles, setDownloadingFiles] = useState(new Set());
-  const [downloadProgress, setDownloadProgress] = useState(null); // {received, total, filename}
-  const [downloadWriter, setDownloadWriter] = useState(null); // For streaming
   const fileBlobs = useRef({});
   const peerConns = useRef({});
   const dataChannels = useRef({});
   const filesRef = useRef(files);
+  const socket = useSocket();
+  const { postMessage } = useServiceWorker();
 
   useEffect(() => { filesRef.current = files; }, [files]);
 
-  // --- Register Service Worker ---
+  // --- Register all socket event listeners at the top level ---
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js');
-    }
-  }, []);
-
-  // --- Helper to generate random fileId ---
-  function makeFileId() {
-    return Math.random().toString(36).substr(2, 9);
-  }
-
-  // --- Defensive: only send meta ONCE per fileId ---
-  const sentSWMeta = {};
-  function sendSWMetaAndChunk(fileId, chunk, filename, mimetype) {
-    if (filename && mimetype && !sentSWMeta[fileId]) {
-      navigator.serviceWorker.controller.postMessage({ fileId, filename, mimetype });
-      sentSWMeta[fileId] = true;
-    }
-    navigator.serviceWorker.controller.postMessage({ fileId, chunk });
-  }
-
-  // --- Defensive logging for all SW postMessages ---
-  function logSWPostMessage(msg) {
-    if (msg.chunk) {
-      console.log('[App] Sending chunk to SW', msg.fileId, msg.chunk.byteLength);
-    } else if (msg.filename) {
-      console.log('[App] Sending meta to SW', msg.fileId, msg.filename, msg.mimetype);
-    }
-  }
-  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-    const origSWPostMessage = navigator.serviceWorker.controller.postMessage;
-    navigator.serviceWorker.controller.postMessage = function(msg) {
-      logSWPostMessage(msg);
-      return origSWPostMessage.apply(this, arguments);
-    };
-  } else {
-    console.warn('[App] Service Worker controller not ready. Logging will be skipped.');
-  }
-
-  // --- Helper: Build file tree from dropped files/folders ---
-  function buildFileTree(fileList) {
-    const root = [];
-    for (const item of fileList) {
-      const pathParts = (item.webkitRelativePath || item.path || item.file.name).split('/').filter(Boolean);
-      let current = root;
-      for (let i = 0; i < pathParts.length; i++) {
-        const part = pathParts[i];
-        if (i === pathParts.length - 1) {
-          // File
-          current.push({
-            type: 'file',
-            name: part,
-            file: item.file,
-            fileId: item.fileId || makeFileId(),
-            size: item.file.size,
-            mimetype: item.file.type
+    function handleSignal({ fileId, data, room }) {
+      const pc = peerConns.current[fileId];
+      if (!pc) return;
+      if (data && data.sdp) {
+        if (data.sdp.type === 'offer') {
+          pc.setRemoteDescription(new RTCSessionDescription(data.sdp)).then(() => {
+            pc.createAnswer().then(answer => {
+              pc.setLocalDescription(answer);
+              console.log('[App] socket.emit signal (answer)', { room: driveCode, fileId, sdp: answer });
+              socket.emit('signal', { room: driveCode, fileId, data: { sdp: answer } });
+            });
           });
-        } else {
-          // Folder
-          let folder = current.find(f => f.type === 'folder' && f.name === part);
-          if (!folder) {
-            folder = { type: 'folder', name: part, children: [], folderId: makeFileId() };
-            current.push(folder);
-          }
-          current = folder.children;
+        } else if (data.sdp.type === 'answer') {
+          pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
         }
+      } else if (data && data.candidate) {
+        pc.addIceCandidate(new RTCIceCandidate(data.candidate));
       }
     }
-    return root;
-  }
+    socket.on('signal', handleSignal);
+    return () => socket.off('signal', handleSignal);
+  }, [socket, peerConns, driveCode]);
 
-  // --- Helper: Flatten tree for meta (for socket sync) ---
-  function flattenTree(tree, parentPath = '') {
-    let out = [];
-    for (const node of tree) {
-      if (node.type === 'file') {
-        out.push({ name: parentPath + node.name, size: node.size, type: node.mimetype, fileId: node.fileId });
-      } else if (node.type === 'folder') {
-        out = out.concat(flattenTree(node.children, parentPath + node.name + '/'));
-      }
-    }
-    return out;
-  }
-
-  // --- SENDER: Upload files and create drive, or add more files (tree version) ---
+  // --- SENDER: Upload files and create drive, or add more files (flat version) ---
   const handleDrop = (acceptedFiles) => {
     if (!acceptedFiles.length) return;
-    const filesWithPaths = acceptedFiles.map(f => ({ file: f, webkitRelativePath: f.webkitRelativePath, fileId: makeFileId() }));
-    const fileTree = buildFileTree(filesWithPaths);
-    console.log('[DEBUG] Built file tree:', fileTree);
-    setFiles(fileTree);
-    filesRef.current = fileTree;
-    setFilesMeta(flattenTree(fileTree));
+    const filesWithIds = acceptedFiles.map(f => ({
+      name: f.name,
+      size: f.size,
+      type: f.type,
+      file: f,
+      fileId: makeFileId()
+    }));
+    setFiles(filesWithIds);
+    filesRef.current = filesWithIds;
+    const filesMeta = filesWithIds.map(({ name, size, type, fileId }) => ({ name, size, type, fileId }));
     if (!driveCode) {
       const code = Math.random().toString(16).slice(2, 8).toUpperCase();
       setDriveCode(code);
       setQrValue(window.location.origin + '/#' + code);
       socket.emit('create-room', code);
       setStep('uploaded');
+      socket.emit('file-list', { room: code, filesMeta });
     } else {
-      socket.emit('file-list', { room: driveCode, filesMeta: flattenTree(fileTree), fileTree });
+      socket.emit('file-list', { room: driveCode, filesMeta });
     }
   };
-
-  useEffect(() => { filesRef.current = files; }, [files]);
 
   // --- SENDER: Always respond to get-file-list requests ---
   useEffect(() => {
     const handler = ({ room }) => {
-      console.log('[sender] Emitting file-list', { room, filesMeta });
+      const filesMeta = files.map(({ name, size, type, fileId }) => ({ name, size, type, fileId }));
       socket.emit('file-list', { room, filesMeta });
     };
     socket.on('get-file-list', handler);
     return () => socket.off('get-file-list', handler);
-  }, [filesMeta]);
+  }, [files, socket]);
 
   // --- SENDER: Send file list to new receivers on joined-room ---
   useEffect(() => {
-    if (!(driveCode && filesMeta.length > 0)) return;
+    if (!(driveCode && files.length > 0)) return;
     const handler = () => {
-      console.log('[sender] Reconnect file-list', { room: driveCode, filesMeta });
+      const filesMeta = files.map(({ name, size, type, fileId }) => ({ name, size, type, fileId }));
       socket.emit('file-list', { room: driveCode, filesMeta });
     };
     socket.on('connect', handler);
     return () => socket.off('connect', handler);
-  }, [driveCode, filesMeta]);
+  }, [driveCode, files, socket]);
 
   // --- SENDER: Periodically broadcast file list for late receivers ---
   useEffect(() => {
-    if (!(driveCode && filesMeta.length > 0)) return;
+    if (!(driveCode && files.length > 0)) return;
     const interval = setInterval(() => {
-      console.log('[sender] Periodic file-list', { room: driveCode, filesMeta });
+      const filesMeta = files.map(({ name, size, type, fileId }) => ({ name, size, type, fileId }));
       socket.emit('file-list', { room: driveCode, filesMeta });
-    }, 3000); // every 3 seconds
+    }, 3000);
     return () => clearInterval(interval);
-  }, [driveCode, filesMeta]);
+  }, [driveCode, files, socket]);
 
   // --- SENDER: On socket reconnect, re-emit file list ---
   useEffect(() => {
-    if (!(driveCode && filesMeta.length > 0)) return;
+    if (!(driveCode && files.length > 0)) return;
     const handler = () => {
-      console.log('[sender] Reconnect file-list', { room: driveCode, filesMeta });
+      const filesMeta = files.map(({ name, size, type, fileId }) => ({ name, size, type, fileId }));
       socket.emit('file-list', { room: driveCode, filesMeta });
     };
     socket.on('connect', handler);
     return () => socket.off('connect', handler);
-  }, [driveCode, filesMeta]);
+  }, [driveCode, files, socket]);
 
   // --- SENDER: Listen for download-file and start per-download WebRTC ---
   useEffect(() => {
     const downloadHandler = ({ fileId: requestedFileId, transferFileId, room, name, size, type }) => {
-      let fileObj = filesRef.current.find(f => f.fileId === requestedFileId);
-      // Fallback: try to match by name/size/type if fileId not found
-      if (!fileObj && name && size && type) {
-        fileObj = filesRef.current.find(f => f.file.name === name && f.file.size === size && f.file.type === f.type);
-      }
+      // Always use filesRef.current to find the file
+      const fileObj = filesRef.current.find(f => f.fileId === requestedFileId);
       if (!fileObj) {
         setError('File not found for download. Please re-upload or refresh.');
         return;
       }
-      // --- CRITICAL: Always use transferFileId for this download session ---
       const useTransferFileId = transferFileId || makeFileId();
       const fileIndex = filesRef.current.findIndex(f => f.fileId === fileObj.fileId);
-      window.__downloadDebug = window.__downloadDebug || {};
-      window.__downloadDebug[useTransferFileId] = window.__downloadDebug[useTransferFileId] || {};
-      window.__downloadDebug[useTransferFileId].senderStarted = Date.now();
-      window.__downloadDebug[useTransferFileId].fileName = fileObj.file.name;
-      window.__downloadDebug[useTransferFileId].transferFileId = useTransferFileId;
-      console.info(`[sender] Start WebRTC for download`, { fileId: requestedFileId, fileName: fileObj.file.name, transferFileId: useTransferFileId });
-      startWebRTC(true, driveCode, fileIndex, undefined, null, null, useTransferFileId);
+      if (fileIndex === -1) {
+        setError('File index not found for download.');
+        return;
+      }
+      console.log('[App] Sender: startWebRTC', { isSender: true, fileId: requestedFileId, transferFileId: useTransferFileId, fileIndex, fileName: fileObj.name });
+      startWebRTC({
+        isSender: true,
+        code: driveCode,
+        fileIndex,
+        filesRef,
+        peerConns,
+        dataChannels,
+        setError,
+        driveCode,
+        socket,
+        sendSWMetaAndChunk,
+        cleanupWebRTCInstance,
+        makeFileId
+      });
     };
     socket.on('download-file', downloadHandler);
     return () => socket.off('download-file', downloadHandler);
-  }, [driveCode, files]);
+  }, [socket, driveCode]);
 
   // --- RECEIVER: Robustly join and request file list after socket connects ---
   useEffect(() => {
@@ -226,27 +170,21 @@ function App() {
       socket.emit('join-room', driveCode);
       socket.emit('get-file-list', { room: driveCode });
     };
-    // If already connected, join immediately
     if (socket.connected) {
       joinAndRequest();
     }
-    // Otherwise, wait for connect event
     socket.on('connect', joinAndRequest);
     return () => socket.off('connect', joinAndRequest);
-  }, [step, driveCode]);
+  }, [step, driveCode, socket]);
 
-  // --- RECEIVER: Listen for file list and tree ---
+  // --- RECEIVER: Listen for file list ---
   useEffect(() => {
-    const handler = ({ filesMeta, fileTree }) => {
-      if (fileTree) {
-        setReceiverFilesMeta(fileTree);
-      } else {
-        setReceiverFilesMeta(filesMeta || []);
-      }
+    const handler = ({ filesMeta }) => {
+      setReceiverFilesMeta(filesMeta || []);
     };
     socket.on('file-list', handler);
     return () => socket.off('file-list', handler);
-  }, []);
+  }, [socket]);
 
   // --- RECEIVER: Download request ---
   const handleDownloadRequest = (fileId) => {
@@ -256,7 +194,6 @@ function App() {
     if (!fileMeta) return;
     const transferFileId = makeFileId();
     const downloadUrl = `/sw-download/${transferFileId}`;
-    console.log('[Download] Button clicked', { fileId, transferFileId, fileMeta });
     const newTab = window.open(downloadUrl, '_blank');
     if (!newTab) {
       setError('Popup blocked! Please allow popups for this site.');
@@ -265,8 +202,6 @@ function App() {
     }
     window.__downloadDebug = window.__downloadDebug || {};
     window.__downloadDebug[fileId] = { started: Date.now(), fileName: fileMeta.name, transferFileId };
-    console.info(`[receiver] Download requested`, { fileId, fileName: fileMeta.name, transferFileId });
-    // Timeout for stuck download detection
     setTimeout(() => {
       if (downloadingFiles.has(fileId)) {
         console.warn(`[receiver] Download stuck in starting state for 10s`, { fileId, fileName: fileMeta.name, transferFileId });
@@ -274,10 +209,25 @@ function App() {
     }, 10000);
     const swHandler = async (event) => {
       if (event.data.type === 'sw-ready' && event.data.fileId === transferFileId) {
-        console.info(`[receiver] Service Worker ready`, { fileId, fileName: fileMeta.name, transferFileId });
-        navigator.serviceWorker.controller.postMessage({ fileId: transferFileId, filename: fileMeta.name, mimetype: fileMeta.type });
-        startWebRTC(false, driveCode, receiverFilesMeta.findIndex(f => f.fileId === fileId), undefined, null, null, transferFileId);
+        postMessage({ fileId: transferFileId, filename: fileMeta.name, mimetype: fileMeta.type });
+        console.log('[App] Receiver: emit download-file', { room: driveCode, fileId, transferFileId, name: fileMeta.name, size: fileMeta.size, type: fileMeta.type });
         socket.emit('download-file', { room: driveCode, fileId, transferFileId, name: fileMeta.name, size: fileMeta.size, type: fileMeta.type });
+        const fileIndex = receiverFilesMeta.findIndex(f => f.fileId === fileId);
+        console.log('[App] Receiver: startWebRTC', { isSender: false, fileId, transferFileId, fileIndex, fileName: fileMeta.name });
+        startWebRTC({
+          isSender: false,
+          code: driveCode,
+          fileIndex,
+          filesRef: { current: receiverFilesMeta },
+          peerConns,
+          dataChannels,
+          setError,
+          driveCode,
+          socket,
+          sendSWMetaAndChunk,
+          cleanupWebRTCInstance,
+          makeFileId
+        });
         navigator.serviceWorker.removeEventListener('message', swHandler);
       }
     };
@@ -298,7 +248,7 @@ function App() {
     return () => navigator.serviceWorker.removeEventListener('message', handler);
   }, []);
 
-  // --- Minimal WebRTC logic ---
+  // --- Minimal WebRTC logic helpers ---
   function cleanupWebRTCInstance(fileId) {
     const pc = peerConns.current[fileId];
     const dc = dataChannels.current[fileId];
@@ -308,219 +258,35 @@ function App() {
     delete dataChannels.current[fileId];
   }
 
-  function startWebRTC(isSender, code, fileIndex, roomOverride, externalWriter, downloadTab, fileId) {
-    if (fileId) cleanupWebRTCInstance(fileId);
-    fileId = fileId || makeFileId();
-    const pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS });
-    peerConns.current[fileId] = pc;
-    let remoteDescSet = false;
-    let pendingCandidates = [];
-    if (isSender) {
-      const dc = pc.createDataChannel('file');
-      dc.binaryType = 'arraybuffer';
-      dataChannels.current[fileId] = dc;
-      const file = filesRef.current[fileIndex];
-      dc.onopen = () => {
-        console.info(`[sender] DataChannel open`, { fileId, fileName: file.file.name });
-        dc.send(`META:${file.file.name}:${file.file.size}`);
-        const chunkSize = 64 * 1024;
-        let offset = 0;
-        const MAX_BUFFERED_AMOUNT = 8 * 1024 * 1024; // 8MB
-        function sendChunk() {
-          if (offset < file.file.size) {
-            if (dc.bufferedAmount > MAX_BUFFERED_AMOUNT) {
-              dc.onbufferedamountlow = () => {
-                dc.onbufferedamountlow = null;
-                sendChunk();
-              };
-              return;
-            }
-            const slice = file.file.slice(offset, offset + chunkSize);
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              try {
-                dc.send(e.target.result);
-                offset += chunkSize;
-                sendChunk();
-              } catch (err) {
-                setError('Sender: DataChannel send failed: ' + err.message);
-                console.error(`[sender] DataChannel send failed`, { fileId, fileName: file.file.name, error: err });
-              }
-            };
-            reader.readAsArrayBuffer(slice);
-          } else {
-            dc.send('EOF:' + file.file.name);
-            console.info(`[sender] Sent EOF`, { fileId, fileName: file.file.name });
-          }
-        }
-        sendChunk();
-      };
-      dc.onerror = (err) => {
-        setError('Sender: DataChannel error.');
-        console.error(`[sender] DataChannel error`, { fileId, fileName: file.file.name, error: err });
-      };
+  function sendSWMetaAndChunk(fileId, chunk, filename, mimetype) {
+    if (filename && mimetype && !window.__sentSWMeta) window.__sentSWMeta = {};
+    if (filename && mimetype && !window.__sentSWMeta[fileId]) {
+      postMessage({ fileId, filename, mimetype });
+      window.__sentSWMeta[fileId] = true;
     }
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        socket.emit('signal', { room: roomOverride || code, fileId, data: { candidate: event.candidate } });
-      }
-    };
-    pc.ondatachannel = (event) => {
-      const dc = event.channel;
-      dc.binaryType = 'arraybuffer';
-      dataChannels.current[fileId] = dc;
-      let filename = null;
-      let expectedSize = 0;
-      let receivedBytes = 0;
-      let receivedChunks = [];
-      dc.onmessage = async (e) => {
-        if (typeof e.data === 'string' && e.data.startsWith('META:')) {
-          const parts = e.data.split(':');
-          filename = parts.slice(1, -1).join(':'); // handles colons in filename
-          expectedSize = parseInt(parts[parts.length - 1], 10);
-        } else if (typeof e.data === 'string' && e.data.startsWith('EOF:')) {
-          if (fileId && navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({ fileId: fileId, done: true });
-            setTimeout(() => {}, 1000);
-            cleanupWebRTCInstance(fileId);
-            console.info(`[receiver] Received EOF`, { fileId, fileName: filename });
-            return;
-          }
-          // fallback for non-SW
-          const blob = new Blob(receivedChunks);
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          setTimeout(() => {
-            URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-          }, 5000);
-          cleanupWebRTCInstance(fileId);
-        } else {
-          if (fileId && navigator.serviceWorker.controller) {
-            sendSWMetaAndChunk(fileId, e.data, filename, expectedSize ? 'application/octet-stream' : undefined);
-          } else {
-            receivedChunks.push(e.data);
-          }
-          receivedBytes += (e.data.byteLength || e.data.size || 0);
-        }
-      };
-      dc.onerror = (err) => {
-        console.error(`[receiver] DataChannel error`, { fileId, fileName: filename, error: err });
-      };
-    };
-    socket.on('signal', function handler({ fileId: signalFileId, data }) {
-      if (signalFileId !== fileId) return;
-      if (data && data.sdp) {
-        if (data.sdp.type === 'offer') {
-          if (!remoteDescSet) {
-            pc.setRemoteDescription(new RTCSessionDescription(data.sdp)).then(() => {
-              remoteDescSet = true;
-              pc.createAnswer().then(answer => {
-                pc.setLocalDescription(answer);
-                socket.emit('signal', { room: roomOverride || code, fileId, data: { sdp: answer } });
-              });
-            }).catch(e => {/* Ignore redundant offers */});
-          } // else ignore late/duplicate offers
-        } else if (data.sdp.type === 'answer') {
-          if (pc.signalingState === 'have-local-offer') {
-            pc.setRemoteDescription(new RTCSessionDescription(data.sdp)).catch(e => {/* Ignore redundant answers */});
-          } // else ignore late/duplicate answers
-        }
-      } else if (data && data.candidate) {
-        if (pc.remoteDescription || remoteDescSet) {
-          pc.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(() => {});
-        } else {
-          pendingCandidates.push(data.candidate);
-        }
-      }
-    });
-    if (isSender) {
-      pc.createOffer().then(offer => {
-        pc.setLocalDescription(offer);
-        socket.emit('signal', { room: roomOverride || code, fileId, data: { sdp: offer } });
-      });
-    }
+    postMessage({ fileId, chunk });
   }
 
-  // --- RECEIVER: Download button UI state ---
   function isDownloading(fileId) {
     return downloadingFiles.has(fileId);
   }
 
-  // Add a delete handler for sender
-  const handleDeleteNode = (node, type) => {
-    const newTree = deleteNodeFromTree(files, type === 'file' ? node.fileId : node.folderId, type);
-    setFiles(newTree);
-    filesRef.current = newTree;
-    setFilesMeta(flattenTree(newTree));
+  const handleDeleteFile = (fileId) => {
+    const newFiles = files.filter(f => f.fileId !== fileId);
+    setFiles(newFiles);
+    filesRef.current = newFiles;
     if (driveCode) {
-      socket.emit('file-list', { room: driveCode, filesMeta: flattenTree(newTree), fileTree: newTree });
+      const filesMeta = newFiles.map(({ name, size, type, fileId }) => ({ name, size, type, fileId }));
+      socket.emit('file-list', { room: driveCode, filesMeta });
     }
   };
-
-  // --- Recursive delete for files/folders in tree ---
-  function deleteNodeFromTree(tree, nodeId, type) {
-    return tree.filter(node => {
-      if (type === 'file' && node.type === 'file' && node.fileId === nodeId) return false;
-      if (type === 'folder' && node.type === 'folder' && node.folderId === nodeId) return false;
-      if (node.type === 'folder') {
-        node.children = deleteNodeFromTree(node.children, nodeId, type);
-      }
-      return true;
-    });
-  }
-
-  // --- Tree Accordion UI (for both sender and receiver) ---
-  function FileTreeAccordion({ tree, onFile, onFolder, parentPath = '', isSender }) {
-    return (
-      <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
-        {tree.map(node => (
-          node.type === 'folder' ? (
-            <li key={node.folderId} style={{ marginBottom: 8 }}>
-              <details>
-                <summary style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
-                  <span style={{ flex: 1 }}>{node.name}</span>
-                  {isSender ? (
-                    <button style={{ marginLeft: 8 }} onClick={e => { e.stopPropagation(); onFolder(node, 'folder'); }}>Delete Folder</button>
-                  ) : (
-                    <button style={{ marginLeft: 8 }} onClick={e => { e.stopPropagation(); onFolder(node, 'folder', parentPath); }}>Download Folder</button>
-                  )}
-                </summary>
-                <FileTreeAccordion tree={node.children} onFile={onFile} onFolder={onFolder} parentPath={parentPath + node.name + '/'} isSender={isSender} />
-              </details>
-            </li>
-          ) : (
-            <li key={node.fileId} style={{ marginLeft: 16, display: 'flex', alignItems: 'center' }}>
-              <span style={{ flex: 1 }}>{node.name} ({node.size.toLocaleString()} bytes)</span>
-              {isSender ? (
-                <button style={{ marginLeft: 8 }} onClick={() => onFile(node, 'file')}>Delete</button>
-              ) : (
-                <button style={{ marginLeft: 8 }} onClick={() => onFile(node, 'file', parentPath)}>Download</button>
-              )}
-            </li>
-          )
-        ))}
-      </ul>
-    );
-  }
 
   // --- UI ---
   if (step === 'init') {
     return (
       <div className="container">
         <h2>Send Files (noUSB style)</h2>
-        <Dropzone onDrop={handleDrop} multiple>
-          {({ getRootProps, getInputProps }) => (
-            <div {...getRootProps()} style={{ border: '2px dashed #ccc', padding: 40, cursor: 'pointer', marginBottom: 20 }}>
-              <input {...getInputProps()} />
-              <p>Drag and drop files here, or click to select files</p>
-            </div>
-          )}
-        </Dropzone>
+        <DropzoneArea onDrop={handleDrop} text="Drag and drop files here, or click to select files" />
         <div style={{ color: '#e74c3c', marginBottom: '1em', fontWeight: 'bold' }}>
           Files will only be available while this tab is open. Do NOT reload or close this tab.
         </div>
@@ -539,30 +305,11 @@ function App() {
     return (
       <div className="container">
         <h2>Drive Hosting</h2>
-        <QRCode value={receiverUrl} size={200} />
-        <div>Drive code: <b>{driveCode}</b></div>
-        <div>Share this code, QR, or link with receivers.</div>
-        <div style={{ margin: '10px 0' }}>
-          <input type="text" value={receiverUrl} readOnly style={{ width: '70%' }} onFocus={e => e.target.select()} />
-          <button style={{ marginLeft: 8 }} onClick={() => {navigator.clipboard.writeText(receiverUrl)}}>Copy Link</button>
-        </div>
-        <div style={{ margin: '10px 0' }}>
-          <a href={receiverUrl} target="_blank" rel="noopener noreferrer">Open Drive Link</a>
-        </div>
+        <QRCodeBlock receiverUrl={receiverUrl} driveCode={driveCode} />
+        <DriveLinkBlock receiverUrl={receiverUrl} />
         <div style={{ marginTop: 20 }}>
-          <Dropzone onDrop={handleDrop} multiple webkitdirectory="true" directory="true">
-            {({ getRootProps, getInputProps }) => (
-              <div {...getRootProps()} style={{ border: '2px dashed #ccc', padding: 40, cursor: 'pointer', marginBottom: 20 }}>
-                <input {...getInputProps()} webkitdirectory="true" directory="true" />
-                <p>Drag and drop more files or folders here, or click to select</p>
-              </div>
-            )}
-          </Dropzone>
-          {files.length === 0 ? (
-            <div style={{ color: '#e74c3c', fontWeight: 'bold' }}>[No files or folders detected. Try uploading a folder, not just files.]</div>
-          ) : (
-            <FileTreeAccordion tree={files} onFile={handleDeleteNode} onFolder={handleDeleteNode} isSender={true} />
-          )}
+          <DropzoneArea onDrop={handleDrop} text="Drag and drop more files here, or click to select" />
+          <FileList files={files} onDelete={handleDeleteFile} isSender={true} />
         </div>
         <div style={{ color: '#e74c3c', marginBottom: '1em', fontWeight: 'bold' }}>
           Do NOT reload or close this tab, or your files will be lost and the drive will stop working!
@@ -574,30 +321,19 @@ function App() {
     return (
       <div className="container">
         <h2>Files in Drive</h2>
-        {receiverFilesMeta.length === 0 ? (
-          <div style={{ color: '#e74c3c', fontWeight: 'bold' }}>[No files or folders detected. Try uploading a folder, not just files.]</div>
-        ) : (
-          <FileTreeAccordion
-            tree={receiverFilesMeta}
-            onFile={(node) => handleDownloadRequest(node.fileId)}
-            onFolder={(node, type, parentPath) => alert('Download folder as zip: ' + (parentPath || '') + node.name)}
-            isSender={false}
-          />
-        )}
-        {error && <div style={{ color: '#e74c3c', fontWeight: 'bold' }}>{error}</div>}
+        <FileList files={receiverFilesMeta} onDownload={handleDownloadRequest} isSender={false} isDownloading={isDownloading} />
+        <ErrorBanner error={error} />
         <button onClick={() => window.location.reload()}>Enter New Drive Code</button>
       </div>
     );
   }
 
-  // If we land in receiver mode from URL, auto-join the drive on mount
   useEffect(() => {
     if (step === 'receiver' && driveCode) {
       setStep('receiver');
     }
   }, [step, driveCode]);
 
-  // Redirect to drive if path matches /:driveCode on homepage/init step (no ?as=receiver)
   useEffect(() => {
     const pathDriveCode = window.location.pathname.slice(1).toUpperCase();
     const asReceiver = new URLSearchParams(window.location.search).get('as') === 'receiver';
