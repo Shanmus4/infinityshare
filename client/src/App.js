@@ -443,7 +443,6 @@ function App() {
     handleDownloadRequest // Pass the single file download handler
   });
 
-
   // --- SENDER: Warn before leaving/reloading ---
   useEffect(() => {
     const handleBeforeUnload = (event) => {
@@ -465,7 +464,11 @@ function App() {
 
   // Update this function in your app - look for it in App.js or similar file
 
-  function sendSWMetaAndChunk(fileId, chunk, filename, mimeType, fileSize) {
+  function sendSWMetaAndChunk(fileId, chunk, filename, mimeType, fileSize, isZipping) {
+    if (isZipping) {
+      console.log('[App] sendSWMetaAndChunk called during zip, skipping SW');
+      return;
+    }
     if (!navigator.serviceWorker.controller) {
       console.error("[App] No service worker controller available");
       return;

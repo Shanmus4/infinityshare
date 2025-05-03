@@ -45,7 +45,7 @@ self.addEventListener('fetch', (event) => {
           });
           // Flush any pending messages for this fileId
           if (pendingChunks[fileId]) {
-            console.log('[SW] Flushing pending messages for', fileId, pendingChunks[fileId]);
+            //console.log('[SW] Flushing pending messages for', fileId, pendingChunks[fileId]);
             pendingChunks[fileId].forEach(msg => {
               if (msg.type === 'meta') {
                 streams[fileId].meta = { filename: msg.filename, mimetype: msg.mimetype };
@@ -55,7 +55,7 @@ self.addEventListener('fetch', (event) => {
                 try {
                   streams[fileId].controller.enqueue(new Uint8Array(msg.chunk));
                   streams[fileId].received += msg.chunk.byteLength;
-                  console.log('[SW] Flushed chunk for', fileId, msg.chunk.byteLength);
+                  //console.log('[SW] Flushed chunk for', fileId, msg.chunk.byteLength);
                 } catch (e) {
                   streams[fileId].closed = true;
                   delete streams[fileId];
@@ -67,7 +67,7 @@ self.addEventListener('fetch', (event) => {
                   if (streams[fileId] && streams[fileId].controller && !streams[fileId].closed) {
                     streams[fileId].controller.close();
                     streams[fileId].closed = true;
-                    console.log('[SW] Flushed done for', fileId);
+                    //console.log('[SW] Flushed done for', fileId);
                   }
                 } catch (e) {}
                 delete streams[fileId];
@@ -115,22 +115,22 @@ self.addEventListener('message', (event) => {
     if (!pendingChunks[fileId]) pendingChunks[fileId] = [];
     if (filename) {
       pendingChunks[fileId].push({ type: 'meta', filename, mimetype });
-      console.log('[SW] Queued meta for missing stream', fileId, event.data);
+      //console.log('[SW] Queued meta for missing stream', fileId, event.data);
     }
     if (chunk) {
       pendingChunks[fileId].push({ type: 'chunk', chunk });
-      console.log('[SW] Queued chunk for missing stream', fileId, event.data);
+      //console.log('[SW] Queued chunk for missing stream', fileId, event.data);
     }
     if (done) {
       pendingChunks[fileId].push({ type: 'done' });
-      console.log('[SW] Queued done for missing stream', fileId, event.data);
+      //console.log('[SW] Queued done for missing stream', fileId, event.data);
     }
     return;
   }
   if (filename) {
     streams[fileId].meta = { filename, mimetype };
     if (streams[fileId].metaResolve) streams[fileId].metaResolve(streams[fileId].meta);
-    console.log('[SW] Meta received for', fileId, streams[fileId].meta);
+    //console.log('[SW] Meta received for', fileId, streams[fileId].meta);
   }
   if (chunk) {
     try {
@@ -140,7 +140,7 @@ self.addEventListener('message', (event) => {
       }
       streams[fileId].controller.enqueue(new Uint8Array(chunk));
       streams[fileId].received += chunk.byteLength;
-      console.log('[SW] Chunk received for', fileId, chunk.byteLength, 'total', streams[fileId].received);
+      //console.log('[SW] Chunk received for', fileId, chunk.byteLength, 'total', streams[fileId].received);
     } catch (e) {
       streams[fileId].closed = true;
       delete streams[fileId];
@@ -152,7 +152,7 @@ self.addEventListener('message', (event) => {
       if (streams[fileId] && streams[fileId].controller && !streams[fileId].closed) {
         streams[fileId].controller.close();
         streams[fileId].closed = true;
-        console.log('[SW] Stream closed for', fileId);
+        //console.log('[SW] Stream closed for', fileId);
       }
     } catch (e) {
       console.warn('[SW] close error', e, fileId, event.data);

@@ -19,7 +19,8 @@ export function startWebRTC({
   onComplete, // Keep existing onComplete for single file download cleanup
   onChunk, // New callback for receiving chunks (used by zip download)
   onComplete: onDownloadComplete, // New callback for download completion (used by zip download)
-  onError: onDownloadError // New callback for download errors (used by zip download)
+  onError: onDownloadError, // New callback for download errors (used by zip download)
+  isZipping // Flag to indicate if zip download is in progress
 }) {
   if (!fileId) {
     console.error('[WebRTC] startWebRTC called without a fileId!');
@@ -37,7 +38,7 @@ export function startWebRTC({
   // Always set onicecandidate for both sender and receiver
   pc.onicecandidate = (event) => {
     if (event.candidate) {
-      console.log('[WebRTC] socket.emit signal (ICE)', { room: driveCode, fileId, candidate: event.candidate });
+      //console.log('[WebRTC] socket.emit signal (ICE)', { room: driveCode, fileId, candidate: event.candidate });
       socket.emit('signal', { room: driveCode, fileId, data: { candidate: event.candidate } });
     }
   };
@@ -50,15 +51,14 @@ export function startWebRTC({
     dc.onopen = () => {
       console.log('[WebRTC] Sender: Data channel open for', fileId, file?.name);
       dc.send(`META:${file.name}:${file.size}`);
-      const chunkSize = 16 * 1024; // Reduced from 64KB to 16KB for better reliability
+      const chunkSize = 8 * 1024; // Further reduced chunk size to 8KB
       let offset = 0;
-      const MAX_BUFFERED_AMOUNT = 1 * 1024 * 1024; // Reduced from 8MB to 1MB
+      const MAX_BUFFERED_AMOUNT = 512 * 1024; // Further reduced max buffered amount to 512KB
       dc.bufferedAmountLowThreshold = 256 * 1024; // 256KB threshold
-      
       function sendChunk() {
         if (offset < file.size) {
           if (dc.bufferedAmount > MAX_BUFFERED_AMOUNT) {
-            console.log('[WebRTC] Sender: Buffer full, waiting to drain for', fileId);
+            //console.log('[WebRTC] Sender: Buffer full, waiting to drain for', fileId);
             dc.onbufferedamountlow = () => {
               dc.onbufferedamountlow = null;
               setTimeout(sendChunk, 10); // Add small delay to allow processing
@@ -72,7 +72,7 @@ export function startWebRTC({
             try {
               if (dc.readyState === 'open') {
                 dc.send(e.target.result);
-                console.log('[WebRTC] Sender: Sent chunk for', fileId, file?.name, 'offset', offset, 'size', nextChunkSize);
+                //console.log('[WebRTC] Sender: Sent chunk for', fileId, file?.name, 'offset', offset, 'size', nextChunkSize);
                 offset += nextChunkSize;
                 setTimeout(sendChunk, 0); // Use setTimeout to prevent call stack overflow
               } else {
@@ -105,6 +105,7 @@ export function startWebRTC({
     });
   }
   pc.ondatachannel = (event) => {
+    console.log('[WebRTC] Receiver: ondatachannel event triggered for', fileId);
     const dc = event.channel;
     dc.binaryType = 'arraybuffer';
     dataChannels.current[fileId] = dc;
@@ -130,7 +131,7 @@ export function startWebRTC({
         if (!onChunk) {
             if (fileId && navigator.serviceWorker.controller) {
                 metaSent = true;
-                sendSWMetaAndChunk(fileId, null, filename, 'application/octet-stream', expectedSize);
+                sendSWMetaAndChunk(fileId, null, filename, 'application/octet-stream', expectedSize, isZipping);
                 console.log('[WebRTC] Receiver: META sent to SW for single download', fileId);
             } else {
                  console.warn('[WebRTC] Receiver: META received but no SW controller or onChunk callback for', fileId);
@@ -159,32 +160,33 @@ export function startWebRTC({
           // Give SW time to process before cleaning up this specific connection
           setTimeout(() => {
             cleanupWebRTCInstance(fileId);
-            if (onComplete) onComplete(); // Call original onComplete if provided
-          }, 500);
+            if (onDownloadComplete) onDownloadComplete(); // Call new onDownloadComplete if provided
+          }, 1000); // Increased delay to 1000ms
         }
         // Else (fallback, should not happen with SW)
         else {
-           const blob = new Blob(receivedChunks);
-           const url = URL.createObjectURL(blob);
-           const a = document.createElement('a');
-           a.href = url;
-           a.download = filename;
-           document.body.appendChild(a);
-           a.click();
-           setTimeout(() => {
-             URL.revokeObjectURL(url);
-             document.body.removeChild(a);
-           }, 5000);
-           cleanupWebRTCInstance(fileId);
-           if (onComplete) onComplete();
-        }
-      } else {
+         const blob = new Blob(receivedChunks);
+         const url = URL.createObjectURL(blob);
+         const a = document.createElement('a');
+         a.href = url;
+         a.download = filename;
+         document.body.appendChild(a);
+         a.click();
+         setTimeout(() => {
+           URL.revokeObjectURL(url);
+           document.body.removeChild(a);
+         }, 5000);
+         cleanupWebRTCInstance(fileId);
+         if (onDownloadComplete) onDownloadComplete();
+       }
+     } else {
         // Received a data chunk (ArrayBuffer)
         if (onChunk) {
-          // If using callbacks (zip download), pass chunk to the callback.
-          onChunk(e.data);
-          // console.log('[WebRTC] Receiver: Chunk passed to onChunk callback for zip download', fileId); // Verbose log
-        }
+            // If using callbacks (zip download), pass chunk to the callback.
+            console.log('[WebRTC] Receiver: Chunk received for zip download', fileId, 'transferFileId', fileId, 'data length', e.data.byteLength);
+            onChunk(e.data);
+            //console.log('[WebRTC] Receiver: Chunk passed to onChunk callback for zip download', fileId); // Verbose log
+          }
         // Else if using Service Worker (single download)
         else if (fileId && navigator.serviceWorker.controller) {
           // Ensure metadata was sent first (fallback for single download)
@@ -194,7 +196,10 @@ export function startWebRTC({
              sendSWMetaAndChunk(fileId, null, filename, 'application/octet-stream', expectedSize);
           }
           // console.log('[WebRTC] Receiver: Sending chunk to SW for single download', fileId); // Verbose log
-          sendSWMetaAndChunk(fileId, e.data);
+          // Only send to SW if not using zip download callbacks
+          if (!onChunk) {
+            sendSWMetaAndChunk(fileId, e.data);
+          }
         }
         // Else (fallback, or if SW/callback not ready)
         else {
