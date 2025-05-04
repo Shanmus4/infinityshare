@@ -121,6 +121,7 @@ function App() {
 
   // --- SENDER: Upload files and create drive, or add more files (flat version) ---
   const handleDrop = (acceptedFiles) => {
+    console.log(`[handleDrop DEBUG] Fired at ${new Date().toLocaleTimeString()} with ${acceptedFiles.length} files.`); // Add timestamped log
     if (!acceptedFiles.length) return;
     // Capture the path property provided by react-dropzone
     const filesWithIds = acceptedFiles.map((f) => {
