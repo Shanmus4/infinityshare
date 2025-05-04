@@ -9,13 +9,14 @@
   - Added Delete/Download buttons for folders in `FileList.js`.
   - Added `handleDeleteFolder` in `App.js`.
   - Refactored `useZipDownload.js` to handle both "Download All" and specific folder downloads (using `startZipProcess(folderPath?)`).
+- **Fixed:** Moved speed/ETR calculation back into `onmessage` handler for accuracy (2025-05-04 4:16 PM)
   - Updated sender (`App.js`) to handle folder download requests via `isFolderRequest` flag.
   - Integrated refactored `useZipDownload` hook into `App.js` receiver view for both button types.
   - Removed unused `useFolderDownload.js` hook.
 - [ ] **Feature:** Add mobile-optimized UI
 - [ ] **Improvement/Security:** Implement rate limiting on `signaling-server` events (e.g., `create-room`, `join-room`) to prevent abuse. (Discovered 2025-05-04)
 - [ ] **Deployment:** Configure TLS/SSL for production deployment (Mentioned in docs) - **Partially Done (2025-05-04):** Signaling server (`signaling-server/index.js`) updated to support HTTPS via `SSL_CERT_PATH` and `SSL_KEY_PATH` environment variables. Actual certificate provisioning and web server (hosting client) HTTPS configuration still required in deployment environment.
-
+  
 ## Completed Tasks (Verified 2025-05-04)
 
 - [x] **BUG & Improvements:** Fix and enhance "Download All" ZIP functionality (User Request, Completed 2025-05-04 1:24 PM)

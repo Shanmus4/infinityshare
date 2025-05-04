@@ -161,6 +161,37 @@ export function useZipDownload({
                      const downloadPercent = (receivedBytes / totalSizeToDownload) * (100 * downloadWeight);
                      setZipProgress(downloadPercent);
                  }
+
+                 // --- Calculate Speed and ETR (Moved back inside onmessage) ---
+                 const now = Date.now();
+                 // Calculate speed roughly every second or half-second
+                 if (now - lastSpeedCheckTime.current > 500) { // Check every 500ms
+                     const bytesSinceLastCheck = totalBytesReceived.current - lastSpeedCheckBytes.current;
+                     const timeSinceLastCheck = (now - lastSpeedCheckTime.current) / 1000; // seconds
+
+                     if (timeSinceLastCheck > 0) {
+                         const currentSpeed = bytesSinceLastCheck / timeSinceLastCheck;
+                         setDownloadSpeed(currentSpeed);
+
+                         // Calculate ETR
+                         // Use currentZipOperation.current.totalSize if available, otherwise fallback
+                         const currentTotalSize = currentZipOperation.current?.totalSize || totalSizeToDownload || 0;
+                         if (currentSpeed > 0 && currentTotalSize > 0) {
+                             const bytesRemaining = currentTotalSize - totalBytesReceived.current;
+                             const currentEtr = bytesRemaining / currentSpeed; // ETR in seconds
+                             setEtr(currentEtr >= 0 ? currentEtr : null); // Ensure ETR is not negative
+                         } else {
+                             setEtr(null); // Cannot estimate if speed is 0
+                         }
+                     } else {
+                         // Avoid division by zero if checks happen too fast
+                         // Keep previous speed/ETR in this case
+                     }
+
+                     lastSpeedCheckTime.current = now;
+                     lastSpeedCheckBytes.current = totalBytesReceived.current;
+                 }
+                 // -------------------------------------------------------
             }
         };
         dc.onerror = (err) => {
@@ -205,34 +236,7 @@ export function useZipDownload({
     currentZipOperation.current.totalSize = totalSizeToDownload;
 
 
-    // --- Speed/ETR Calculation Interval ---
-    const speedInterval = setInterval(() => {
-        if (!isZipping) { // Check isZipping state directly
-             clearInterval(speedInterval);
-             return;
-        }
-        const now = Date.now();
-        const bytesSinceLastCheck = totalBytesReceived.current - lastSpeedCheckBytes.current;
-        const timeSinceLastCheck = (now - lastSpeedCheckTime.current) / 1000;
-
-        if (timeSinceLastCheck > 0.5) { // Update roughly every 0.5s+
-            const currentSpeed = bytesSinceLastCheck / timeSinceLastCheck;
-            setDownloadSpeed(currentSpeed);
-
-            if (currentSpeed > 0 && totalSizeToDownload > 0) {
-                const bytesRemaining = totalSizeToDownload - totalBytesReceived.current;
-                const currentEtr = bytesRemaining / currentSpeed;
-                setEtr(currentEtr >= 0 ? currentEtr : null); // Ensure ETR is not negative
-            } else {
-                setEtr(null);
-            }
-            lastSpeedCheckTime.current = now;
-            lastSpeedCheckBytes.current = totalBytesReceived.current;
-        }
-    }, 1000); // Check speed every second
-
-    // Cleanup interval when component unmounts or operation finishes
-     return () => clearInterval(speedInterval);
+    // REMOVED Speed/ETR Calculation Interval - Moved into onmessage handler
 
 
   }, [isZipping, receiverFilesMeta, driveCode, socket, cleanupWebRTCInstance, makeFileId, handleDownloadRequest, peerConns, dataChannels, pendingSignals, handleSignal]);
