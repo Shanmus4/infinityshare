@@ -3,6 +3,7 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 // import { startWebRTC } from './useWebRTC'; // No longer used directly here for receiver
 import { setupZipReceiverConnection } from '../utils/setupZipReceiverConnection'; // Import the new utility
+import { ICE_SERVERS } from '../utils/signaling'; // Import ICE_SERVERS
 
 export function useZipDownload({
   receiverFilesMeta,
@@ -12,8 +13,9 @@ export function useZipDownload({
   makeFileId,
   handleDownloadRequest, // Still needed for single file fallback
   peerConns, // Need peerConns ref from App.js
-  dataChannels // Need dataChannels ref from App.js
-  // zipCallbacksRef // REMOVED - passing functions directly
+  dataChannels, // Need dataChannels ref from App.js
+  pendingSignals, // Ref from App.js for buffered signals
+  handleSignal // Function from App.js to process signals
 }) {
   const [isZipping, setIsZipping] = useState(false);
   const [zipProgress, setZipProgress] = useState(0); // 0 to 100
@@ -48,8 +50,8 @@ export function useZipDownload({
     setDownloadProgress({});
     setError('');
     fileData.current = {}; // Clear previous data
-    const transferIdToOriginalIdMap = new Map(); // Map to link transfer IDs to original file IDs
-    const activeTransferIds = []; // Store active transfer IDs for cleanup
+    const transferIdToOriginalIdMap = new Map(); // Map channel labels (transfer IDs) to original file IDs
+    const activeTransferIds = []; // Store active transfer IDs (channel labels) for cleanup/tracking
 
     const zip = new JSZip();
     let filesDownloaded = 0;
@@ -162,45 +164,148 @@ export function useZipDownload({
         handleFileError: handleFileErrorCallback,
     };
 
-    // Initiate download for each file
-    console.log('[useZipDownload] startDownloadAll: initiating download for', receiverFilesMeta.length, 'files');
-    receiverFilesMeta.forEach(fileMeta => {
-      const transferFileId = makeFileId(); // Generate a unique ID for this transfer attempt
-      transferIdToOriginalIdMap.set(transferFileId, fileMeta.fileId); // Store the mapping
-      activeTransferIds.push(transferFileId); // Store for cleanup
-      console.log(`[useZipDownload] Setting up Zip Receiver for file: ${fileMeta.name} (originalId: ${fileMeta.fileId}, transferId: ${transferFileId})`);
+    // --- Create ONE PeerConnection for the entire zip transfer ---
+    const mainZipPcId = `zip-pc-${makeFileId()}`; // Unique ID for this zip download attempt's PC
+    console.log(`[useZipDownload] Creating main PeerConnection for zip download: ${mainZipPcId}`);
+    cleanupWebRTCInstance(mainZipPcId); // Clean up any previous main zip PC for this hook instance
 
-      // Call the new utility function to set up the receiver connection
-      const pc = setupZipReceiverConnection({
-          transferFileId,
-          peerConns, // Pass the main peerConns ref from App.js
-          dataChannels, // Pass the main dataChannels ref from App.js
-          zipCallbacks, // Pass the actual callback functions
-          socket,
-          driveCode
-      });
+    // Ensure ICE servers are available (read from signaling.js, handled by App.js import)
+    // We assume ICE_SERVERS is correctly imported and available via setupZipReceiverConnection's scope or passed if needed.
+    // For simplicity, let's assume setupZipReceiverConnection handles ICE_SERVERS internally for now.
+    // If not, we'd need to import ICE_SERVERS here or pass it down.
 
-      if (pc) {
-          // Store the created peer connection in the shared ref IMMEDIATELY
-          peerConns.current[transferFileId] = pc;
-          console.log(`[useZipDownload] Stored peer connection for zip transferId: ${transferFileId}`);
+    const pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS }); // Use imported ICE_SERVERS
+    peerConns.current[mainZipPcId] = pc; // Store the single PC
 
-          // NOW Emit download request via signaling server AFTER peer connection is set up and stored
-          console.log(`[useZipDownload] Emitting download-file request for transferId: ${transferFileId}`);
-          socket.emit('download-file', {
+    // --- Setup Handlers for the Main PC ---
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        console.log(`[useZipDownload] Emitting ICE candidate for main zip connection ${mainZipPcId}`);
+        socket.emit('signal', { room: driveCode, fileId: mainZipPcId, data: { candidate: event.candidate } });
+      } else {
+        console.log(`[useZipDownload] End of ICE candidates for ${mainZipPcId}.`);
+      }
+    };
+
+    pc.onicecandidateerror = (event) => {
+      // Log non-fatal errors, let connection state handle fatal ones
+      console.error(`[useZipDownload] Main zip PC ICE candidate error for ${mainZipPcId}:`, event);
+       if (event.errorCode) {
+           console.error(`  Error Code: ${event.errorCode}, Host Candidate: ${event.hostCandidate}, Server URL: ${event.url}, Text: ${event.errorText}`);
+       }
+       // Don't trigger handleFileErrorCallback here for the whole zip
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log(`[useZipDownload] Main zip PC connection state change for ${mainZipPcId}: ${pc.connectionState}`);
+      if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
+         console.error(`[useZipDownload] Main zip PC ${mainZipPcId} failed/disconnected/closed.`);
+         setError('Zip download connection failed.');
+         setIsZipping(false);
+         setZipProgress(0);
+         setDownloadProgress({});
+         // Cleanup the main PC and potentially associated channels?
+         cleanupWebRTCInstance(mainZipPcId);
+         // Also cleanup any channels associated with this failed PC?
+         activeTransferIds.forEach(id => {
+             // We might need a more robust way to track channels associated with this PC
+             // For now, assume cleanupWebRTCInstance handles related resources if needed,
+             // or enhance cleanupWebRTCInstance later.
+             delete dataChannels.current[id]; // Remove channel refs
+         });
+      }
+    };
+
+     pc.onsignalingstatechange = () => {
+       console.log(`[useZipDownload] Main zip PC signaling state change for ${mainZipPcId}: ${pc.signalingState}`);
+     };
+
+    // --- Central Data Channel Handler ---
+    pc.ondatachannel = (event) => {
+        const dc = event.channel;
+        const transferFileId = dc.label; // Get the transfer ID (channel label)
+        console.log(`[useZipDownload] Received data channel request for transferId: ${transferFileId}`);
+
+        if (!transferIdToOriginalIdMap.has(transferFileId)) {
+            console.error(`[useZipDownload] Received data channel for unknown transferId/label: ${transferFileId}`);
+            dc.close(); // Close unexpected channels
+            return;
+        }
+
+        dataChannels.current[transferFileId] = dc; // Store channel by its label/transferId
+        dc.binaryType = 'arraybuffer';
+
+        dc.onopen = () => {
+            console.log(`[useZipDownload] DataChannel opened for transferId: ${transferFileId}`);
+        };
+
+        dc.onmessage = (e) => {
+            // Use the existing callbacks, passing the correct transferFileId
+            if (typeof e.data === 'string' && e.data.startsWith('EOF:')) {
+                 if (zipCallbacks.handleFileComplete) zipCallbacks.handleFileComplete(transferFileId);
+            } else if (e.data instanceof ArrayBuffer) {
+                 if (zipCallbacks.handleFileData) zipCallbacks.handleFileData(transferFileId, e.data);
+            } else if (typeof e.data === 'string' && e.data.startsWith('META:')) {
+                 console.log(`[useZipDownload] META received (and ignored by receiver) for transferId: ${transferFileId}`);
+                 // Meta is handled by sender setting up the channel
+            } else {
+                 console.warn(`[useZipDownload] Received unexpected message type for ${transferFileId}:`, typeof e.data);
+            }
+        };
+
+        dc.onerror = (err) => {
+            console.error(`[useZipDownload] DataChannel error for transferId: ${transferFileId}`, err);
+            // Trigger error for the specific file, not the whole zip (unless desired)
+            if (zipCallbacks.handleFileError) zipCallbacks.handleFileError(transferFileId, err);
+            // Should we remove this channel from dataChannels ref?
+            delete dataChannels.current[transferFileId];
+        };
+
+        dc.onclose = () => {
+            console.log(`[useZipDownload] DataChannel closed for transferId: ${transferFileId}`);
+            // Check if file was completed? If not, maybe trigger error?
+            // This might be redundant if onerror or handleFileComplete already handled it.
+            delete dataChannels.current[transferFileId]; // Clean up ref on close
+        };
+    };
+
+    // --- Process Pending Signals for the Main PC ---
+    // Note: App.js needs to be updated to use mainZipPcId for zip signals
+    if (pendingSignals && pendingSignals.current[mainZipPcId]) {
+        console.log(`[useZipDownload] Processing ${pendingSignals.current[mainZipPcId].length} pending signals for ${mainZipPcId}`);
+        pendingSignals.current[mainZipPcId].forEach(signalData => {
+          // Assuming handleSignal is correctly passed and handles { fileId: mainZipPcId, ... }
+          handleSignal({ fileId: mainZipPcId, ...signalData });
+        });
+        delete pendingSignals.current[mainZipPcId];
+    }
+
+    // --- Initiate Channel Requests Sequentially ---
+    console.log('[useZipDownload] Initiating data channel requests for', receiverFilesMeta.length, 'files on PC:', mainZipPcId);
+    const delay = ms => new Promise(resolve => setTimeout(resolve, ms)); // Keep delay helper
+
+    for (const fileMeta of receiverFilesMeta) {
+        const transferFileId = makeFileId(); // ID for the channel and file data tracking
+        transferIdToOriginalIdMap.set(transferFileId, fileMeta.fileId);
+        activeTransferIds.push(transferFileId); // Track active channels
+
+        console.log(`[useZipDownload] Emitting download-file request for originalId: ${fileMeta.fileId}, channelLabel: ${transferFileId}, using mainPcId: ${mainZipPcId}`);
+        socket.emit('download-file', {
             room: driveCode,
-            fileId: fileMeta.fileId, // Original file ID
-            transferFileId: transferFileId, // New transfer ID
+            fileId: fileMeta.fileId,        // Original ID for sender lookup
+            transferFileId: transferFileId, // Unique ID for this specific file transfer / channel label
+            mainPcId: mainZipPcId,          // ID of the single PeerConnection to use/create
             name: fileMeta.name,
             size: fileMeta.size,
             type: fileMeta.type,
-            isZipRequest: true // Add flag to indicate zip request
-          });
-      } else {
-          console.error(`[useZipDownload] Failed to setup zip receiver connection for ${transferFileId}`);
-          handleFileErrorCallback(transferFileId, new Error("Failed to setup receiver connection"));
-      }
-    });
+            isZipRequest: true
+        });
+
+        // Keep delay between *requests* to potentially avoid overwhelming sender/signaling
+        console.log(`[useZipDownload] Waiting 500ms before next file request...`); // Reduced delay slightly
+        await delay(500);
+    }
   };
 
   // Need to adapt startWebRTC to use onChunk, onComplete, onError callbacks

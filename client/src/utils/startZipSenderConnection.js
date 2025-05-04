@@ -24,12 +24,12 @@ export function startZipSenderConnection({
   }
 
   // Cleanup any existing connection for this ID *before* creating a new one
-  cleanupWebRTCInstance(transferFileId);
+  // cleanupWebRTCInstance(transferFileId); // Let's comment this out - cleanup should happen on completion/error
 
   const pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS });
   peerConns.current[transferFileId] = pc; // Store sender PC
 
-  // --- Detailed Logging ---
+  // --- Detailed Logging ADDED ---
   pc.oniceconnectionstatechange = () => {
     console.log(`[ZipSender] ICE connection state change for ${transferFileId}: ${pc.iceConnectionState}`);
   };
@@ -55,10 +55,11 @@ export function startZipSenderConnection({
 
   pc.onicecandidate = (event) => {
     if (event.candidate) {
+      console.log(`[ZipSender] Emitting ICE candidate for ${transferFileId}:`, event.candidate.type, event.candidate.sdpMid, event.candidate.sdpMLineIndex);
       // Use the main 'signal' event
       socket.emit('signal', { room: driveCode, fileId: transferFileId, data: { candidate: event.candidate } });
     } else {
-       console.log(`[ZipSender] End of ICE candidates for ${transferFileId}.`);
+      console.log(`[ZipSender] End of ICE candidates for ${transferFileId}.`);
     }
   };
 
@@ -69,8 +70,9 @@ export function startZipSenderConnection({
   console.log(`[ZipSender] Data channel created for transferId: ${transferFileId}`);
 
   dc.onopen = () => {
-    console.log(`[ZipSender] Data channel open for transferId: ${transferFileId}, file: ${file.name}`);
+    console.log(`[ZipSender] Data channel opened for transferId: ${transferFileId}`);
     // Send META first
+    console.log(`[ZipSender] Sending META for ${transferFileId}: ${file.name}:${file.size}`);
     dc.send(`META:${file.name}:${file.size}`);
 
     // Configuration for sending chunks
@@ -93,10 +95,13 @@ export function startZipSenderConnection({
         const reader = new FileReader();
         reader.onload = (e) => {
           try {
+            // console.log(`[ZipSender] Attempting send chunk for ${transferFileId}, offset: ${offset}, size: ${e.target.result.byteLength}`); // Too noisy
             if (dc.readyState === 'open') {
               dc.send(e.target.result);
               offset += nextChunkSize;
-              setTimeout(sendChunk, 0); // Schedule next chunk send
+              // Use requestAnimationFrame for potentially smoother sending loop
+              requestAnimationFrame(sendChunk);
+              // setTimeout(sendChunk, 0); // Schedule next chunk send
             } else {
               console.error(`[ZipSender] Data channel not open for ${transferFileId}:`, dc.readyState);
               setError && setError(`ZipSender: DataChannel closed unexpectedly for ${file.name}`);
@@ -116,8 +121,8 @@ export function startZipSenderConnection({
         reader.readAsArrayBuffer(slice);
       } else {
         // All chunks sent, send EOF
+        console.log(`[ZipSender] Sending EOF for ${transferFileId}: ${file.name}`);
         dc.send('EOF:' + file.name);
-        console.log(`[ZipSender] Sent EOF for transferId: ${transferFileId}, file: ${file.name}`);
         // Note: Sender cleanup might happen later or be triggered by receiver confirmation
       }
     }
@@ -131,14 +136,14 @@ export function startZipSenderConnection({
   };
 
   dc.onclose = () => {
-      console.log(`[ZipSender] DataChannel closed for transferId: ${transferFileId}`);
-      // Consider if cleanup is needed here if closed unexpectedly before EOF
+    console.log(`[ZipSender] DataChannel closed for transferId: ${transferFileId}`);
+    // Consider if cleanup is needed here if closed unexpectedly before EOF
   };
 
   // Create and send offer
   pc.createOffer().then(offer => {
     pc.setLocalDescription(offer);
-    console.log(`[ZipSender] Emitting offer signal for transferId: ${transferFileId}`);
+    console.log(`[ZipSender] Emitting offer signal for ${transferFileId}`);
     // Use the main 'signal' event
     socket.emit('signal', { room: driveCode, fileId: transferFileId, data: { sdp: offer } });
   }).catch(e => {

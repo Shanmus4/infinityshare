@@ -7,10 +7,11 @@ import ErrorBanner from "./components/ErrorBanner";
 import { useSocket } from "./hooks/useSocket";
 import { useServiceWorker } from "./hooks/useServiceWorker";
 import { startWebRTC } from "./hooks/useWebRTC"; // For single file downloads
-import { startZipSenderConnection } from "./utils/startZipSenderConnection"; // For zip sender
+// import { startZipSenderConnection } from "./utils/startZipSenderConnection"; // REMOVED - Logic integrated into App.js downloadHandler
 // setupZipReceiverConnection is used inside useZipDownload now
 import { makeFileId } from "./utils/fileHelpers";
 import { useZipDownload } from "./hooks/useZipDownload"; // Import the new hook
+import { ICE_SERVERS } from "./utils/signaling"; // Import ICE_SERVERS
 
 function App() {
   function getInitialStepAndDriveCode() {
@@ -43,104 +44,79 @@ function App() {
   const socket = useSocket();
   const { postMessage } = useServiceWorker();
   const pendingSignals = useRef({});
-  window.pendingSignals = pendingSignals.current; // For debugging maybe?
-  // REMOVED zipDownloadCallbacks ref - no longer needed
+  window.pendingSignals = pendingSignals.current;
 
   useEffect(() => {
     filesRef.current = files;
   }, [files]);
 
-  // --- Register all socket event listeners at the top level ---
-  useEffect(() => {
-    function handleSignal({ fileId, data, room }) {
-      // console.log(`[App] handleSignal received for fileId: ${fileId}`, data); // Verbose: Log full signal data
+  // --- Define handleSignal using useCallback for stable reference ---
+  const handleSignal = React.useCallback(
+    // Function definition starts here
+    ({ fileId, data, room }) => {
       const pc = peerConns.current[fileId];
+      // console.log(`[App] handleSignal called for ${fileId}. PC exists? ${!!pc}`);
       if (!pc) {
-        // console.log(`[App] handleSignal: No peer connection found for ${fileId}, buffering signal.`); // Keep for debugging buffering issues if needed
-        // Buffer the signal for later
-        if (!pendingSignals.current[fileId])
+        // console.log(`[App] Signal received for unknown peer ${fileId}, buffering.`);
+        if (!pendingSignals.current[fileId]) {
           pendingSignals.current[fileId] = [];
+        }
         pendingSignals.current[fileId].push({ data, room });
-        return;
+        return; // Explicit return when buffering
       }
-      // console.log(`[App] handleSignal: Found peer connection for ${fileId}. Processing signal.`); // Verbose
+
+      // console.log(`[App] Processing signal for ${fileId}`);
       if (data && data.sdp) {
-        if (data.sdp.type === "offer") {
-          // console.log(`[App] handleSignal: Received OFFER for ${fileId}`); // Verbose
-          pc.setRemoteDescription(new RTCSessionDescription(data.sdp)).then(
-            () => {
-              // console.log(`[App] handleSignal: Remote description (offer) set for ${fileId}`); // Verbose
-              pc.createAnswer().then((answer) => {
-                // console.log(`[App] handleSignal: Created ANSWER for ${fileId}`); // Verbose
-                pc.setLocalDescription(answer);
-                // console.log("[App] handleSignal: Emitting ANSWER for", { // Verbose: Logs full SDP
-                //   room: driveCode,
-                //   fileId,
-                //   sdp: answer,
-                // });
-                socket.emit("signal", {
-                  room: driveCode,
-                  fileId,
-                  data: { sdp: answer },
-                });
-              });
-            }
-          );
-        } else if (data.sdp.type === "answer") {
-          // console.log(`[App] handleSignal: Received ANSWER for ${fileId}`); // Verbose
-          pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        // Handle SDP Offer/Answer
+        const sdp = new RTCSessionDescription(data.sdp);
+        if (sdp.type === "offer") {
+          // console.log(`[App] Processing OFFER for ${fileId}`);
+          pc.setRemoteDescription(sdp)
+            .then(() => pc.createAnswer()) // Chain promises
+            .then((answer) => pc.setLocalDescription(answer))
+            .then(() => {
+              // Ensure localDescription is set before emitting
+              if (pc.localDescription) {
+                 socket.emit("signal", {
+                   room: driveCode,
+                   fileId,
+                   data: { sdp: pc.localDescription },
+                 });
+              } else {
+                 console.error(`[App] Local description not set before emitting answer for ${fileId}`);
+              }
+            })
+            .catch((e) => console.error(`[App] Error handling offer for ${fileId}:`, e));
+        } else if (sdp.type === "answer") {
+          // console.log(`[App] Processing ANSWER for ${fileId}`);
+          pc.setRemoteDescription(sdp)
+            .catch((e) => console.error(`[App] Error setting remote description (answer) for ${fileId}:`, e));
         }
       } else if (data && data.candidate) {
-        // console.log(`[App] handleSignal: Received ICE CANDIDATE for ${fileId}`); // Verbose
-        pc.addIceCandidate(new RTCIceCandidate(data.candidate))
-          .catch(e => console.error(`[App] handleSignal: Error adding ICE candidate for ${fileId}:`, e)); // Keep error handling
+        // Handle ICE Candidate
+        // console.log(`[App] Processing ICE CANDIDATE for ${fileId}`);
+        const candidate = new RTCIceCandidate(data.candidate);
+        pc.addIceCandidate(candidate)
+          .catch((e) => {
+            // Ignore benign errors like candidate already added or connection closed
+             if (!e.message.includes("OperationError") && !e.message.includes("InvalidStateError")) {
+               console.error(`[App] Error adding ICE candidate for ${fileId}:`, e);
+             }
+          });
       }
-    }
+    },
+    // Dependency array for useCallback
+    [socket, peerConns, dataChannels, driveCode]
+  ); // Closing parenthesis for useCallback call
+
+  // --- Register socket listener ---
+  useEffect(() => {
     socket.on("signal", handleSignal);
-
-    // Listener for zip download peer setup
-    const handlePrepareZipPeer = ({ transferFileId }) => {
-      // console.log(`[App] Received prepare-zip-download-peer for transferId: ${transferFileId}`); // Keep for debugging zip setup
-      if (!zipDownloadCallbacks.current || !zipDownloadCallbacks.current.handleFileData) {
-        console.error("[App] Zip download callbacks ref not available or not populated!"); // Keep error
-        // Handle error appropriately
-        return;
-      }
-
-      cleanupWebRTCInstance(transferFileId); // Ensure clean state
-
-      // Use the utility to setup the receiver connection
-      // It returns the pc object
-      const pc = setupZipReceiverConnection({
-          transferFileId,
-          // peerConns, // setupZipReceiverConnection doesn't need this ref
-          dataChannels, // Pass the main dataChannels ref
-          zipCallbacks: zipDownloadCallbacks.current, // Pass the actual callbacks object
-          socket,
-          driveCode
-      });
-
-      if (pc) {
-          // Store the created peer connection in the shared ref IMMEDIATELY
-          peerConns.current[transferFileId] = pc;
-          // console.log(`[App] Stored peer connection for zip transferId: ${transferFileId}`); // Keep for debugging zip setup
-          // Now the peer connection exists before handleSignal processes the offer/candidate
-      } else {
-           console.error(`[App] Failed to setup zip receiver connection via utility for ${transferFileId}`); // Keep error
-           // Optionally call error callback if setup fails
-           if (zipDownloadCallbacks.current.handleFileError) {
-               zipDownloadCallbacks.current.handleFileError(transferFileId, new Error("Failed to setup receiver connection"));
-           }
-      }
-    };
-
-    socket.on('prepare-zip-download-peer', handlePrepareZipPeer);
-
+    // REMOVED prepare-zip-download-peer listener logic
     return () => {
       socket.off("signal", handleSignal);
-      socket.off('prepare-zip-download-peer', handlePrepareZipPeer); // Cleanup listener
     };
-  }, [socket, peerConns, dataChannels, driveCode]); // REMOVED zipDownloadCallbacks dependency
+  }, [socket, handleSignal]); // Use handleSignal from useCallback
 
   // --- SENDER: Upload files and create drive, or add more files (flat version) ---
   const handleDrop = (acceptedFiles) => {
@@ -243,18 +219,19 @@ function App() {
 
   // --- SENDER: Listen for download-file and start appropriate WebRTC ---
   useEffect(() => {
-    const downloadHandler = ({
+    const downloadHandler = async ({ // Make handler async for potential await later if needed
       fileId: requestedFileId,
-      transferFileId,
+      transferFileId, // This is the unique ID for the specific file/channel
+      mainPcId,       // ID for the main PeerConnection (NEW)
       room,
       name,
       size,
       type,
-      isZipRequest // Check for the zip request flag
+      isZipRequest
    }) => {
-     // console.log(`[App] Sender: Received download-file request. Original fileId: ${requestedFileId}, Transfer fileId: ${transferFileId}, Name: ${name}, isZip: ${!!isZipRequest}`); // Keep for debugging requests
+     console.log(`[App Sender] Received download-file request. isZip=${isZipRequest}, mainPcId=${mainPcId}, transferFileId=${transferFileId}, requestedFileId=${requestedFileId}`);
 
-     // Always use filesRef.current to find the file
+    // Always use filesRef.current to find the file
       const fileObj = filesRef.current.find(
         (f) => f.fileId === requestedFileId
       );
@@ -264,9 +241,9 @@ function App() {
         setError("File not found for download. Please re-upload or refresh.");
         return;
       }
-      // console.log(`[App] Sender: Found fileObj for ${requestedFileId}:`, fileObj.name); // Verbose
+      // console.log(`[App] Sender: Found fileObj`);
 
-      const useTransferFileId = transferFileId || makeFileId(); // Should always have transferFileId from receiver
+      const useTransferFileId = transferFileId || makeFileId();
       if (!transferFileId) {
           console.warn(`[App] Sender: Missing transferFileId in request for ${requestedFileId}, generated: ${useTransferFileId}`); // Keep warning
       }
@@ -280,26 +257,169 @@ function App() {
         setError("File index not found for download.");
         return;
       }
-      // console.log(`[App] Sender: Found fileIndex ${fileIndex} for ${requestedFileId}`); // Verbose
+      // console.log(`[App] Sender: Found fileIndex`);
 
       if (isZipRequest) {
-        // --- Start Zip Sender ---
-        // console.log("[App] Sender: Calling startZipSenderConnection for transferId:", useTransferFileId); // Keep for debugging zip
-        startZipSenderConnection({
-          socket,
-          transferFileId: useTransferFileId,
-          driveCode,
-          file: fileObj, // Pass the full file object
-          peerConns,
-          dataChannels,
-          setError,
-          cleanupWebRTCInstance
-        });
-        // console.log(`[App] Sender: Called startZipSenderConnection for transferFileId: ${useTransferFileId}`); // Keep for debugging zip
+        // --- Zip Request: Use Single PeerConnection (mainPcId) ---
+        if (!mainPcId) {
+            console.error("[App Sender] Zip request received without mainPcId!");
+            setError("Zip download error: Missing connection ID.");
+            return;
+        }
 
-      } else {
+        let pc = peerConns.current[mainPcId];
+        let isNewPc = false;
+
+        // --- Create Main PeerConnection if it doesn't exist ---
+        if (!pc) {
+            console.log(`[App Sender] Creating NEW main PeerConnection for zip: ${mainPcId}`);
+            isNewPc = true;
+            // cleanupWebRTCInstance(mainPcId); // Cleanup previous instance if any (optional)
+            pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS }); // Use imported ICE_SERVERS
+            peerConns.current[mainPcId] = pc;
+
+            // Setup handlers for the NEW main PC
+            pc.onicecandidate = (event) => {
+              if (event.candidate) {
+                console.log(`[App Sender] Emitting ICE candidate for main zip PC ${mainPcId}`);
+                socket.emit('signal', { room: driveCode, fileId: mainPcId, data: { candidate: event.candidate } });
+              } else {
+                 console.log(`[App Sender] End of ICE candidates for ${mainPcId}.`);
+              }
+            };
+            pc.onicecandidateerror = (event) => {
+               console.error(`[App Sender] Main zip PC ICE candidate error for ${mainPcId}:`, event);
+               if (event.errorCode) {
+                   console.error(`  Error Code: ${event.errorCode}, Host Candidate: ${event.hostCandidate}, Server URL: ${event.url}, Text: ${event.errorText}`);
+               }
+               // Don't setError here for the whole zip based on candidate error
+            };
+            pc.onconnectionstatechange = () => {
+               console.log(`[App Sender] Main zip PC connection state change for ${mainPcId}: ${pc.connectionState}`);
+               if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
+                  console.error(`[App Sender] Main zip PC ${mainPcId} failed/disconnected/closed.`);
+                  setError('Zip download connection failed.');
+                  // Consider cleanup of associated channels if needed
+                  cleanupWebRTCInstance(mainPcId);
+               }
+            };
+            pc.onsignalingstatechange = () => {
+               console.log(`[App Sender] Main zip PC signaling state change for ${mainPcId}: ${pc.signalingState}`);
+            };
+
+             // Process pending signals for the NEW main PC
+             if (pendingSignals && pendingSignals.current[mainPcId]) {
+                console.log(`[App Sender] Processing ${pendingSignals.current[mainPcId].length} pending signals for NEW main PC ${mainPcId}`);
+                pendingSignals.current[mainPcId].forEach(signalData => {
+                  handleSignal({ fileId: mainPcId, ...signalData });
+                });
+                delete pendingSignals.current[mainPcId];
+             }
+
+        } else {
+             console.log(`[App Sender] Reusing existing main PeerConnection for zip: ${mainPcId}`);
+        }
+
+        // --- Create Data Channel for the specific file ---
+        // Use transferFileId as the channel label for multiplexing
+        console.log(`[App Sender] Creating DataChannel for transferId: ${useTransferFileId} on main PC: ${mainPcId}`);
+        const dc = pc.createDataChannel(useTransferFileId); // Label channel with unique transfer ID
+        dc.binaryType = 'arraybuffer';
+        dataChannels.current[useTransferFileId] = dc; // Store channel by transfer ID
+
+        // --- Setup Data Channel Handlers (File Sending Logic) ---
+        dc.onopen = () => {
+            console.log(`[App Sender] DataChannel opened for transferId: ${useTransferFileId}`);
+            // Send META first
+            console.log(`[App Sender] Sending META for ${useTransferFileId}: ${fileObj.name}:${fileObj.size}`);
+            dc.send(`META:${fileObj.name}:${fileObj.size}`);
+
+            // File sending logic (adapted from startZipSenderConnection)
+            const chunkSize = 8 * 1024;
+            let offset = 0;
+            const MAX_BUFFERED_AMOUNT = 512 * 1024;
+            dc.bufferedAmountLowThreshold = 256 * 1024;
+
+            function sendChunk() {
+              if (offset < fileObj.size) {
+                if (dc.bufferedAmount > MAX_BUFFERED_AMOUNT) {
+                  dc.onbufferedamountlow = () => {
+                    dc.onbufferedamountlow = null;
+                    setTimeout(sendChunk, 10);
+                  };
+                  return;
+                }
+                const nextChunkSize = Math.min(chunkSize, fileObj.size - offset);
+                const slice = fileObj.file.slice(offset, offset + nextChunkSize);
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                  try {
+                    if (dc.readyState === 'open') {
+                      dc.send(e.target.result);
+                      offset += nextChunkSize;
+                      // requestAnimationFrame(sendChunk); // Switch from rAF
+                      setTimeout(sendChunk, 0); // Use setTimeout to yield but continue loop
+                    } else {
+                      console.error(`[App Sender] Data channel not open for ${useTransferFileId}:`, dc.readyState);
+                      setError && setError(`Sender: DataChannel closed unexpectedly for ${fileObj.name}`);
+                      // Don't cleanup main PC here, just this channel? Or let connection state handle it.
+                      delete dataChannels.current[useTransferFileId];
+                    }
+                  } catch (err) {
+                    setError && setError(`Sender: DataChannel send failed for ${fileObj.name}: ${err.message}`);
+                    console.error(`[App Sender] DataChannel send error for ${useTransferFileId}:`, err);
+                    delete dataChannels.current[useTransferFileId];
+                  }
+                };
+                 reader.onerror = (e) => {
+                     console.error(`[App Sender] FileReader error for ${useTransferFileId}:`, e);
+                     setError && setError(`Sender: FileReader error for ${fileObj.name}`);
+                     delete dataChannels.current[useTransferFileId];
+                 };
+                reader.readAsArrayBuffer(slice);
+              } else {
+                console.log(`[App Sender] Sending EOF for ${useTransferFileId}: ${fileObj.name}`);
+                dc.send('EOF:' + fileObj.name);
+                // Channel might be closed by receiver after EOF, or keep open for potential reuse?
+                // For simplicity, let receiver close or main PC failure handle cleanup.
+              }
+            }
+            sendChunk(); // Start sending
+        };
+
+        dc.onerror = (err) => {
+            setError && setError(`Sender: DataChannel error for ${fileObj.name}.`);
+            console.error(`[App Sender] DataChannel error for transferId: ${useTransferFileId}`, err);
+            delete dataChannels.current[useTransferFileId]; // Clean up failed channel ref
+        };
+
+        dc.onclose = () => {
+            console.log(`[App Sender] DataChannel closed for transferId: ${useTransferFileId}`);
+            delete dataChannels.current[useTransferFileId]; // Clean up closed channel ref
+        };
+
+        // --- Create and Send Offer ONLY if it's a new PeerConnection ---
+        if (isNewPc) {
+            console.log(`[App Sender] Creating and sending OFFER for main PC ${mainPcId}`);
+            pc.createOffer()
+              .then(offer => pc.setLocalDescription(offer))
+              .then(() => {
+                 if (pc.localDescription) {
+                    socket.emit('signal', { room: driveCode, fileId: mainPcId, data: { sdp: pc.localDescription } });
+                 } else {
+                    console.error(`[App Sender] Local description not set before emitting offer for ${mainPcId}`);
+                 }
+              })
+              .catch(e => {
+                  console.error(`[App Sender] Error creating offer for ${mainPcId}:`, e);
+                  setError && setError(`Sender: Failed to create offer for zip download.`);
+                  cleanupWebRTCInstance(mainPcId); // Clean up failed PC
+              });
+        }
+
+      } else { // --- Single File Request (Original Logic) ---
         // --- Start Single File Sender (Original Logic) ---
-        // console.log("[App] Sender: Calling startWebRTC for single file transferId:", useTransferFileId); // Keep for debugging single file
+        // console.log("[App] Sender: Calling startWebRTC");
         startWebRTC({
           isSender: true,
           code: driveCode,
@@ -316,7 +436,7 @@ function App() {
           fileId: useTransferFileId,
           // No zip callbacks needed here
         });
-        // console.log(`[App] Sender: Called startWebRTC for transferFileId: ${useTransferFileId}`); // Keep for debugging single file
+        // console.log(`[App] Sender: Called startWebRTC`);
       }
     };
     socket.on("download-file", downloadHandler);
@@ -372,14 +492,10 @@ function App() {
     };
     setTimeout(() => {
       if (downloadingFiles.has(fileId)) {
-        console.warn(`[receiver] Download stuck in starting state for 10s`, { // Keep warning
-          fileId,
-          fileName: fileMeta.name,
-          transferFileId,
-        });
+        console.warn(`[App Receiver] Single download stuck for ${fileId}`);
       }
     }, 10000);
-    const swHandler = async (event) => {
+    const swHandler = async (event) => { // This handler is only for single file downloads now
       if (
         event.data.type === "sw-ready" &&
         event.data.fileId === transferFileId
@@ -390,14 +506,7 @@ function App() {
           filename: fileMeta.name,
           mimetype: fileMeta.type,
         });
-        // console.log("[App] Receiver: emit download-file", { // Keep for debugging download start
-        //   room: driveCode,
-        //   fileId: fileMeta.fileId,
-        //   transferFileId,
-        //   name: fileMeta.name,
-        //   size: fileMeta.size,
-        //   type: fileMeta.type,
-        // });
+        // console.log("[App Receiver] Emitting download-file");
         // Emit download request with original fileId and the transferFileId
         socket.emit("download-file", {
           room: driveCode,
@@ -446,10 +555,7 @@ function App() {
         const debug =
           window.__downloadDebug && window.__downloadDebug[event.data.fileId];
         if (debug) {
-          // console.info(`[receiver] Download complete`, { // Keep for debugging completion
-          //   fileId: event.data.fileId,
-          //   fileName: debug.fileName,
-          // });
+          // console.info(`[App Receiver] Single download complete via SW`);
         }
         setDownloadingFiles((prev) => {
           const s = new Set(prev);
@@ -468,7 +574,7 @@ function App() {
     const handler = (event) => {
       if (event.data.type === "download-ready") {
         const { fileId, url } = event.data;
-        // console.log("[App] Download ready for", fileId, "at", url); // Keep for debugging SW interaction
+        // console.log("[App Receiver] Download ready via SW");
         // Open the download in a new tab
         window.open(url, "_blank");
       }
@@ -506,10 +612,11 @@ function App() {
     cleanupWebRTCInstance,
     makeFileId,
     sendSWMetaAndChunk, // Pass the SW function for single file fallback
-    handleDownloadRequest, // Pass the single file download handler
-    peerConns, // Pass refs needed by useZipDownload
-    dataChannels
-    // REMOVED zipCallbacksRef prop
+    handleDownloadRequest,
+    peerConns,
+    dataChannels,
+    pendingSignals, // Pass down the pendingSignals ref
+    handleSignal // Pass down the memoized handleSignal function
   });
 
   // --- SENDER: Warn before leaving/reloading ---
@@ -533,22 +640,19 @@ function App() {
 
   // Update this function in your app - look for it in App.js or similar file
 
-  function sendSWMetaAndChunk(fileId, chunk, filename, mimeType, fileSize, isZipping) {
-   if (isZipping) {
-     // console.log('[App] sendSWMetaAndChunk called during zip, skipping SW'); // Keep for debugging zip/sw interaction
-     return;
-   }
+  // This function is ONLY for single file downloads now
+  function sendSWMetaAndChunk(fileId, chunk, filename, mimeType, fileSize) {
    if (!navigator.serviceWorker.controller) {
-     console.error("[App] No service worker controller available"); // Keep error
+     console.error("[App] SW Ctrl not available for sendSWMetaAndChunk"); // Keep error
      return;
    }
 
    if (filename && (!chunk || chunk === null)) {
      // This is a metadata-only message
-     // console.log("[App] Sending metadata to SW for", fileId, filename); // Keep for debugging SW interaction
+     // console.log("[App] Sending metadata to SW");
      navigator.serviceWorker.controller.postMessage({
        type: "meta",
-       fileId,
+       fileId, // This is transferFileId
         meta: {
           name: filename,
           type: mimeType || "application/octet-stream",

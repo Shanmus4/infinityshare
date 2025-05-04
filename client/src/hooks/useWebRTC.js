@@ -28,28 +28,27 @@ export function startWebRTC({
   const pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS });
   peerConns.current[fileId] = pc;
 
-  // --- Detailed Logging ---
+  // --- Detailed Logging ADDED ---
   pc.oniceconnectionstatechange = () => {
     console.log(`[WebRTC Single] ICE connection state change for ${fileId}: ${pc.iceConnectionState}`);
-    // Error handling based on this state might be redundant if onconnectionstatechange is used
   };
-  pc.onconnectionstatechange = () => { // Newer, more comprehensive state
+  pc.onconnectionstatechange = () => {
     console.log(`[WebRTC Single] Connection state change for ${fileId}: ${pc.connectionState}`);
      if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
       setError && setError(`WebRTC connection failed or disconnected for ${fileId}. State: ${pc.connectionState}`);
-      // Consider cleanup here? cleanupWebRTCInstance(fileId);
+      // Consider cleanup here too? cleanupWebRTCInstance(fileId);
     }
   };
   pc.onsignalingstatechange = () => {
     console.log(`[WebRTC Single] Signaling state change for ${fileId}: ${pc.signalingState}`);
   };
   pc.onicecandidateerror = (event) => {
-    // This event is often more informative than the Trickle ICE tool errors
     console.error(`[WebRTC Single] ICE candidate error for ${fileId}:`, event);
     if (event.errorCode) {
        console.error(`  Error Code: ${event.errorCode}, Host Candidate: ${event.hostCandidate}, Server URL: ${event.url}, Text: ${event.errorText}`);
     }
     setError && setError(`ICE candidate gathering error for ${fileId}. Code: ${event.errorCode || 'N/A'}`);
+    // Consider cleanup here too? cleanupWebRTCInstance(fileId);
   };
   // --- End Detailed Logging ---
 
@@ -58,10 +57,10 @@ export function startWebRTC({
   // Always set onicecandidate for both sender and receiver
   pc.onicecandidate = (event) => {
     if (event.candidate) {
-      //console.log('[WebRTC Single] Found ICE candidate for', fileId, event.candidate.type);
+      console.log(`[WebRTC Single] Emitting ICE candidate for ${fileId}:`, event.candidate.type, event.candidate.sdpMid, event.candidate.sdpMLineIndex);
       socket.emit('signal', { room: driveCode, fileId, data: { candidate: event.candidate } });
     } else {
-      console.log(`[WebRTC Single] End of ICE candidates for ${fileId}.`);
+       console.log(`[WebRTC Single] End of ICE candidates for ${fileId}.`);
     }
   };
   if (isSender) {
@@ -69,9 +68,10 @@ export function startWebRTC({
     dc.binaryType = 'arraybuffer';
     dataChannels.current[fileId] = dc;
     const file = filesRef.current[fileIndex];
-    console.log('[WebRTC] Sender: Data channel created for', fileId, file?.name);
+    console.log(`[WebRTC Single Sender] Data channel created for ${fileId}`);
     dc.onopen = () => {
-      console.log('[WebRTC] Sender: Data channel open for', fileId, file?.name);
+      console.log(`[WebRTC Single Sender] Data channel opened for ${fileId}`);
+      console.log(`[WebRTC Single Sender] Sending META for ${fileId}: ${file.name}:${file.size}`);
       dc.send(`META:${file.name}:${file.size}`);
       const chunkSize = 8 * 1024; // Further reduced chunk size to 8KB
       let offset = 0;
@@ -110,24 +110,25 @@ export function startWebRTC({
           };
           reader.readAsArrayBuffer(slice);
         } else {
+          console.log(`[WebRTC Single Sender] Sending EOF for ${fileId}: ${file.name}`);
           dc.send('EOF:' + file.name);
-          console.log('[WebRTC] Sender: Sent EOF for', fileId, file?.name);
         }
       }
       sendChunk();
     };
-    dc.onerror = (err) => {
-      setError && setError('Sender: DataChannel error.');
-      console.error('[WebRTC] Sender: DataChannel error', err);
+    dc.onerror = (event) => { // event is RTCErrorEvent
+      // Keep minimal error logging
+      console.error('[WebRTC] Sender: DataChannel error', event?.error || event);
+      setError && setError(`Sender: DataChannel error: ${event?.error?.message || 'Unknown error'}`);
     };
     pc.createOffer().then(offer => {
       pc.setLocalDescription(offer);
-      console.log('[WebRTC] socket.emit signal (offer)', { room: driveCode, fileId, sdp: offer });
+      console.log(`[WebRTC Single Sender] Emitting offer signal for ${fileId}`);
       socket.emit('signal', { room: driveCode, fileId, data: { sdp: offer } });
     });
   }
   pc.ondatachannel = (event) => {
-    console.log('[WebRTC] Receiver: ondatachannel event triggered for', fileId);
+    console.log(`[WebRTC Single Receiver] ondatachannel triggered for ${fileId}`);
     const dc = event.channel;
     dc.binaryType = 'arraybuffer';
     dataChannels.current[fileId] = dc;
@@ -136,8 +137,12 @@ export function startWebRTC({
     let receivedBytes = 0;
     let receivedChunks = [];
     let metaSent = false;
-    console.log('[WebRTC] Receiver: Data channel received for', fileId);
-    
+    console.log(`[WebRTC Single Receiver] Data channel received for ${fileId}`);
+
+    dc.onopen = () => { // Add onopen log for receiver DC
+        console.log(`[WebRTC Single Receiver] DataChannel opened for ${fileId}`);
+    };
+
     dc.onmessage = async (e) => {
       // console.log('[WebRTC] Receiver: onmessage for', fileId, typeof e.data, e.data?.byteLength || e.data?.length || e.data); // Verbose log
 
@@ -145,29 +150,28 @@ export function startWebRTC({
         const parts = e.data.split(':');
         filename = parts.slice(1, -1).join(':');
         expectedSize = parseInt(parts[parts.length - 1], 10);
-        console.log('[WebRTC] Receiver: META received', filename, expectedSize);
+        console.log(`[WebRTC Single Receiver] META received for ${fileId}: ${filename}, Size: ${expectedSize}`);
 
         // Single download always uses SW
         if (fileId && navigator.serviceWorker.controller) {
             metaSent = true;
-            // Assuming sendSWMetaAndChunk is only for single downloads now, remove isZipping flag
+            // Assuming sendSWMetaAndChunk is only for single downloads now
             sendSWMetaAndChunk(fileId, null, filename, 'application/octet-stream', expectedSize);
-            console.log('[WebRTC] Receiver: META sent to SW for single download', fileId);
+            console.log(`[WebRTC Single Receiver] META sent to SW for ${fileId}`);
         } else {
              console.warn('[WebRTC] Receiver: META received but no SW controller for single download', fileId);
         }
       } else if (typeof e.data === 'string' && e.data.startsWith('EOF:')) {
-        console.log('[WebRTC] Receiver: EOF received for', fileId, filename);
+        console.log(`[WebRTC Single Receiver] EOF received for ${fileId}`);
 
-        // Single download always uses SW
         if (fileId && navigator.serviceWorker.controller) {
-          console.log('[WebRTC] Receiver: Sending EOF to SW for single download', fileId);
+          console.log(`[WebRTC Single Receiver] Sending EOF to SW for ${fileId}`);
           navigator.serviceWorker.controller.postMessage({
             type: 'chunk',
             fileId: fileId,
             done: true
           });
-          console.log('[WebRTC] Receiver: EOF sent to SW for', fileId, filename);
+          console.log(`[WebRTC Single Receiver] EOF sent to SW for ${fileId}`);
           // Give SW time to process before cleaning up this specific connection
           setTimeout(() => {
             cleanupWebRTCInstance(fileId);
@@ -180,13 +184,13 @@ export function startWebRTC({
         if (fileId && navigator.serviceWorker.controller) {
           // Ensure metadata was sent first
           if (!metaSent && filename) {
-             console.warn('[WebRTC] Receiver: Sending META late to SW for single download', fileId);
+             console.warn('[WebRTC Single Receiver] Sending META late to SW for single download', fileId);
              metaSent = true;
-             // Assuming sendSWMetaAndChunk is only for single downloads now, remove isZipping flag
+             // Assuming sendSWMetaAndChunk is only for single downloads now
              sendSWMetaAndChunk(fileId, null, filename, 'application/octet-stream', expectedSize);
           }
           // Send chunk to SW
-          // Assuming sendSWMetaAndChunk is only for single downloads now, remove isZipping flag
+          // Assuming sendSWMetaAndChunk is only for single downloads now
           sendSWMetaAndChunk(fileId, e.data);
         }
         // Fallback logic removed
@@ -198,10 +202,13 @@ export function startWebRTC({
       console.error('[WebRTC] Receiver: DataChannel error during single download', fileId, err);
       setError && setError(`Receiver: DataChannel error for ${fileId}.`);
     };
+    dc.onclose = () => { // Add onclose log for receiver DC
+        console.log(`[WebRTC Single Receiver] DataChannel closed for ${fileId}`);
+    };
   };
   // Process any buffered signals for this fileId (receiver side)
   if (!isSender && window.pendingSignals && window.pendingSignals[fileId]) {
-    console.log(`[WebRTC] Processing buffered signals for: ${fileId}`); // Log added
+    console.log(`[WebRTC Single Receiver] Processing ${window.pendingSignals[fileId].length} pending signals for ${fileId}`);
     window.pendingSignals[fileId].forEach(({ data, room }) => {
       if (data && data.sdp) {
         if (data.sdp.type === 'offer') {

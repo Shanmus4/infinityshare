@@ -2,65 +2,30 @@
 // Example .env file: REACT_APP_SIGNALING_SERVER_URL=wss://your-signaling-server.com
 export const SIGNALING_SERVER_URL =
   process.env.REACT_APP_SIGNALING_SERVER_URL || "ws://localhost:3000";
-// Base STUN servers
+// Base STUN servers - Google Only
 const baseIceServers = [
-  // Google STUN servers (hostname and IP) - Port 19302 is standard STUN
+  // Google STUN servers (using multiple can sometimes help redundancy)
   { urls: "stun:stun.l.google.com:19302" },
-  { urls: "stun:74.125.140.127:19302" }, // Example Google STUN IP
   { urls: "stun:stun1.l.google.com:19302" },
-  { urls: "stun:74.125.196.127:19302" }, // Example Google STUN IP
   { urls: "stun:stun2.l.google.com:19302" },
-  // Twilio STUN server
-  { urls: "stun:global.stun.twilio.com:3478" },
 ];
 
-// Twilio TURN server credentials from environment variables
+// Twilio TURN server credentials from environment variables - REMOVED
 // Example .env file:
 // REACT_APP_TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 // REACT_APP_TWILIO_AUTH_TOKEN=your_auth_token_here
-const twilioAccountSid = process.env.REACT_APP_TWILIO_ACCOUNT_SID;
-const twilioAuthToken = process.env.REACT_APP_TWILIO_AUTH_TOKEN;
+// const twilioAccountSid = process.env.REACT_APP_TWILIO_ACCOUNT_SID; // REMOVED
+// const twilioAuthToken = process.env.REACT_APP_TWILIO_AUTH_TOKEN; // REMOVED
 
-let finalIceServers = [...baseIceServers];
+// Use only the base STUN servers now
+const finalIceServers = [...baseIceServers];
 
-// Conditionally add TURN servers if credentials are provided
-if (twilioAccountSid && twilioAuthToken) {
-  console.log("Twilio TURN credentials found, adding TURN servers.");
-  const twilioTurnServers = [
-    {
-      urls: "turn:global.turn.twilio.com:3478?transport=udp",
-      username: twilioAccountSid,
-      credential: twilioAuthToken,
-    },
-    {
-      urls: "turn:global.turn.twilio.com:3478?transport=tcp",
-      username: twilioAccountSid,
-      credential: twilioAuthToken,
-    },
-    {
-      // Also try port 443 for TURN over TLS (often better firewall traversal)
-      urls: "turn:global.turn.twilio.com:443?transport=tcp",
-      username: twilioAccountSid,
-      credential: twilioAuthToken,
-    },
-  ];
-  finalIceServers = finalIceServers.concat(twilioTurnServers);
-} else {
-  console.log(
-    "Twilio TURN credentials not found in environment variables. Using STUN servers only."
-  );
-}
+// REMOVED Conditional TURN logic
+// if (twilioAccountSid && twilioAuthToken) { ... }
+
+console.log("Using Google STUN servers only for ICE configuration."); // Log the current config
 
 export const ICE_SERVERS = finalIceServers;
 
-// Basic check to warn if credentials are missing during development
-if (
-  process.env.NODE_ENV === "development" &&
-  (!process.env.REACT_APP_TWILIO_ACCOUNT_SID ||
-    !process.env.REACT_APP_TWILIO_AUTH_TOKEN)
-) {
-  console.warn(
-    "Twilio TURN credentials (REACT_APP_TWILIO_ACCOUNT_SID, REACT_APP_TWILIO_AUTH_TOKEN) are not set in the environment. " +
-      "File transfer may fail over networks requiring TURN servers. Create a .env file in the client directory."
-  );
-}
+// REMOVED Twilio credential warning
+// if ( ... ) { ... }

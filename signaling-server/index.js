@@ -97,8 +97,10 @@ io.on('connection', socket => {
       console.error(`[${socket.id}] Invalid 'download-file' event: Data must be an object with a non-empty 'room' string. Received:`, data);
       return; // Stop processing if invalid
     }
-    console.log(`[${socket.id}] download-file to room:`, data.room);
-    socket.to(data.room).emit('download-file', data);
+    const { room, fileId, transferFileId, name, isZipRequest } = data;
+    console.log(`[${socket.id}] download-file request received for room: ${room}, originalFileId: ${fileId}, transferFileId: ${transferFileId}, name: ${name}, isZip: ${!!isZipRequest}`);
+    // Relay the request to others in the room
+    socket.to(room).emit('download-file', data);
   });
   socket.on('signal', data => {
     // Validation: Ensure data is an object with a non-empty room string
@@ -108,8 +110,11 @@ io.on('connection', socket => {
     }
     // Note: We don't validate the 'signal' content itself here, as it's complex WebRTC data.
     // The receiving client is responsible for handling potentially malformed signal data.
-    console.log(`[${socket.id}] signal to room:`, data.room);
-    socket.to(data.room).emit('signal', data);
+    const { room: signalRoom, fileId: signalFileId, data: signalData } = data; // fileId here is the transferFileId for zip
+    const signalType = signalData?.candidate ? 'candidate' : (signalData?.sdp?.type || 'unknown');
+    console.log(`[${socket.id}] signal received for room: ${signalRoom}, transferFileId: ${signalFileId}, type: ${signalType}`);
+    // Relay the signal to others in the room
+    socket.to(signalRoom).emit('signal', data);
   });
   socket.on('disconnect', reason => {
     console.log('Client disconnected:', socket.id, 'reason:', reason);
