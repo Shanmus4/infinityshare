@@ -3,21 +3,21 @@
 ## Active Tasks
 
 - [ ] **UI:** Fix general UI issues and improve responsiveness (User Request)
-- [ ] **Optimization:** Improve perceived speed of "Download All" zip download (User Request)
-  - Removed delay between channel requests in `useZipDownload.js` (2025-05-04 12:50 PM)
-- Changed zip filename to "InfinityShare Files.zip" (2025-05-04 1:03 PM)
-  - Updated zip progress calculation based on total bytes; removed individual file progress display (2025-05-04 1:03 PM)
-- Added download speed and ETR calculation/display (2025-05-04 1:08 PM)
-- Adjusted zip progress weighting (80% download, 20% zip) for better UX (2025-05-04 1:13 PM)
+- [ ] **UI:** Display file and folder structure correctly (User Request 2025-05-04)
 - [ ] **Feature:** Add mobile-optimized UI
 - [ ] **Improvement/Security:** Implement rate limiting on `signaling-server` events (e.g., `create-room`, `join-room`) to prevent abuse. (Discovered 2025-05-04)
 - [ ] **Deployment:** Configure TLS/SSL for production deployment (Mentioned in docs) - **Partially Done (2025-05-04):** Signaling server (`signaling-server/index.js`) updated to support HTTPS via `SSL_CERT_PATH` and `SSL_KEY_PATH` environment variables. Actual certificate provisioning and web server (hosting client) HTTPS configuration still required in deployment environment.
 
 ## Completed Tasks (Verified 2025-05-04)
 
-- [x] **BUG:** Fix "Download All" ZIP functionality failing due to ICE errors / background tab throttling (User Request, Fixed 2025-05-04 12:50 PM)
-  - _Root cause: Likely browser/network limits with multiple PeerConnections. ICE errors were non-fatal but treated as such initially. Background tab throttling also caused stalls._
-  - _Fix: Refactored to use a single PeerConnection with multiple DataChannels. Switched sender loop to `setTimeout`._
+- [x] **BUG & Improvements:** Fix and enhance "Download All" ZIP functionality (User Request, Completed 2025-05-04 1:24 PM)
+  - **Fixed:** Resolved failures caused by ICE errors (non-fatal 701 treated as fatal) and background tab throttling.
+    - _Root cause: Likely browser/network limits with multiple PeerConnections. Background tab throttling also caused stalls._
+    - _Fix: Refactored to use a single PeerConnection with multiple DataChannels. Switched sender loop to `setTimeout`. Modified ICE error handling._
+  - **Improved:** Removed artificial delay between file requests to increase speed.
+  - **Improved:** Changed downloaded zip filename to `InfinityShare Files.zip`.
+  - **Improved:** Updated progress calculation (80% download/20% zip weighting) and display (removed individual file progress, added 2 decimal places).
+  - **Improved:** Added download speed and ETR calculation/display.
 - [x] **Refactor:** Review and remove unused dependencies across `client`, `server`, and `signaling-server` (User Request) - Done (2025-05-04): `/server` directory removed. Other dependencies checked.
 - [x] **Security/Prep:** Address `npm audit` vulnerabilities in `/client` (8 vulnerabilities: 2 moderate, 6 high from `react-scripts` transitive dependencies - `nth-check`, `postcss`). **Mitigation Applied (2025-05-04):** Added `overrides` for `nth-check@2.0.1` and `postcss@8.4.31` in `client/package.json` and reinstalled. `npm audit` still reports the vulnerabilities, but the overrides should force the use of patched versions. `npm audit fix --force` was avoided as breaking.
 - [x] **Security/Prep:** Perform Security/Privacy review for open-sourcing (User Request) - **Done (2025-05-04):** Hardcoded Twilio credentials removed from client (`client/src/utils/signaling.js`). Signaling server logging reviewed (seems okay). CORS restricted. Input validation added. XSS checked in `FileList`, `App`, `ErrorBanner` (React escaping handles it). Lack of rate limiting on signaling server noted as potential improvement area. Git history cleaned of secrets.
