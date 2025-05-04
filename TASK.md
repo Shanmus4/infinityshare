@@ -4,6 +4,8 @@
 
 - [ ] **UI:** Fix general UI issues and improve responsiveness (User Request)
 - [ ] **UI:** Display file and folder structure correctly (User Request 2025-05-04)
+  - **Done (2025-05-04 2:14 PM):** Captured `file.path` in `App.js`, updated `FileList.js` to display path (flat list), updated `useZipDownload.js` for correct zip structure.
+  - **Done (2025-05-04 2:15 PM):** Implemented visual tree view in `FileList.js` using `buildFileTree` utility and recursive `RenderNode`, ensuring props are passed down.
 - [ ] **Feature:** Add mobile-optimized UI
 - [ ] **Improvement/Security:** Implement rate limiting on `signaling-server` events (e.g., `create-room`, `join-room`) to prevent abuse. (Discovered 2025-05-04)
 - [ ] **Deployment:** Configure TLS/SSL for production deployment (Mentioned in docs) - **Partially Done (2025-05-04):** Signaling server (`signaling-server/index.js`) updated to support HTTPS via `SSL_CERT_PATH` and `SSL_KEY_PATH` environment variables. Actual certificate provisioning and web server (hosting client) HTTPS configuration still required in deployment environment.

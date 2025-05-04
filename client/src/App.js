@@ -30,11 +30,11 @@ function App() {
 
   const initial = getInitialStepAndDriveCode();
   const [step, setStep] = useState(initial.step);
-  const [files, setFiles] = useState([]); // Flat array: {name, size, type, file, fileId}
+  const [files, setFiles] = useState([]); // Array: {name, size, type, file, fileId, path?} path includes full path from dropzone
   const [driveCode, setDriveCode] = useState(initial.driveCode);
   const [joinDriveCodeInput, setJoinDriveCodeInput] = useState(''); // State for join input
   const [qrValue, setQrValue] = useState("");
-  const [receiverFilesMeta, setReceiverFilesMeta] = useState([]); // Flat array for receiver
+  const [receiverFilesMeta, setReceiverFilesMeta] = useState([]); // Array for receiver: {name, size, type, fileId, path?}
   const [error, setError] = useState("");
   const [downloadingFiles, setDownloadingFiles] = useState(new Set());
   const fileBlobs = useRef({});
@@ -121,24 +121,38 @@ function App() {
   // --- SENDER: Upload files and create drive, or add more files (flat version) ---
   const handleDrop = (acceptedFiles) => {
     if (!acceptedFiles.length) return;
-    const filesWithIds = acceptedFiles.map((f) => ({
-      name: f.name,
-      size: f.size,
-      type: f.type,
-      file: f,
-      fileId: makeFileId(),
-    }));
+    // Capture the path property provided by react-dropzone
+    console.log("[handleDrop] Raw accepted files:", acceptedFiles.map(f => ({ name: f.name, path: f.path, size: f.size, type: f.type }))); // Log raw paths
+    const filesWithIds = acceptedFiles.map((f) => {
+      // Basic path cleaning: remove leading './' or '.\' if present
+      let cleanedPath = f.path;
+      if (cleanedPath && (cleanedPath.startsWith('./') || cleanedPath.startsWith('.\\'))) {
+        cleanedPath = cleanedPath.substring(2);
+      }
+      // Add more cleaning if needed based on logs
+
+      return {
+        name: f.name, // Original filename
+        size: f.size,
+        type: f.type,
+        file: f, // The File object itself
+        fileId: makeFileId(),
+        path: cleanedPath || f.name // Use cleaned path, fallback to name if path was empty/undefined
+      };
+    });
+    console.log("[handleDrop] Processed files with IDs and cleaned paths:", filesWithIds); // Log processed paths
     // Combine new files with existing ones using the up-to-date ref
     const combinedFiles = [...filesRef.current, ...filesWithIds];
     setFiles(combinedFiles);
     // Note: filesRef.current will be updated by the useEffect hook watching 'files'
 
-    // Generate metadata from the *combined* list
-    const combinedFilesMeta = combinedFiles.map(({ name, size, type, fileId }) => ({
-      name,
+    // Generate metadata from the *combined* list, including the path
+    const combinedFilesMeta = combinedFiles.map(({ name, size, type, fileId, path }) => ({
+      name, // Keep original name for potential display fallback
       size,
       type,
       fileId,
+      path // <--- ADDED: Send the path to receivers
     }));
 
     if (!driveCode) {
@@ -158,11 +172,13 @@ function App() {
   // --- SENDER: Always respond to get-file-list requests ---
   useEffect(() => {
     const handler = ({ room }) => {
-      const filesMeta = files.map(({ name, size, type, fileId }) => ({
+      // Include path in metadata sent on request
+      const filesMeta = files.map(({ name, size, type, fileId, path }) => ({
         name,
         size,
         type,
         fileId,
+        path // <--- ADDED
       }));
       socket.emit("file-list", { room, filesMeta });
     };
@@ -174,11 +190,13 @@ function App() {
   useEffect(() => {
     if (!(driveCode && files.length > 0)) return;
     const handler = () => {
-      const filesMeta = files.map(({ name, size, type, fileId }) => ({
+      // Include path in metadata sent on join
+      const filesMeta = files.map(({ name, size, type, fileId, path }) => ({
         name,
         size,
         type,
         fileId,
+        path // <--- ADDED
       }));
       socket.emit("file-list", { room: driveCode, filesMeta });
     };
@@ -190,11 +208,13 @@ function App() {
   useEffect(() => {
     if (!(driveCode && files.length > 0)) return;
     const interval = setInterval(() => {
-      const filesMeta = files.map(({ name, size, type, fileId }) => ({
+      // Include path in periodic metadata broadcast
+      const filesMeta = files.map(({ name, size, type, fileId, path }) => ({
         name,
         size,
         type,
         fileId,
+        path // <--- ADDED
       }));
       socket.emit("file-list", { room: driveCode, filesMeta });
     }, 3000);
@@ -205,11 +225,13 @@ function App() {
   useEffect(() => {
     if (!(driveCode && files.length > 0)) return;
     const handler = () => {
-      const filesMeta = files.map(({ name, size, type, fileId }) => ({
+      // Include path in metadata sent on reconnect
+      const filesMeta = files.map(({ name, size, type, fileId, path }) => ({
         name,
         size,
         type,
         fileId,
+        path // <--- ADDED
       }));
       socket.emit("file-list", { room: driveCode, filesMeta });
     };
@@ -460,7 +482,9 @@ function App() {
   // --- RECEIVER: Listen for file list ---
   useEffect(() => {
     const handler = ({ filesMeta }) => {
-      setReceiverFilesMeta(filesMeta || []);
+      console.log("[App Receiver] Received file-list event. filesMeta:", filesMeta); // Log received meta
+      const validatedMeta = Array.isArray(filesMeta) ? filesMeta : []; // Ensure it's an array
+      setReceiverFilesMeta(validatedMeta);
     };
     socket.on("file-list", handler);
     return () => socket.off("file-list", handler);
@@ -692,11 +716,13 @@ function App() {
     setFiles(newFiles);
     filesRef.current = newFiles;
     if (driveCode) {
-      const filesMeta = newFiles.map(({ name, size, type, fileId }) => ({
+      // Include path when sending updated list after delete
+      const filesMeta = newFiles.map(({ name, size, type, fileId, path }) => ({
         name,
         size,
         type,
         fileId,
+        path // <--- ADDED
       }));
       socket.emit("file-list", { room: driveCode, filesMeta });
     }

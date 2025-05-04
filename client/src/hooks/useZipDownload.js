@@ -39,6 +39,9 @@ export function useZipDownload({
       return;
     }
 
+    // REMOVED DEBUG LOG
+    // console.log("[useZipDownload startDownloadAll] Using receiverFilesMeta:", receiverFilesMeta);
+
     if (receiverFilesMeta.length === 1) {
       // If only one file, trigger the standard single file download
       const fileMeta = receiverFilesMeta[0];
@@ -153,7 +156,28 @@ export function useZipDownload({
          receiverFilesMeta.forEach(fileMeta => {
            if (fileData.current[fileMeta.fileId]) {
              const blob = new Blob(fileData.current[fileMeta.fileId]);
-             zip.file(fileMeta.name, blob);
+             // Use fileMeta.path (which includes the full path like "Folder/file.txt")
+             // JSZip automatically creates folders based on the path.
+             // Fallback to fileMeta.name if path is somehow missing.
+             const zipPath = fileMeta.path || fileMeta.name;
+             // --- REMOVED DETAILED DEBUG LOG ---
+             // console.log(`[useZipDownload ZIPPING] Adding to zip: ID=${fileMeta.fileId}, Name=${fileMeta.name}, PathProp=${fileMeta.path}, FinalZipPath="${zipPath}"`);
+ 
+             // Trim leading slashes from the path before adding to zip
+             const finalZipPathForFile = zipPath.startsWith('/') || zipPath.startsWith('\\')
+               ? zipPath.substring(1)
+               : zipPath;
+ 
+             if (finalZipPathForFile !== zipPath) {
+                  console.log(`[useZipDownload ZIPPING] Trimmed leading slash. Original: "${zipPath}", Using: "${finalZipPathForFile}"`); // Log trimming action
+             }
+ 
+             try {
+                 zip.file(finalZipPathForFile, blob); // Use the trimmed path
+             } catch (zipError) {
+                 console.error(`[useZipDownload ZIPPING] Error adding file to zip: ID=${fileMeta.fileId}, Path="${zipPath}"`, zipError);
+                 // Optionally set an error state here
+             }
              delete fileData.current[fileMeta.fileId]; // Free up memory
            } else {
              console.warn(`[useZipDownload] No data found for file ${fileMeta.name} (ID: ${fileMeta.fileId}) during zipping.`);
