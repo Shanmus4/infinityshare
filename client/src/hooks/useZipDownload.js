@@ -64,11 +64,11 @@ export function useZipDownload({
       isFolderDownload = true;
       const pathPrefix = folderPathFilter + '/'; // Ensure trailing slash for prefix match
 
-      console.log(`[useZipDownload FILTER] Filtering for prefix: "${pathPrefix}"`); // Log prefix
+      // console.log(`[useZipDownload FILTER] Filtering for prefix: "${pathPrefix}"`); // REMOVE Log prefix
 
       filesToInclude = receiverFilesMeta.filter(f => {
           const starts = f.path && f.path.startsWith(pathPrefix);
-          // Log each comparison
+          // REMOVE Log each comparison
           // console.log(`[useZipDownload FILTER] Comparing: file.path="${f.path}" | startsWith("${pathPrefix}")? ${starts}`);
           return starts;
       });
@@ -271,7 +271,7 @@ export function useZipDownload({
 
               // Ensure path is not empty after trimming (e.g., if original path was just '/')
               if (finalZipPathForFile) {
-                  console.log(`[useZipDownload] Adding to zip: "${finalZipPathForFile}" (Original: ${fileMeta.path})`);
+                  // console.log(`[useZipDownload] Adding to zip: "${finalZipPathForFile}" (Original: ${fileMeta.path})`); // REMOVE Log
                   try {
                       zip.file(finalZipPathForFile, blob);
                       filesAdded++;

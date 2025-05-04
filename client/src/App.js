@@ -123,7 +123,6 @@ function App() {
   const handleDrop = (acceptedFiles) => {
     if (!acceptedFiles.length) return;
     // Capture the path property provided by react-dropzone
-    console.log("[handleDrop] Raw accepted files:", acceptedFiles.map(f => ({ name: f.name, path: f.path, size: f.size, type: f.type }))); // Log raw paths
     const filesWithIds = acceptedFiles.map((f) => {
       let processedPath = f.path;
 
@@ -155,7 +154,6 @@ function App() {
         path: finalPath
       };
     });
-    console.log("[handleDrop] Processed files with IDs and cleaned paths:", filesWithIds); // Log processed paths
     // Combine new files with existing ones using the up-to-date ref
     const combinedFiles = [...filesRef.current, ...filesWithIds];
     setFiles(combinedFiles);
@@ -505,7 +503,6 @@ function App() {
   // --- RECEIVER: Listen for file list ---
   useEffect(() => {
     const handler = ({ filesMeta }) => {
-      console.log("[App Receiver] Received file-list event. filesMeta:", filesMeta); // Log received meta
       const validatedMeta = Array.isArray(filesMeta) ? filesMeta : []; // Ensure it's an array
       setReceiverFilesMeta(validatedMeta);
     };
@@ -756,28 +753,21 @@ function App() {
 
   // --- SENDER: Delete Folder ---
   const handleDeleteFolder = (folderPath) => {
-    console.log(`[App SENDER] Request to delete folder: ${folderPath}`);
     // Filter out files that start with the folder path + '/'
     // Also filter out files whose path *is* the folder path (shouldn't happen, but safety)
     const pathPrefix = folderPath + '/';
-    console.log(`[handleDeleteFolder FILTER] Filtering OUT files starting with prefix: "${pathPrefix}" or matching path: "${folderPath}"`); // Log prefix
-    console.log("[handleDeleteFolder FILTER] Available file paths in filesRef.current:", filesRef.current.map(f => f.path)); // Log available paths
 
     const newFiles = filesRef.current.filter(f => {
         const isDirectMatch = f.path === folderPath; // Should not happen for folders from buildFileTree, but check anyway
         const isPrefixMatch = f.path && f.path.startsWith(pathPrefix);
         const shouldKeep = !(isDirectMatch || isPrefixMatch);
-        // Log each comparison (optional, uncomment if needed)
-        // console.log(`[handleDeleteFolder FILTER] Comparing: file.path="${f.path}" | isDirectMatch? ${isDirectMatch} | isPrefixMatch? ${isPrefixMatch} | shouldKeep? ${shouldKeep}`);
         return shouldKeep;
     });
 
     if (newFiles.length === filesRef.current.length) {
-        console.warn(`[App SENDER] No files found matching path prefix "${pathPrefix}" for deletion.`);
         return; // No changes made
     }
 
-    console.log(`[App SENDER] Deleting ${filesRef.current.length - newFiles.length} files under ${folderPath}`);
     setFiles(newFiles); // Update state
     // filesRef will be updated by useEffect
 
@@ -790,10 +780,9 @@ function App() {
     }
   };
 
-  // --- RECEIVER: Download Folder (Placeholder) ---
+  // --- RECEIVER: Download Folder ---
   const handleDownloadFolder = (folderPath) => {
     // Call the unified zip process function with the folder path filter
-    console.log(`[App RECEIVER] Calling startZipProcess for folder: ${folderPath}`);
     startZipProcess(folderPath); // Pass folderPath as the filter
   };
 
