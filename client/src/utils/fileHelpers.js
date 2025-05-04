@@ -35,13 +35,17 @@ export function buildFileTree(files) {
         return; // Skip if no path or name
     }
 
-    // Split by / or \ , filter out empty parts (e.g., from leading/trailing slashes)
-    const pathParts = pathString.split(/[\\/]/).filter(part => part.length > 0);
+    // Standardize to forward slashes FIRST, remove leading/trailing slashes
+    const standardizedPathString = pathString.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    // Split by / , filter out empty parts (e.g., from double slashes)
+    const pathParts = standardizedPathString.split('/').filter(part => part.length > 0);
+
     let currentLevel = tree;
     let currentPathSegments = []; // Keep track of path segments for folder fullPath
 
     pathParts.forEach((part, index) => {
       currentPathSegments.push(part); // Add current part to segments list
+      const folderFullPath = currentPathSegments.join('/'); // Construct full path using ONLY forward slashes
       const isLastPart = index === pathParts.length - 1;
 
       if (isLastPart) {
@@ -60,7 +64,7 @@ export function buildFileTree(files) {
         }
       } else {
         // --- Intermediate part: should be a folder ---
-        const folderFullPath = currentPathSegments.join('/'); // Construct full path for this folder
+        // folderFullPath is already calculated above
 
         if (!currentLevel[part]) {
           // Folder does not exist, create it and store its full path

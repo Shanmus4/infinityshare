@@ -62,15 +62,16 @@ export function useZipDownload({
 
     if (folderPathFilter) {
       isFolderDownload = true;
-      const pathPrefix = folderPathFilter.endsWith('/') ? folderPathFilter : folderPathFilter + '/';
-      filesToInclude = receiverFilesMeta.filter(f =>
-          f.path && f.path.startsWith(pathPrefix)
-      );
-      // Also include files directly matching the folder path if it represents a single file drop? No, filter should only include files *within* the folder path.
-      // Let's refine the filter slightly:
-       filesToInclude = receiverFilesMeta.filter(f =>
-          f.path && f.path.startsWith(pathPrefix)
-      );
+      const pathPrefix = folderPathFilter + '/'; // Ensure trailing slash for prefix match
+
+      console.log(`[useZipDownload FILTER] Filtering for prefix: "${pathPrefix}"`); // Log prefix
+
+      filesToInclude = receiverFilesMeta.filter(f => {
+          const starts = f.path && f.path.startsWith(pathPrefix);
+          // Log each comparison
+          // console.log(`[useZipDownload FILTER] Comparing: file.path="${f.path}" | startsWith("${pathPrefix}")? ${starts}`);
+          return starts;
+      });
 
 
       if (filesToInclude.length === 0) {

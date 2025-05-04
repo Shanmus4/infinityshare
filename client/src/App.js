@@ -125,12 +125,26 @@ function App() {
     // Capture the path property provided by react-dropzone
     console.log("[handleDrop] Raw accepted files:", acceptedFiles.map(f => ({ name: f.name, path: f.path, size: f.size, type: f.type }))); // Log raw paths
     const filesWithIds = acceptedFiles.map((f) => {
-      // Basic path cleaning: remove leading './' or '.\' if present
-      let cleanedPath = f.path;
-      if (cleanedPath && (cleanedPath.startsWith('./') || cleanedPath.startsWith('.\\'))) {
-        cleanedPath = cleanedPath.substring(2);
+      let processedPath = f.path;
+
+      // 1. Use forward slashes
+      if (processedPath) {
+        processedPath = processedPath.replace(/\\/g, '/');
       }
-      // Add more cleaning if needed based on logs
+
+      // 2. Remove leading './'
+      if (processedPath && processedPath.startsWith('./')) {
+        processedPath = processedPath.substring(2);
+      }
+
+      // 3. Remove leading/trailing slashes (after other cleaning)
+      if (processedPath) {
+        processedPath = processedPath.replace(/^\/+|\/+$/g, '');
+      }
+
+      // Use processed path, fallback to name if path was invalid/empty
+      const finalPath = processedPath || f.name;
+      // console.log(`[handleDrop] File: ${f.name}, Original Path: ${f.path}, Processed Path: ${finalPath}`); // Debug log
 
       return {
         name: f.name, // Original filename
@@ -138,7 +152,7 @@ function App() {
         type: f.type,
         file: f, // The File object itself
         fileId: makeFileId(),
-        path: cleanedPath || f.name // Use cleaned path, fallback to name if path was empty/undefined
+        path: finalPath
       };
     });
     console.log("[handleDrop] Processed files with IDs and cleaned paths:", filesWithIds); // Log processed paths
@@ -746,9 +760,17 @@ function App() {
     // Filter out files that start with the folder path + '/'
     // Also filter out files whose path *is* the folder path (shouldn't happen, but safety)
     const pathPrefix = folderPath + '/';
-    const newFiles = filesRef.current.filter(f =>
-        !(f.path === folderPath || (f.path && f.path.startsWith(pathPrefix)))
-    );
+    console.log(`[handleDeleteFolder FILTER] Filtering OUT files starting with prefix: "${pathPrefix}" or matching path: "${folderPath}"`); // Log prefix
+    console.log("[handleDeleteFolder FILTER] Available file paths in filesRef.current:", filesRef.current.map(f => f.path)); // Log available paths
+
+    const newFiles = filesRef.current.filter(f => {
+        const isDirectMatch = f.path === folderPath; // Should not happen for folders from buildFileTree, but check anyway
+        const isPrefixMatch = f.path && f.path.startsWith(pathPrefix);
+        const shouldKeep = !(isDirectMatch || isPrefixMatch);
+        // Log each comparison (optional, uncomment if needed)
+        // console.log(`[handleDeleteFolder FILTER] Comparing: file.path="${f.path}" | isDirectMatch? ${isDirectMatch} | isPrefixMatch? ${isPrefixMatch} | shouldKeep? ${shouldKeep}`);
+        return shouldKeep;
+    });
 
     if (newFiles.length === filesRef.current.length) {
         console.warn(`[App SENDER] No files found matching path prefix "${pathPrefix}" for deletion.`);
