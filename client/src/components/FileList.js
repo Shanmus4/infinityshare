@@ -11,7 +11,15 @@ function RenderNode({
   isSender,
   isDownloading,
   onDeleteFolder,
-  onDownloadFolder
+  onDownloadFolder,
+  // Props for inline progress
+  isZipping,
+  zippingFolderPath,
+  zipProgress,
+  downloadSpeed,
+  etr,
+  formatSpeed,
+  formatEtr
 }) {
   const indent = level * 20;
   const [isExpanded, setIsExpanded] = useState(false);
@@ -28,6 +36,11 @@ function RenderNode({
     const fullPath = node.fullPath;
     const showDeleteButton = isSender === true && typeof onDeleteFolder === 'function' && fullPath;
     const showDownloadButton = isSender === false && typeof onDownloadFolder === 'function' && fullPath;
+
+    // Check if this specific folder is the one currently being zipped
+    const isCurrentlyZippingThisFolder = isZipping && zippingFolderPath === fullPath;
+    // Disable download button if *any* zip operation is in progress, unless it's this folder
+    const isDownloadDisabled = isZipping && !isCurrentlyZippingThisFolder;
 
     return (
       <li style={{ marginLeft: indent, listStyle: 'none', marginBottom: '2px' }}>
@@ -59,11 +72,39 @@ function RenderNode({
                style={{ marginLeft: 8, flexShrink: 0, fontSize: '0.8em', padding: '1px 4px' }}
                onClick={(e) => { e.stopPropagation(); onDownloadFolder(fullPath); }}
                title={`Download folder "${name}" as zip`}
+               disabled={isDownloadDisabled} // Disable if another zip is happening
              >
-               Download
+               {isCurrentlyZippingThisFolder ? `Zipping...` : 'Download'}
              </button>
            )}
         </div>
+        {/* Inline Progress Display for this folder */}
+        {isCurrentlyZippingThisFolder && (
+          <div style={{ marginLeft: '15px', padding: '5px', border: '1px solid #eee', marginTop: '3px', fontSize: '0.9em' }}>
+            {/* Progress Bar */}
+            <div style={{ width: '100%', backgroundColor: '#ddd', height: '15px', marginBottom: '3px' }}>
+              <div style={{
+                width: `${zipProgress}%`,
+                backgroundColor: '#4CAF50',
+                height: '100%',
+                textAlign: 'center',
+                lineHeight: '15px',
+                color: 'white',
+                fontSize: '0.8em'
+              }}>
+                {zipProgress.toFixed(1)}%
+              </div>
+            </div>
+            {/* Speed and ETR */}
+            <div style={{ fontSize: '0.9em', color: '#555' }}>
+              <span>Speed: {formatSpeed(downloadSpeed)}</span>
+              <span style={{ marginLeft: '1em' }}>ETR: {formatEtr(etr)}</span>
+            </div>
+            <div style={{ fontSize: '0.8em', color: '#888', marginTop: '3px' }}>
+               (Please wait, the download will start automatically when zipping is complete)
+            </div>
+          </div>
+        )}
         {hasChildren && isExpanded && (
           <ul style={{ paddingLeft: '10px', marginTop: '0px', borderLeft: '1px dashed #ccc' }}>
             {Object.entries(node.children)
@@ -84,6 +125,14 @@ function RenderNode({
                   isDownloading={isDownloading}
                   onDeleteFolder={onDeleteFolder}
                   onDownloadFolder={onDownloadFolder}
+                  // Pass progress props down
+                  isZipping={isZipping}
+                  zippingFolderPath={zippingFolderPath}
+                  zipProgress={zipProgress}
+                  downloadSpeed={downloadSpeed}
+                  etr={etr}
+                  formatSpeed={formatSpeed}
+                  formatEtr={formatEtr}
                 />
               ))}
           </ul>
@@ -127,7 +176,11 @@ function RenderNode({
 
 
 // --- Main FileList Component ---
-function FileList({ files, onDelete, onDownload, isSender, isDownloading, onDeleteFolder, onDownloadFolder }) {
+function FileList({
+  files, onDelete, onDownload, isSender, isDownloading, onDeleteFolder, onDownloadFolder,
+  // Add progress props
+  isZipping, zippingFolderPath, zipProgress, downloadSpeed, etr, formatSpeed, formatEtr
+}) {
   if (!Array.isArray(files)) {
     console.error("[FileList] Error: 'files' prop is not an array.", files);
     return <div style={{ color: 'red', fontWeight: 'bold' }}>[Error: Invalid file data received]</div>;
@@ -157,6 +210,14 @@ function FileList({ files, onDelete, onDownload, isSender, isDownloading, onDele
             isDownloading={isDownloading}
             onDeleteFolder={onDeleteFolder}
             onDownloadFolder={onDownloadFolder}
+            // Pass progress props down
+            isZipping={isZipping}
+            zippingFolderPath={zippingFolderPath}
+            zipProgress={zipProgress}
+            downloadSpeed={downloadSpeed}
+            etr={etr}
+            formatSpeed={formatSpeed}
+            formatEtr={formatEtr}
           />
       ))}
     </ul>

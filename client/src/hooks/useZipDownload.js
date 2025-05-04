@@ -20,6 +20,7 @@ export function useZipDownload({
   const [error, setError] = useState('');
   const [downloadSpeed, setDownloadSpeed] = useState(0);
   const [etr, setEtr] = useState(null);
+  const [zippingFolderPath, setZippingFolderPath] = useState(null); // Track which folder is zipping
   const fileData = useRef({});
   const totalBytesReceived = useRef(0);
   const lastSpeedCheckTime = useRef(0);
@@ -33,6 +34,7 @@ export function useZipDownload({
     setError('');
     setDownloadSpeed(0);
     setEtr(null);
+    setZippingFolderPath(null); // Reset folder path on completion/error
     fileData.current = {};
     totalBytesReceived.current = 0;
     lastSpeedCheckTime.current = 0;
@@ -95,6 +97,7 @@ export function useZipDownload({
     // --- Reset state and prepare for download ---
     resetZipState(); // Clear previous operation state
     setIsZipping(true); // Set zipping state for the new operation
+    setZippingFolderPath(isFolderDownload ? folderPathFilter : null); // Track the folder being zipped
     downloadStartTime.current = Date.now();
 
     const pcId = `zip-pc-${makeFileId()}`; // Unique PC ID for this operation
@@ -316,6 +319,6 @@ export function useZipDownload({
       });
   };
 
-  // Expose the unified function
-  return { startZipProcess, isZipping, zipProgress, downloadSpeed, etr, error };
+  // Expose the unified function and the zipping folder path
+  return { startZipProcess, isZipping, zipProgress, downloadSpeed, etr, error, zippingFolderPath };
 }

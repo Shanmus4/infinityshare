@@ -3,6 +3,12 @@
 ## Active Tasks
 
 - [ ] **UI:** Fix general UI issues and improve responsiveness (User Request)
+- [ ] **Feature:** Add mobile-optimized UI
+- [ ] **Improvement/Security:** Implement rate limiting on `signaling-server` events (e.g., `create-room`, `join-room`) to prevent abuse. (Discovered 2025-05-04)
+- [ ] **Deployment:** Configure TLS/SSL for production deployment (Mentioned in docs) - **Partially Done (2025-05-04):** Signaling server (`signaling-server/index.js`) updated to support HTTPS via `SSL_CERT_PATH` and `SSL_KEY_PATH` environment variables. Actual certificate provisioning and web server (hosting client) HTTPS configuration still required in deployment environment.
+
+## Completed Tasks (Verified 2025-05-04)
+
 - [x] **UI & Feature:** Implement folder structure display and actions (User Request 2025-05-04, Completed 2025-05-04 3:05 PM)
   - Captured `file.path` in `App.js`.
   - Implemented expandable/collapsible tree view in `FileList.js`.
@@ -13,12 +19,12 @@
   - Updated sender (`App.js`) to handle folder download requests via `isFolderRequest` flag.
   - Integrated refactored `useZipDownload` hook into `App.js` receiver view for both button types.
   - Removed unused `useFolderDownload.js` hook.
-- [ ] **Feature:** Add mobile-optimized UI
-- [ ] **Improvement/Security:** Implement rate limiting on `signaling-server` events (e.g., `create-room`, `join-room`) to prevent abuse. (Discovered 2025-05-04)
-- [ ] **Deployment:** Configure TLS/SSL for production deployment (Mentioned in docs) - **Partially Done (2025-05-04):** Signaling server (`signaling-server/index.js`) updated to support HTTPS via `SSL_CERT_PATH` and `SSL_KEY_PATH` environment variables. Actual certificate provisioning and web server (hosting client) HTTPS configuration still required in deployment environment.
-  
-## Completed Tasks (Verified 2025-05-04)
-
+- [x] **UI/UX:** Show folder download progress inline, disable other folders, and restore "Download All" progress (User Request 2025-05-04, Completed 2025-05-04 4:35 PM)
+  - Added `zippingFolderPath` state to `useZipDownload` hook.
+  - Passed progress state (`isZipping`, `zippingFolderPath`, `zipProgress`, etc.) and formatters from `App.js` to `FileList.js`.
+  - Updated `FileList.js` (`RenderNode`) to display progress inline (including "Please wait..." text) for the specific folder being zipped.
+  - Updated `FileList.js` (`RenderNode`) to disable download buttons for other folders when `isZipping` is true.
+  - Restored global progress display in `App.js`, conditional on `isZipping && !zippingFolderPath` (for "Download All").
 - [x] **BUG & Improvements:** Fix and enhance "Download All" ZIP functionality (User Request, Completed 2025-05-04 1:24 PM)
   - **Fixed:** Resolved failures caused by ICE errors (non-fatal 701 treated as fatal) and background tab throttling.
     - _Root cause: Likely browser/network limits with multiple PeerConnections. Background tab throttling also caused stalls._

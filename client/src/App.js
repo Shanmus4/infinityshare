@@ -650,7 +650,8 @@ function App() {
     zipProgress,
     downloadSpeed, // Add speed
     etr, // Add etr
-    error: zipError // Alias to avoid state name conflict
+    error: zipError, // Alias to avoid state name conflict
+    zippingFolderPath // Get the path of the folder being zipped
   } = useZipDownload({
     receiverFilesMeta,
     driveCode,
@@ -903,9 +904,10 @@ function App() {
           {isZipping ? `Preparing Zip (${Math.round(zipProgress)}%)` : 'Download All'}
         </button>
 
-        {isZipping && (
+        {/* Global Progress Display for "Download All" */}
+        {isZipping && !zippingFolderPath && (
           <div style={{ marginBottom: '1em' }}>
-            <p>Downloading and Zipping Files...</p>
+            <p>Downloading and Zipping All Files...</p>
             {/* Basic progress bar */}
             <div style={{ width: '100%', backgroundColor: '#ddd', height: '20px' }}>
               <div style={{
@@ -916,18 +918,17 @@ function App() {
                 lineHeight: '20px',
                 color: 'white'
               }}>
-                {/* Format progress to 2 decimal places */}
                 {zipProgress.toFixed(2)}%
               </div>
             </div>
-            {/* Display Speed and ETR */}
-            {isZipping && zipProgress < 80 && ( // Show only during weighted download phase (0-80%)
-               <div style={{ marginTop: '0.5em', fontSize: '0.9em', color: '#555' }}>
-                   <span>Speed: {formatSpeed(downloadSpeed)}</span>
-                   <span style={{ marginLeft: '1em' }}>ETR: {formatEtr(etr)}</span>
-               </div>
-            )}
-            {/* REMOVED individual file progress display */}
+            {/* Speed and ETR */}
+            <div style={{ marginTop: '0.5em', fontSize: '0.9em', color: '#555' }}>
+                <span>Speed: {formatSpeed(downloadSpeed)}</span>
+                <span style={{ marginLeft: '1em' }}>ETR: {formatEtr(etr)}</span>
+            </div>
+             <div style={{ fontSize: '0.8em', color: '#888', marginTop: '3px' }}>
+                (Please wait, the download will start automatically when zipping is complete)
+             </div>
           </div>
         )}
 
@@ -937,7 +938,14 @@ function App() {
           isSender={false}
           isDownloading={isDownloading} // This state is for single downloads
           onDownloadFolder={handleDownloadFolder} // <-- ADDED
-          isZipping={isZipping} // Pass isZipping state
+          isZipping={isZipping} // Pass isZipping state for disabling
+          // Pass props for inline folder progress display
+          zippingFolderPath={zippingFolderPath}
+          zipProgress={zipProgress}
+          downloadSpeed={downloadSpeed}
+          etr={etr}
+          formatSpeed={formatSpeed} // Pass helper functions
+          formatEtr={formatEtr}
         />
         {/* Display errors from App state and the unified zip hook */}
         <ErrorBanner error={error || zipError} />
