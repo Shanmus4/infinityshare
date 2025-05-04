@@ -10,7 +10,8 @@ import { startWebRTC } from "./hooks/useWebRTC"; // For single file downloads
 // import { startZipSenderConnection } from "./utils/startZipSenderConnection"; // REMOVED - Logic integrated into App.js downloadHandler
 // setupZipReceiverConnection is used inside useZipDownload now
 import { makeFileId } from "./utils/fileHelpers";
-import { useZipDownload } from "./hooks/useZipDownload"; // Import the new hook
+import { useZipDownload } from "./hooks/useZipDownload"; // Handles all zip downloads now
+// import { useFolderDownload } from "./hooks/useFolderDownload"; // <-- REMOVE Import
 import { ICE_SERVERS } from "./utils/signaling"; // Import ICE_SERVERS
 
 function App() {
@@ -249,9 +250,11 @@ function App() {
       name,
       size,
       type,
-      isZipRequest
+      isZipRequest,
+      isFolderRequest, // <-- New flag
+      folderPath       // <-- New path info
    }) => {
-     console.log(`[App Sender] Received download-file request. isZip=${isZipRequest}, mainPcId=${mainPcId}, transferFileId=${transferFileId}, requestedFileId=${requestedFileId}`);
+     console.log(`[App Sender] Received download-file request. isZip=${isZipRequest}, isFolder=${isFolderRequest}, mainPcId=${mainPcId}, transferFileId=${transferFileId}, requestedFileId=${requestedFileId}, folderPath=${folderPath}`);
 
     // Always use filesRef.current to find the file
       const fileObj = filesRef.current.find(
@@ -281,70 +284,74 @@ function App() {
       }
       // console.log(`[App] Sender: Found fileIndex`);
 
-      if (isZipRequest) {
-        // --- Zip Request: Use Single PeerConnection (mainPcId) ---
-        if (!mainPcId) {
-            console.error("[App Sender] Zip request received without mainPcId!");
-            setError("Zip download error: Missing connection ID.");
+      // Determine the PeerConnection ID to use
+      // Use mainPcId if provided (for zip or folder requests), otherwise generate one for single file? No, single file uses transferFileId.
+      const pcIdToUse = mainPcId; // For zip or folder requests, the receiver dictates the PC ID
+
+      if (isZipRequest || isFolderRequest) { // Handle Zip OR Folder requests using the specified mainPcId
+        // --- Zip/Folder Request: Use Single PeerConnection (pcIdToUse) ---
+        if (!pcIdToUse) {
+            console.error(`[App Sender] ${isZipRequest ? 'Zip' : 'Folder'} request received without mainPcId!`);
+            setError(`${isZipRequest ? 'Zip' : 'Folder'} download error: Missing connection ID.`);
             return;
         }
 
-        let pc = peerConns.current[mainPcId];
+        let pc = peerConns.current[pcIdToUse];
         let isNewPc = false;
 
         // --- Create Main PeerConnection if it doesn't exist ---
         if (!pc) {
-            console.log(`[App Sender] Creating NEW main PeerConnection for zip: ${mainPcId}`);
+            console.log(`[App Sender] Creating NEW main PeerConnection for ${isZipRequest ? 'zip' : 'folder'} request: ${pcIdToUse}`);
             isNewPc = true;
-            // cleanupWebRTCInstance(mainPcId); // Cleanup previous instance if any (optional)
+            // cleanupWebRTCInstance(pcIdToUse); // Cleanup previous instance if any (optional)
             pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS }); // Use imported ICE_SERVERS
-            peerConns.current[mainPcId] = pc;
+            peerConns.current[pcIdToUse] = pc;
 
             // Setup handlers for the NEW main PC
             pc.onicecandidate = (event) => {
               if (event.candidate) {
-                console.log(`[App Sender] Emitting ICE candidate for main zip PC ${mainPcId}`);
-                socket.emit('signal', { room: driveCode, fileId: mainPcId, data: { candidate: event.candidate } });
+                console.log(`[App Sender] Emitting ICE candidate for main PC ${pcIdToUse}`);
+                socket.emit('signal', { room: driveCode, fileId: pcIdToUse, data: { candidate: event.candidate } });
               } else {
-                 console.log(`[App Sender] End of ICE candidates for ${mainPcId}.`);
+                 console.log(`[App Sender] End of ICE candidates for ${pcIdToUse}.`);
               }
             };
             pc.onicecandidateerror = (event) => {
-               console.error(`[App Sender] Main zip PC ICE candidate error for ${mainPcId}:`, event);
+               console.error(`[App Sender] Main PC ICE candidate error for ${pcIdToUse}:`, event);
                if (event.errorCode) {
                    console.error(`  Error Code: ${event.errorCode}, Host Candidate: ${event.hostCandidate}, Server URL: ${event.url}, Text: ${event.errorText}`);
                }
                // Don't setError here for the whole zip based on candidate error
             };
             pc.onconnectionstatechange = () => {
-               console.log(`[App Sender] Main zip PC connection state change for ${mainPcId}: ${pc.connectionState}`);
+               console.log(`[App Sender] Main PC connection state change for ${pcIdToUse}: ${pc.connectionState}`);
                if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
-                  console.error(`[App Sender] Main zip PC ${mainPcId} failed/disconnected/closed.`);
-                  setError('Zip download connection failed.');
+                  console.error(`[App Sender] Main PC ${pcIdToUse} failed/disconnected/closed.`);
+                  setError(`${isZipRequest ? 'Zip' : 'Folder'} download connection failed.`);
                   // Consider cleanup of associated channels if needed
-                  cleanupWebRTCInstance(mainPcId);
+                  cleanupWebRTCInstance(pcIdToUse);
                }
             };
             pc.onsignalingstatechange = () => {
-               console.log(`[App Sender] Main zip PC signaling state change for ${mainPcId}: ${pc.signalingState}`);
+               console.log(`[App Sender] Main PC signaling state change for ${pcIdToUse}: ${pc.signalingState}`);
             };
 
              // Process pending signals for the NEW main PC
-             if (pendingSignals && pendingSignals.current[mainPcId]) {
-                console.log(`[App Sender] Processing ${pendingSignals.current[mainPcId].length} pending signals for NEW main PC ${mainPcId}`);
-                pendingSignals.current[mainPcId].forEach(signalData => {
-                  handleSignal({ fileId: mainPcId, ...signalData });
+             if (pendingSignals && pendingSignals.current[pcIdToUse]) {
+                console.log(`[App Sender] Processing ${pendingSignals.current[pcIdToUse].length} pending signals for NEW main PC ${pcIdToUse}`);
+                pendingSignals.current[pcIdToUse].forEach(signalData => {
+                  handleSignal({ fileId: pcIdToUse, ...signalData }); // Use pcIdToUse
                 });
-                delete pendingSignals.current[mainPcId];
+                delete pendingSignals.current[pcIdToUse];
              }
 
         } else {
-             console.log(`[App Sender] Reusing existing main PeerConnection for zip: ${mainPcId}`);
+             console.log(`[App Sender] Reusing existing main PeerConnection for ${isZipRequest ? 'zip' : 'folder'} request: ${pcIdToUse}`);
         }
 
         // --- Create Data Channel for the specific file ---
-        // Use transferFileId as the channel label for multiplexing
-        console.log(`[App Sender] Creating DataChannel for transferId: ${useTransferFileId} on main PC: ${mainPcId}`);
+        // Use transferFileId as the channel label for multiplexing on the shared PC
+        console.log(`[App Sender] Creating DataChannel for transferId: ${useTransferFileId} on main PC: ${pcIdToUse}`);
         const dc = pc.createDataChannel(useTransferFileId); // Label channel with unique transfer ID
         dc.binaryType = 'arraybuffer';
         dataChannels.current[useTransferFileId] = dc; // Store channel by transfer ID
@@ -421,25 +428,27 @@ function App() {
         };
 
         // --- Create and Send Offer ONLY if it's a new PeerConnection ---
+        // Create and Send Offer ONLY if it's a new PeerConnection (for either zip or folder)
         if (isNewPc) {
-            console.log(`[App Sender] Creating and sending OFFER for main PC ${mainPcId}`);
+            console.log(`[App Sender] Creating and sending OFFER for main PC ${pcIdToUse}`);
             pc.createOffer()
               .then(offer => pc.setLocalDescription(offer))
               .then(() => {
                  if (pc.localDescription) {
-                    socket.emit('signal', { room: driveCode, fileId: mainPcId, data: { sdp: pc.localDescription } });
+                    socket.emit('signal', { room: driveCode, fileId: pcIdToUse, data: { sdp: pc.localDescription } });
                  } else {
-                    console.error(`[App Sender] Local description not set before emitting offer for ${mainPcId}`);
+                    console.error(`[App Sender] Local description not set before emitting offer for ${pcIdToUse}`);
                  }
               })
               .catch(e => {
-                  console.error(`[App Sender] Error creating offer for ${mainPcId}:`, e);
-                  setError && setError(`Sender: Failed to create offer for zip download.`);
-                  cleanupWebRTCInstance(mainPcId); // Clean up failed PC
+                  console.error(`[App Sender] Error creating offer for ${pcIdToUse}:`, e);
+                  setError && setError(`Sender: Failed to create offer for ${isZipRequest ? 'zip' : 'folder'} download.`);
+                  cleanupWebRTCInstance(pcIdToUse); // Clean up failed PC
               });
         }
+        // If PC already exists, the receiver's offer/answer flow handles channel opening
 
-      } else { // --- Single File Request (Original Logic) ---
+      } else { // --- Single File Request (Original Logic - NOT zip or folder) ---
         // --- Start Single File Sender (Original Logic) ---
         // console.log("[App] Sender: Calling startWebRTC");
         startWebRTC({
@@ -622,9 +631,9 @@ function App() {
     delete dataChannels.current[fileId];
   }
 
-  // Integrate the useZipDownload hook
+  // Integrate the unified useZipDownload hook
   const {
-    startDownloadAll,
+    startZipProcess, // <-- Renamed function
     isZipping,
     zipProgress,
     downloadSpeed, // Add speed
@@ -643,6 +652,9 @@ function App() {
     pendingSignals, // Pass down the pendingSignals ref
     handleSignal // Pass down the memoized handleSignal function
   });
+
+  // --- REMOVE useFolderDownload hook integration ---
+
 
   // --- SENDER: Warn before leaving/reloading ---
   useEffect(() => {
@@ -728,6 +740,42 @@ function App() {
     }
   };
 
+  // --- SENDER: Delete Folder ---
+  const handleDeleteFolder = (folderPath) => {
+    console.log(`[App SENDER] Request to delete folder: ${folderPath}`);
+    // Filter out files that start with the folder path + '/'
+    // Also filter out files whose path *is* the folder path (shouldn't happen, but safety)
+    const pathPrefix = folderPath + '/';
+    const newFiles = filesRef.current.filter(f =>
+        !(f.path === folderPath || (f.path && f.path.startsWith(pathPrefix)))
+    );
+
+    if (newFiles.length === filesRef.current.length) {
+        console.warn(`[App SENDER] No files found matching path prefix "${pathPrefix}" for deletion.`);
+        return; // No changes made
+    }
+
+    console.log(`[App SENDER] Deleting ${filesRef.current.length - newFiles.length} files under ${folderPath}`);
+    setFiles(newFiles); // Update state
+    // filesRef will be updated by useEffect
+
+    // Emit updated file list to receivers
+    if (driveCode) {
+      const filesMeta = newFiles.map(({ name, size, type, fileId, path }) => ({
+        name, size, type, fileId, path
+      }));
+      socket.emit("file-list", { room: driveCode, filesMeta });
+    }
+  };
+
+  // --- RECEIVER: Download Folder (Placeholder) ---
+  const handleDownloadFolder = (folderPath) => {
+    // Call the unified zip process function with the folder path filter
+    console.log(`[App RECEIVER] Calling startZipProcess for folder: ${folderPath}`);
+    startZipProcess(folderPath); // Pass folderPath as the filter
+  };
+
+
   const handleJoinDrive = (codeToJoin) => {
     const upperCode = codeToJoin.toUpperCase();
     // Basic validation
@@ -809,7 +857,13 @@ function App() {
             onDrop={handleDrop}
             text="Drag and drop more files here, or click to select"
           />
-          <FileList files={files} onDelete={handleDeleteFile} isSender={true} />
+          {/* Pass folder delete handler to FileList */}
+          <FileList
+             files={files}
+             onDelete={handleDeleteFile}
+             onDeleteFolder={handleDeleteFolder} // <-- ADDED
+             isSender={true}
+          />
         </div>
         <div
           style={{ color: "#e74c3c", marginBottom: "1em", fontWeight: "bold" }}
@@ -828,8 +882,9 @@ function App() {
       <div className="container">
         <h2>Files in Drive</h2>
         <p><strong>Drive Code:</strong> {driveCode}</p> {/* Display drive code at the top */}
+        {/* Call startZipProcess without args for "Download All" */}
         <button
-          onClick={startDownloadAll}
+          onClick={() => startZipProcess()}
           disabled={isDownloadAllDisabled}
           style={{ marginBottom: '1em' }}
         >
@@ -869,10 +924,12 @@ function App() {
           onDownload={handleDownloadRequest} // Keep single file download
           isSender={false}
           isDownloading={isDownloading} // This state is for single downloads
+          onDownloadFolder={handleDownloadFolder} // <-- ADDED
           isZipping={isZipping} // Pass isZipping state
         />
-        {/* Display errors from both App state and zip hook */}
+        {/* Display errors from App state and the unified zip hook */}
         <ErrorBanner error={error || zipError} />
+        {/* REMOVE separate folder download progress display (now handled by isZipping/zipProgress) */}
         {/* Removed "Enter New Drive Code" button */}
       </div>
     );

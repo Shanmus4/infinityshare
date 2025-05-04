@@ -10,7 +10,7 @@ export function makeFileId() {
  *                                Each object should have at least 'name' and 'fileId'.
  *                                If 'path' exists (e.g., "Folder/Sub/file.txt"), it's used.
  * @returns {Object} A nested object representing the file tree.
- *                   Folders have { type: 'folder', children: {...} }.
+ *                   Folders have { type: 'folder', children: {...}, fullPath: '...' }.
  *                   Files have { type: 'file', ...originalFileObject }.
  */
 export function buildFileTree(files) {
@@ -38,8 +38,10 @@ export function buildFileTree(files) {
     // Split by / or \ , filter out empty parts (e.g., from leading/trailing slashes)
     const pathParts = pathString.split(/[\\/]/).filter(part => part.length > 0);
     let currentLevel = tree;
+    let currentPathSegments = []; // Keep track of path segments for folder fullPath
 
     pathParts.forEach((part, index) => {
+      currentPathSegments.push(part); // Add current part to segments list
       const isLastPart = index === pathParts.length - 1;
 
       if (isLastPart) {
@@ -58,16 +60,24 @@ export function buildFileTree(files) {
         }
       } else {
         // --- Intermediate part: should be a folder ---
+        const folderFullPath = currentPathSegments.join('/'); // Construct full path for this folder
+
         if (!currentLevel[part]) {
-          // Folder does not exist, create it
-          currentLevel[part] = { type: 'folder', children: {} };
+          // Folder does not exist, create it and store its full path
+          currentLevel[part] = { type: 'folder', children: {}, fullPath: folderFullPath };
           currentLevel = currentLevel[part].children; // Move into the new folder's children
         } else if (currentLevel[part].type === 'folder') {
           // Folder already exists, move into its children
+          // Ensure fullPath is set if it wasn't somehow (e.g., created implicitly earlier)
+          if (!currentLevel[part].fullPath) {
+              currentLevel[part].fullPath = folderFullPath;
+          }
           currentLevel = currentLevel[part].children;
         } else {
           // Conflict: A file exists with the name needed for a folder path segment
           console.warn(`buildFileTree: Folder path segment "${part}" in "${pathString}" conflicts with existing file. Skipping this file.`);
+          // Remove the last segment as we are stopping processing for this file path
+          currentPathSegments.pop();
           return; // Stop processing this file path due to conflict
         }
       }

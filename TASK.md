@@ -3,9 +3,15 @@
 ## Active Tasks
 
 - [ ] **UI:** Fix general UI issues and improve responsiveness (User Request)
-- [ ] **UI:** Display file and folder structure correctly (User Request 2025-05-04)
-  - **Done (2025-05-04 2:14 PM):** Captured `file.path` in `App.js`, updated `FileList.js` to display path (flat list), updated `useZipDownload.js` for correct zip structure.
-  - **Done (2025-05-04 2:53 PM):** Implemented expandable/collapsible tree view in `FileList.js`.
+- [x] **UI & Feature:** Implement folder structure display and actions (User Request 2025-05-04, Completed 2025-05-04 3:05 PM)
+  - Captured `file.path` in `App.js`.
+  - Implemented expandable/collapsible tree view in `FileList.js`.
+  - Added Delete/Download buttons for folders in `FileList.js`.
+  - Added `handleDeleteFolder` in `App.js`.
+  - Refactored `useZipDownload.js` to handle both "Download All" and specific folder downloads (using `startZipProcess(folderPath?)`).
+  - Updated sender (`App.js`) to handle folder download requests via `isFolderRequest` flag.
+  - Integrated refactored `useZipDownload` hook into `App.js` receiver view for both button types.
+  - Removed unused `useFolderDownload.js` hook.
 - [ ] **Feature:** Add mobile-optimized UI
 - [ ] **Improvement/Security:** Implement rate limiting on `signaling-server` events (e.g., `create-room`, `join-room`) to prevent abuse. (Discovered 2025-05-04)
 - [ ] **Deployment:** Configure TLS/SSL for production deployment (Mentioned in docs) - **Partially Done (2025-05-04):** Signaling server (`signaling-server/index.js`) updated to support HTTPS via `SSL_CERT_PATH` and `SSL_KEY_PATH` environment variables. Actual certificate provisioning and web server (hosting client) HTTPS configuration still required in deployment environment.
