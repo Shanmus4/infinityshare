@@ -603,7 +603,8 @@ function App() {
     startDownloadAll,
     isZipping,
     zipProgress,
-    downloadProgress,
+    downloadSpeed, // Add speed
+    etr, // Add etr
     error: zipError // Alias to avoid state name conflict
   } = useZipDownload({
     receiverFilesMeta,
@@ -715,6 +716,27 @@ function App() {
     }
   };
 
+  // --- Helper Functions for UI ---
+  function formatSpeed(bytesPerSecond) {
+    if (bytesPerSecond < 1024) {
+      return `${bytesPerSecond.toFixed(0)} B/s`;
+    } else if (bytesPerSecond < 1024 * 1024) {
+      return `${(bytesPerSecond / 1024).toFixed(1)} KB/s`;
+    } else {
+      return `${(bytesPerSecond / (1024 * 1024)).toFixed(1)} MB/s`;
+    }
+  }
+
+  function formatEtr(seconds) {
+    if (seconds === null || seconds === Infinity || seconds < 0) {
+      return '--:--';
+    }
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  // -----------------------------
+
   // --- UI ---
   if (step === "init") {
     return (
@@ -801,20 +823,18 @@ function App() {
                 lineHeight: '20px',
                 color: 'white'
               }}>
-                {Math.round(zipProgress)}%
+                {/* Format progress to 2 decimal places */}
+                {zipProgress.toFixed(2)}%
               </div>
             </div>
-            {/* Optional: Display individual file progress */}
-            {Object.keys(downloadProgress).length > 0 && (
-              <div style={{ marginTop: '0.5em', fontSize: '0.9em' }}>
-                {Object.entries(downloadProgress).map(([fileId, progress]) => {
-                  const file = receiverFilesMeta.find(f => f.fileId === fileId);
-                  return (
-                    <div key={fileId}>{file?.name || fileId}: {Math.round(progress)}%</div>
-                  );
-                })}
-              </div>
+            {/* Display Speed and ETR */}
+            {isZipping && zipProgress < 80 && ( // Show only during weighted download phase (0-80%)
+               <div style={{ marginTop: '0.5em', fontSize: '0.9em', color: '#555' }}>
+                   <span>Speed: {formatSpeed(downloadSpeed)}</span>
+                   <span style={{ marginLeft: '1em' }}>ETR: {formatEtr(etr)}</span>
+               </div>
             )}
+            {/* REMOVED individual file progress display */}
           </div>
         )}
 

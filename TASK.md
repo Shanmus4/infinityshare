@@ -1,13 +1,23 @@
 # TASK.md
 
 ## Active Tasks
+
 - [ ] **UI:** Fix general UI issues and improve responsiveness (User Request)
-- [ ] **BUG/Improvement:** Investigate and fix potential issues with "Download All" ZIP functionality (User Request)
+- [ ] **Optimization:** Improve perceived speed of "Download All" zip download (User Request)
+  - Removed delay between channel requests in `useZipDownload.js` (2025-05-04 12:50 PM)
+- Changed zip filename to "InfinityShare Files.zip" (2025-05-04 1:03 PM)
+  - Updated zip progress calculation based on total bytes; removed individual file progress display (2025-05-04 1:03 PM)
+- Added download speed and ETR calculation/display (2025-05-04 1:08 PM)
+- Adjusted zip progress weighting (80% download, 20% zip) for better UX (2025-05-04 1:13 PM)
 - [ ] **Feature:** Add mobile-optimized UI
 - [ ] **Improvement/Security:** Implement rate limiting on `signaling-server` events (e.g., `create-room`, `join-room`) to prevent abuse. (Discovered 2025-05-04)
 - [ ] **Deployment:** Configure TLS/SSL for production deployment (Mentioned in docs) - **Partially Done (2025-05-04):** Signaling server (`signaling-server/index.js`) updated to support HTTPS via `SSL_CERT_PATH` and `SSL_KEY_PATH` environment variables. Actual certificate provisioning and web server (hosting client) HTTPS configuration still required in deployment environment.
 
 ## Completed Tasks (Verified 2025-05-04)
+
+- [x] **BUG:** Fix "Download All" ZIP functionality failing due to ICE errors / background tab throttling (User Request, Fixed 2025-05-04 12:50 PM)
+  - _Root cause: Likely browser/network limits with multiple PeerConnections. ICE errors were non-fatal but treated as such initially. Background tab throttling also caused stalls._
+  - _Fix: Refactored to use a single PeerConnection with multiple DataChannels. Switched sender loop to `setTimeout`._
 - [x] **Refactor:** Review and remove unused dependencies across `client`, `server`, and `signaling-server` (User Request) - Done (2025-05-04): `/server` directory removed. Other dependencies checked.
 - [x] **Security/Prep:** Address `npm audit` vulnerabilities in `/client` (8 vulnerabilities: 2 moderate, 6 high from `react-scripts` transitive dependencies - `nth-check`, `postcss`). **Mitigation Applied (2025-05-04):** Added `overrides` for `nth-check@2.0.1` and `postcss@8.4.31` in `client/package.json` and reinstalled. `npm audit` still reports the vulnerabilities, but the overrides should force the use of patched versions. `npm audit fix --force` was avoided as breaking.
 - [x] **Security/Prep:** Perform Security/Privacy review for open-sourcing (User Request) - **Done (2025-05-04):** Hardcoded Twilio credentials removed from client (`client/src/utils/signaling.js`). Signaling server logging reviewed (seems okay). CORS restricted. Input validation added. XSS checked in `FileList`, `App`, `ErrorBanner` (React escaping handles it). Lack of rate limiting on signaling server noted as potential improvement area. Git history cleaned of secrets.
@@ -36,6 +46,7 @@
 - [x] BUG FIX: Download of newly appended files is slow or stuck unless page is refreshed (fixed YYYY-MM-DD HH:MM, ensured SW is ready before starting download)
 
 ## Discovered During Work (2025-05-03)
+
 - **RESOLVED (2025-05-04):** The `/server` directory was confirmed unused and has been removed.
 - **MITIGATED (2025-05-04):** `npm audit` reported 8 vulnerabilities (2 moderate, 6 high) in `/client` due to `react-scripts` transitive dependencies (`nth-check`, `postcss`). Added `overrides` in `client/package.json` as mitigation, although `npm audit` continues to report them.
 
@@ -44,6 +55,7 @@
 - **RESOLVED (2025-05-04):** Basic input validation added to signaling server socket event handlers.
 
 ---
-*Last updated: 2025-05-03T18:03:30+05:30*
+
+_Last updated: 2025-05-03T18:03:30+05:30_
 
 - [x] **UI:** Update URL when drive code is entered manually, so refresh keeps the user on the receiver page. (2025-05-04 04:05 AM)

@@ -19,10 +19,16 @@ export function useZipDownload({
 }) {
   const [isZipping, setIsZipping] = useState(false);
   const [zipProgress, setZipProgress] = useState(0); // 0 to 100
-  const [downloadProgress, setDownloadProgress] = useState({}); // { fileId: progress } - keyed by originalFileId
+  // const [downloadProgress, setDownloadProgress] = useState({}); // REMOVED - Use single overall progress
   const [error, setError] = useState('');
+  const [downloadSpeed, setDownloadSpeed] = useState(0); // Bytes per second
+  const [etr, setEtr] = useState(null); // Estimated time remaining in seconds
 
   const fileData = useRef({}); // To store received file chunks/Blobs before zipping
+  const totalBytesReceived = useRef(0); // Ref to track total bytes received across all files
+  const lastSpeedCheckTime = useRef(0); // Timestamp of last speed calc
+  const lastSpeedCheckBytes = useRef(0); // Bytes received at last speed calc
+  const downloadStartTime = useRef(0); // Timestamp when download phase starts
   // REMOVED internal refs - use refs passed from App.js via props
   // const peerConns = useRef({});
   // const dataChannels = useRef({});
@@ -47,14 +53,23 @@ export function useZipDownload({
 
     setIsZipping(true);
     setZipProgress(0);
-    setDownloadProgress({});
+    // setDownloadProgress({}); // REMOVED
     setError('');
+    totalBytesReceived.current = 0; // Reset total bytes received
+    setDownloadSpeed(0); // Reset speed
+    setEtr(null); // Reset ETR
+    lastSpeedCheckTime.current = 0;
+    lastSpeedCheckBytes.current = 0;
+    downloadStartTime.current = Date.now(); // Record start time for ETR calc
     fileData.current = {}; // Clear previous data
     const transferIdToOriginalIdMap = new Map(); // Map channel labels (transfer IDs) to original file IDs
     const activeTransferIds = []; // Store active transfer IDs (channel labels) for cleanup/tracking
 
     const zip = new JSZip();
     let filesDownloaded = 0;
+    // Calculate total size for progress calculation
+    const totalSizeToDownload = receiverFilesMeta.reduce((sum, meta) => sum + (meta.size || 0), 0);
+    console.log(`[useZipDownload] Total size to download: ${totalSizeToDownload}`);
 
     // Define callbacks locally
     const handleFileDataCallback = (transferFileId, chunk) => {
@@ -70,20 +85,51 @@ export function useZipDownload({
         //console.log('[useZipDownload] handleFileData: creating new array for originalFileId', originalFileId);
         fileData.current[originalFileId] = [];
       }
+      const chunkSize = chunk.byteLength || 0;
       fileData.current[originalFileId].push(chunk);
+      totalBytesReceived.current += chunkSize; // Increment total bytes
 
-      // Update individual file download progress (optional but good UX)
-      // Find meta using the original file ID
-      const fileMeta = receiverFilesMeta.find(f => f.fileId === originalFileId);
-      if (fileMeta && fileMeta.size > 0) {
-         const receivedSize = fileData.current[originalFileId].reduce((sum, c) => sum + c.byteLength, 0);
-         //console.log('[useZipDownload] handleFileData: originalFileId', originalFileId, 'receivedSize', receivedSize, 'fileSize', fileMeta.size);
-         // Update progress state keyed by the original file ID
-         setDownloadProgress(prev => ({
-           ...prev,
-           [originalFileId]: (receivedSize / fileMeta.size) * 100
-         }));
+      // Update overall download progress (weighted to 80% of total bar)
+      if (totalSizeToDownload > 0) {
+          const downloadWeight = 0.80; // 80% for download
+          const downloadPercent = (totalBytesReceived.current / totalSizeToDownload) * (100 * downloadWeight);
+          setZipProgress(downloadPercent);
+          // console.log(`[useZipDownload] Total Received: ${totalBytesReceived.current}/${totalSizeToDownload}, Weighted Progress: ${downloadPercent.toFixed(2)}%`); // Debug log
       }
+
+      // --- Calculate Speed and ETR ---
+      const now = Date.now();
+      // Calculate speed roughly every second
+      if (now - lastSpeedCheckTime.current > 1000) {
+          const bytesSinceLastCheck = totalBytesReceived.current - lastSpeedCheckBytes.current;
+          const timeSinceLastCheck = (now - lastSpeedCheckTime.current) / 1000; // seconds
+
+          if (timeSinceLastCheck > 0) {
+              const currentSpeed = bytesSinceLastCheck / timeSinceLastCheck;
+              setDownloadSpeed(currentSpeed);
+
+              // Calculate ETR
+              if (currentSpeed > 0 && totalSizeToDownload > 0) {
+                  const bytesRemaining = totalSizeToDownload - totalBytesReceived.current;
+                  const currentEtr = bytesRemaining / currentSpeed; // ETR in seconds
+                  setEtr(currentEtr);
+              } else {
+                  setEtr(null); // Cannot estimate if speed is 0
+              }
+          } else {
+              // Avoid division by zero if checks happen too fast
+              setDownloadSpeed(0);
+              setEtr(null);
+          }
+
+          lastSpeedCheckTime.current = now;
+          lastSpeedCheckBytes.current = totalBytesReceived.current;
+      }
+      // -----------------------------
+
+      // REMOVED individual file download progress logic
+      // const fileMeta = receiverFilesMeta.find(f => f.fileId === originalFileId);
+      // if (fileMeta && fileMeta.size > 0) { ... }
     };
 
     const handleFileCompleteCallback = (transferFileId) => {
@@ -94,13 +140,14 @@ export function useZipDownload({
        }
        filesDownloaded++;
        console.log(`[useZipDownload] File complete (originalId: ${originalFileId}, transferId: ${transferFileId}). ${filesDownloaded}/${receiverFilesMeta.length} files received.`);
-       // Update overall progress based on files received
-       setZipProgress((filesDownloaded / receiverFilesMeta.length) * 50); // First 50% for downloading
+       // Don't update progress based on file count anymore, use total bytes received
 
        // Check if all files are downloaded
        if (filesDownloaded === receiverFilesMeta.length) {
          console.log('[useZipDownload] All files downloaded, starting zipping.');
-         setZipProgress(50); // Transition to zipping phase
+         // Ensure progress shows at least the full download weight before zipping starts
+         const downloadWeightPercent = 80; // 80% allocated to download
+         setZipProgress(downloadWeightPercent); // Set progress to start of zipping phase
 
          // Start zipping - uses originalFileId from receiverFilesMeta to access fileData.current
          receiverFilesMeta.forEach(fileMeta => {
@@ -114,15 +161,20 @@ export function useZipDownload({
          });
 
          zip.generateAsync({ type: 'blob' }, (metadata) => {
-           // Update zipping progress (remaining 50%)
-           setZipProgress(50 + metadata.percent / 2);
+           // Update zipping progress (remaining 20% of total bar)
+           const downloadWeightPercent = 80; // 80% allocated to download
+           const zipWeight = 0.20; // 20% for zipping
+           const zipPhaseProgress = (metadata.percent / 100) * (100 * zipWeight); // Calculate zip's contribution to the 20%
+           setZipProgress(downloadWeightPercent + zipPhaseProgress); // Add zip progress to the base 80%
          })
          .then(function(content) {
            console.log('[useZipDownload] Zipping complete, triggering download.');
-           saveAs(content, 'files.zip');
+           saveAs(content, 'InfinityShare Files.zip'); // Use new filename
            setIsZipping(false);
            setZipProgress(100);
-           setDownloadProgress({});
+           setDownloadSpeed(0); // Reset speed on completion
+           setEtr(null); // Reset ETR on completion
+           // setDownloadProgress({}); // REMOVED
            // Cleanup all peer connections using the stored transfer IDs
            console.log('[useZipDownload] Cleaning up WebRTC instances for transfers:', activeTransferIds);
            activeTransferIds.forEach(id => cleanupWebRTCInstance(id));
@@ -132,7 +184,9 @@ export function useZipDownload({
            setError('Failed to zip files.');
            setIsZipping(false);
            setZipProgress(0);
-           setDownloadProgress({});
+           setDownloadSpeed(0); // Reset speed on error
+           setEtr(null); // Reset ETR on error
+           // setDownloadProgress({}); // REMOVED
            // Cleanup all peer connections using the stored transfer IDs
            console.log('[useZipDownload] Cleaning up WebRTC instances after zip error:', activeTransferIds);
            activeTransferIds.forEach(id => cleanupWebRTCInstance(id));
@@ -147,7 +201,9 @@ export function useZipDownload({
       setError(`Error downloading file: ${fileName}`);
       setIsZipping(false);
       setZipProgress(0);
-      setDownloadProgress({});
+      setDownloadSpeed(0); // Reset speed on error
+      setEtr(null); // Reset ETR on error
+      // setDownloadProgress({}); // REMOVED
       // Attempt to cleanup the specific connection using transferFileId
       cleanupWebRTCInstance(transferFileId);
       // Note: If one file fails, the whole zip download might need to be cancelled or handled.
@@ -204,7 +260,7 @@ export function useZipDownload({
          setError('Zip download connection failed.');
          setIsZipping(false);
          setZipProgress(0);
-         setDownloadProgress({});
+         // setDownloadProgress({}); // REMOVED
          // Cleanup the main PC and potentially associated channels?
          cleanupWebRTCInstance(mainZipPcId);
          // Also cleanup any channels associated with this failed PC?
@@ -303,13 +359,13 @@ export function useZipDownload({
         });
 
         // Keep delay between *requests* to potentially avoid overwhelming sender/signaling
-        console.log(`[useZipDownload] Waiting 500ms before next file request...`); // Reduced delay slightly
-        await delay(500);
+        // console.log(`[useZipDownload] Waiting 500ms before next file request...`); // REMOVED Delay
+        // await delay(500); // REMOVED Delay
     }
   };
 
   // Need to adapt startWebRTC to use onChunk, onComplete, onError callbacks
   // instead of interacting with the service worker directly when these callbacks are provided.
 
-  return { startDownloadAll, isZipping, zipProgress, downloadProgress, error };
+  return { startDownloadAll, isZipping, zipProgress, downloadSpeed, etr, error };
 }
