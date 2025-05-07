@@ -1,13 +1,12 @@
 import React from 'react';
 import QRCode from 'qrcode.react';
 
-function QRCodeBlock({ receiverUrl, driveCode }) {
+// Modified to only render the QR code itself
+function QRCodeBlock({ receiverUrl }) {
+  // Removed driveCode prop as it's displayed separately now
+  // Removed wrapper div and extra text
   return (
-    <div style={{ marginBottom: 16 }}>
-      <QRCode value={receiverUrl} size={200} />
-      <div>Drive code: <b>{driveCode}</b></div>
-      <div>Share this code, QR, or link with receivers.</div>
-    </div>
+      <QRCode value={receiverUrl} size={160} /> // Set size to 160
   );
 }
 

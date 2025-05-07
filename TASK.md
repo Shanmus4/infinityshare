@@ -2,6 +2,15 @@
 
 ## Active Tasks
 
+- [x] **Analysis:** Analyze the codebase and understand the project (User Request 2025-05-07, Completed 2025-05-07)
+  - Reviewed `PLANNING.md` and `TASK.md`.
+  - Examined `client/src/App.js` (main component, state, WebRTC orchestration).
+  - Examined `signaling-server/index.js` (Socket.IO based signaling).
+  - Examined `client/src/hooks/useWebRTC.js` (single file WebRTC logic).
+  - Examined `client/src/hooks/useZipDownload.js` (multi-file/folder WebRTC and JSZip integration).
+  - Examined `client/public/service-worker.js` (streaming downloads for single files).
+- [ ] **UI Styling:** Apply CSS changes provided by the user for colors, fonts, and general styling. (User Request 2025-05-07)
+- [ ] **SEO:** Add `og:url` and `twitter:url` to `client/public/index.html` after deployment. (Discovered 2025-05-07)
 - [ ] **UI:** Fix general UI issues and improve responsiveness (User Request)
 - [ ] **Feature:** Add mobile-optimized UI
 - [ ] **Improvement/Security:** Implement rate limiting on `signaling-server` events (e.g., `create-room`, `join-room`) to prevent abuse. (Discovered 2025-05-04)
