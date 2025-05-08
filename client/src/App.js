@@ -1011,7 +1011,8 @@ function App() {
                       <span className="drive-link-text">{receiverUrl}</span>
                       <button className="copy-button" onClick={() => handleCopy(receiverUrl)}>
                          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="33" viewBox="0 0 32 33" fill="none">
-                           <path d="M20 27.1666H6.66667V9.83329C6.66667 9.09996 6.06667 8.49996 5.33333 8.49996C4.6 8.49996 4 9.09996 4 9.83329V27.1666C4 28.6333 5.2 29.8333 6.66667 29.8333H20C20.7333 29.8333 21.3333 29.2333 21.3333 28.5C21.3333 27.7666 20.7333 27.1666 20 27.1666ZM26.6667 21.8333V5.83329C26.6667 4.36663 25.4667 3.16663 24 3.16663H12C10.5333 3.16663 9.33333 4.36663 9.33333 5.83329V21.8333C9.33333 23.3 10.5333 24.5 12 24.5H24C25.4667 24.5 26.6667 23.3 26.6667 21.8333ZM24 21.8333H12V5.83329H24V21.8333Z" fill="white"/>
+                           {/* Changed fill to black */}
+                           <path d="M20 27.1666H6.66667V9.83329C6.66667 9.09996 6.06667 8.49996 5.33333 8.49996C4.6 8.49996 4 9.09996 4 9.83329V27.1666C4 28.6333 5.2 29.8333 6.66667 29.8333H20C20.7333 29.8333 21.3333 29.2333 21.3333 28.5C21.3333 27.7666 20.7333 27.1666 20 27.1666ZM26.6667 21.8333V5.83329C26.6667 4.36663 25.4667 3.16663 24 3.16663H12C10.5333 3.16663 9.33333 4.36663 9.33333 5.83329V21.8333C9.33333 23.3 10.5333 24.5 12 24.5H24C25.4667 24.5 26.6667 23.3 26.6667 21.8333ZM24 21.8333H12V5.83329H24V21.8333Z" fill="black"/>
                          </svg>
                       </button>
                    </div>
@@ -1021,15 +1022,13 @@ function App() {
                    </div>
                 </div>
               </div>
-            </div>
-
-            {/* File List Section */}
-            <div className="file-list-section">
+              {/* File List Section is now rendered by FileList component */}
               <FileList
                  files={files}
                  onDelete={handleDeleteFile}
                  onDeleteFolder={handleDeleteFolder}
                  isSender={true}
+                 // Pass necessary props for FileList styling/functionality if needed
               />
             </div>
 
@@ -1037,8 +1036,10 @@ function App() {
           </div>
            {/* Toast Snackbar */}
            <div className={`toast-snackbar ${showToast ? 'show' : ''}`}>
-              <svg className="toast-snackbar-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                 <path d="M16 12C16 13.0609 15.5786 14.0783 14.8284 14.8284C14.0783 15.5786 13.0609 16 12 16C10.9391 16 9.92172 15.5786 9.17157 14.8284C8.42143 14.0783 8 13.0609 8 12C8 10.9391 8.42143 9.92172 9.17157 9.17157C9.92172 8.42143 10.9391 8 12 8C13.0609 8 14.0783 8.42143 14.8284 9.17157C15.5786 9.92172 16 10.9391 16 12ZM18.82 11H22C21.76 6.97 19.03 4.24 15 4V7.18C17.36 7.64 18.82 9.1 18.82 11ZM11 2C10.45 2 10 2.45 10 3V5.08C6.71 5.57 4 8.42 4 12C4 12.55 4.45 13 5 13H7.08C7.57 16.29 10.42 19 14 19C14.55 19 15 18.55 15 18V15.92C18.29 15.43 21 12.58 21 9C21 8.45 20.55 8 20 8H17.92C17.43 4.71 14.58 2 11 2Z" fill="white"/>
+              {/* Changed icon to a generic link icon */}
+              <svg className="toast-snackbar-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.72"></path>
+                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.72-1.72"></path>
               </svg>
               Link Copied!
            </div>
@@ -1051,7 +1052,7 @@ function App() {
     const isDownloadAllDisabled = receiverFilesMeta.length === 0 || isZipping;
 
     return (
-      <div className="container">
+      <div className="container"> {/* TODO: Update receiver view to use new layout structure */}
         <h2>Files in Drive</h2>
         <p><strong>Drive Code:</strong> {driveCode}</p> {/* Display drive code at the top */}
         {/* Call startZipProcess without args for "Download All" */}

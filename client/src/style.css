@@ -19,7 +19,7 @@ html {
   --Primary-Light-Pink: #ff90e7;
   --Secondary-Dark-Red: #98282a;
   --Secondary-Yellow: #6f5700;
-  --Secondary-Dark-Pink: #b23386; /* Added */
+  --Secondary-Dark-Pink: #b23386;
 }
 
 body {
@@ -32,7 +32,6 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: flex-start; /* Align content to the start (top) */
-  /* justify-content: center; Removed for now, header is absolute */
   align-items: center;
   overflow-x: hidden;
 }
@@ -374,9 +373,10 @@ button:disabled {
   opacity: 1 !important;
   pointer-events: none !important;
 }
-button:hover {
+/* Remove generic button hover if it conflicts */
+/* button:hover {
   background: #2566d4;
-}
+} */
 
 /* Error Message Styling */
 .error-subcontainer {
@@ -459,22 +459,23 @@ button:hover {
 /* Styles for QR Code / Link / File List sections in Sender View */
 .sharing-info-section {
   /* This is the main container for QR, Link, Code */
-  padding: 20px;
+  display: flex;
+  padding: 40px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 32px;
+  align-self: stretch;
   border: 1px solid var(--Black-Black, #0d0d0d);
   background: var(--White-Pure-White, #fff);
-  align-self: stretch;
-  box-sizing: border-box;
-  display: flex; /* Itself is a flex container for .link-details */
-  flex-direction: column; /* Stack .link-details and other potential direct children */
-  gap: 20px; /* Gap if there were other direct children */
+  /* Removed layout styles, now handled by .link-details */
 }
 
 .link-details {
-  /* New intermediate div as per user clarification */
+  /* Wrapper for QR and Right Div */
   display: flex;
-  align-items: center; /* Vertically align QR and Right Div */
-  gap: 24px; /* Horizontal gap between QR and Right Div */
-  align-self: stretch; /* Make this div stretch within sharing-info-section */
+  align-items: center;
+  gap: 24px;
+  align-self: stretch;
   width: 100%; /* Ensure it takes full width of parent */
 }
 
@@ -508,6 +509,7 @@ button:hover {
   align-items: center;
   align-self: stretch;
   border: 1px solid var(--Black-Pure-Black, #000);
+  /* Removed border */
 }
 
 .drive-link-text {
@@ -529,14 +531,24 @@ button:hover {
   display: flex;
   width: 48px;
   height: 48px;
-  padding: 0; /* Padding is for content, not button size itself if fixed */
   justify-content: center;
   align-items: center;
   border-radius: 2px;
   border: 0.48px solid var(--Black-Pure-Black, #000);
-  background: var(--Black-Pure-Black, #000);
+  background: var(--White-Pure-White, #fff); /* White background */
   cursor: pointer;
-  flex-shrink: 0; /* Prevent shrinking */
+  flex-shrink: 0;
+  transition: transform 0.1s ease-out, box-shadow 0.1s ease-out; /* Add transition */
+  background-color: violet;
+}
+
+.copy-button:hover {
+  box-shadow: 3px 3px 0px 0px var(--Black-Pure-Black, #000); /* Shadow on hover */
+}
+
+.copy-button:active {
+  transform: translate(3px, 3px); /* Move on active */
+  box-shadow: none; /* Remove shadow on active */
 }
 
 .copy-button svg {
@@ -549,8 +561,7 @@ button:hover {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
-  /* Removed margin-top */
+  gap: 2px;
 }
 
 .drive-code-label {
@@ -570,7 +581,7 @@ button:hover {
   font-size: 36px;
   font-style: normal;
   font-weight: 700;
-  line-height: normal;
+  line-height: 32px;
 }
 
 /* Toast/Snackbar Styling */
@@ -579,8 +590,9 @@ button:hover {
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  background-color: var(--Black-Pure-Black, #000);
-  color: var(--White-Pure-White, #fff);
+  background-color: var(--White-Pure-White, #fff); /* White background */
+  color: var(--Black-Pure-Black, #000); /* Black text */
+  border: 1px solid var(--Black-Pure-Black, #000); /* Black border */
   padding: 12px 20px;
   border-radius: 4px;
   z-index: 1000;
@@ -605,6 +617,7 @@ button:hover {
 }
 
 .file-list-section {
+  /* Keep this if used in receiver view */
   display: flex;
   flex-direction: column;
   padding: 20px;
@@ -612,4 +625,173 @@ button:hover {
   background: var(--White-Pure-White, #fff);
   align-self: stretch;
   box-sizing: border-box;
+}
+
+/* FileList Component Styles (New Structure) */
+.drive-contents-div {
+  /* Renamed from .file-list-section */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  align-self: stretch;
+  width: 100%; /* Ensure full width */
+  /* Removed padding/border/background as it's now inside sharing-info */
+}
+
+/* Styles for the new div-based structure */
+.structure {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  align-self: stretch;
+  width: 100%;
+  border: 1px solid var(--Black-Black, #0d0d0d); /* Added border */
+}
+
+.level-div {
+  /* Base style for folder/file rows */
+  display: flex;
+  padding: 16px 16px; /* Updated padding */
+  justify-content: space-between; /* Updated justification */
+  align-items: center;
+  align-self: stretch;
+  width: 100%;
+  /* gap: 16px; */ /* Removed gap */
+  transition: background-color 0.2s ease;
+  /* Indentation will be handled dynamically via style prop based on level */
+}
+
+.level-div:hover {
+  background-color: var(--Grey-Light-Grey);
+}
+
+.level-div.file-level {
+  /* Modifier for files inside folders */
+  padding-left: 32px; /* Specific padding for files */
+  padding-right: 32px;
+  border-bottom: none; /* No border for files inside folders */
+}
+
+.arrow-folder-div {
+  /* Container for arrow + folder icon/name */
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-grow: 1;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.folder-arrow-icon {
+  width: 24px;
+  height: 24px;
+  aspect-ratio: 1/1;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+  display: flex; /* Center SVG inside */
+  justify-content: center;
+  align-items: center;
+}
+.folder-arrow-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.folder-arrow-icon.expanded {
+  transform: rotate(90deg);
+}
+
+.folder-icon-name-div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.folder-icon-svg,
+.file-icon-svg {
+  /* Combined styles for icons */
+  width: 24px;
+  height: 24px;
+  aspect-ratio: 1/1;
+  flex-shrink: 0;
+}
+/* Specific fill/stroke can be added for file types later */
+.file-icon-svg path {
+  fill: var(--Primary-Green); /* Example: Default file icon color */
+}
+
+.folder-name-text,
+.file-name-text {
+  /* Combined style for names */
+  color: var(--Black-Pure-Black, #000);
+  font-family: "Mabry Pro", sans-serif;
+  font-size: 20px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.level-delete-button {
+  /* Style for the delete button icon */
+  width: 32px;
+  height: 32px;
+  aspect-ratio: 1/1;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-left: auto; /* Push delete button to the right */
+  padding: 2px;
+  background: none;
+  border: none;
+}
+
+.level-delete-button svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.level-delete-button {
+  /* ... existing styles ... */
+  border: 1px solid var(--Black-Pure-Black, #000); /* Added border */
+  transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
+}
+
+.level-delete-button:hover {
+  /* Add shadow on hover */
+  box-shadow: 3px 3px 0px 0px var(--Black-Pure-Black, #000);
+  background: none; /* Ensure no background change on hover */
+}
+/* Removed hover fill change */
+/* .level-delete-button:hover svg path { ... } */
+
+.level-delete-button:active {
+  /* Add transform on active */
+  transform: translate(3px, 3px); /* Adjusted to match shadow */
+  box-shadow: none; /* Remove shadow on active */
+  background: none; /* Ensure no background change on active */
+}
+
+/* Remove old progress/empty/error styles if replaced */
+.folder-children-container {
+  /* Wrapper for nested items */
+  width: 100%;
+  padding-left: 0; /* Reset padding, indentation is on level-div */
+  /* border-left: 1px dashed #ccc; */ /* Removed border */
+}
+/* .folder-progress-container { ... } */
+/* ... etc ... */
+.file-list-empty {
+  color: #aaa;
+  font-style: italic;
+  padding: 20px; /* Add some padding */
+}
+
+.file-list-error {
+  color: red;
+  font-weight: bold;
+  padding: 20px; /* Add some padding */
 }
