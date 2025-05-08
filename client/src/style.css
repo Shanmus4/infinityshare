@@ -481,8 +481,8 @@ button:disabled {
 
 .qr-code-container {
   /* For the QR code block */
-  width: 160px;
-  height: 160px;
+  width: 200px; /* Increased base size */
+  height: 200px;
   aspect-ratio: 1/1;
   /* background: url(<path-to-image>) lightgray 50% / cover no-repeat; */ /* Placeholder, actual QR is canvas */
   background-color: lightgray; /* Fallback if QR doesn't load */
@@ -492,12 +492,20 @@ button:disabled {
   flex-shrink: 0; /* Prevent shrinking */
 }
 
+/* Ensure canvas fills the container */
+.qr-code-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain; /* Scale QR code correctly within bounds */
+}
+
 .link-details-right-div {
   display: flex;
   flex-direction: column;
   justify-content: space-between; /* Distributes space between link and code */
   align-items: flex-start;
-  flex: 1 0 0; /* Takes remaining space */
+  flex: 1 1 0; /* Allow shrinking (middle value 1) */
+  min-width: 0; /* Crucial for allowing flex items with overflow text to shrink */
   align-self: stretch; /* Stretches to height of .sharing-info-section */
 }
 
@@ -510,21 +518,26 @@ button:disabled {
   align-self: stretch;
   border: 1px solid var(--Black-Pure-Black, #000);
   /* Removed border */
+  min-width: 0; /* Allow shrinking if necessary */
 }
 
 .drive-link-text {
-  font-family: "Mabry Pro", sans-serif;
-  font-size: 20px; /* Updated size */
+  /* User provided styles */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  flex: 1 0 0; /* Use flex: 1 0 0 as provided */
+  overflow: hidden;
+  color: var(--Black-Pure-Black, #000);
+  text-overflow: ellipsis;
+  font-family: "Mabry Pro";
+  font-size: 20px;
   font-style: normal;
   font-weight: 400;
   line-height: 24px; /* 120% */
-  color: var(--Black-Pure-Black, #000);
-  text-align: left; /* Changed from center spec, as links usually align left */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex-grow: 1;
+  /* Added/Retained properties */
   margin-right: 10px; /* Space before copy button */
+  min-width: 0; /* Helps flex item shrink and trigger ellipsis */
 }
 
 .copy-button {
@@ -539,7 +552,7 @@ button:disabled {
   cursor: pointer;
   flex-shrink: 0;
   transition: transform 0.1s ease-out, box-shadow 0.1s ease-out; /* Add transition */
-  background-color: violet;
+  /* background-color: violet; */ /* Ensure debug color is removed */
 }
 
 .copy-button:hover {
@@ -582,6 +595,7 @@ button:disabled {
   font-style: normal;
   font-weight: 700;
   line-height: 32px;
+  overflow-wrap: break-word; /* Prevent long codes from breaking layout */
 }
 
 /* Toast/Snackbar Styling */
@@ -602,12 +616,14 @@ button:disabled {
   font-size: 14px;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.3s ease, visibility 0.3s ease;
+  transform: translateX(-50%) translateY(100%); /* Start centered below viewport */
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out, visibility 0.3s; /* Add transform to transition */
 }
 
 .toast-snackbar.show {
   opacity: 1;
   visibility: visible;
+  transform: translateX(-50%) translateY(0); /* Slide up to final centered position */
 }
 
 .toast-snackbar-icon {
@@ -743,15 +759,18 @@ button:disabled {
   cursor: pointer;
   flex-shrink: 0;
   margin-left: auto; /* Push delete button to the right */
-  padding: 2px;
+  padding: 0; /* Remove padding to let flexbox center the icon */
   background: none;
   border: none;
+  display: flex; /* Added for centering icon */
+  justify-content: center; /* Added for centering icon */
+  align-items: center; /* Added for centering icon */
 }
 
 .level-delete-button svg {
   display: block;
-  width: 100%;
-  height: 100%;
+  /* width: 100%; */ /* Let explicit size in MQ control this */
+  /* height: 100%; */
 }
 .level-delete-button {
   /* ... existing styles ... */
@@ -813,4 +832,294 @@ button:disabled {
   color: red;
   font-weight: bold;
   padding: 20px; /* Add some padding */
+}
+
+/* --- Responsive Styles --- */
+
+@media (max-width: 768px) {
+  body {
+    padding: 0 16px; /* Reduce body horizontal padding */
+  }
+
+  .app-header {
+    padding: 12px 10px; /* Reduce header padding */
+  }
+  .website-logo-icon,
+  .github-icon {
+    width: 36px; /* Smaller icons in header */
+    height: 36px;
+  }
+  .website-name-text {
+    font-size: 24px; /* Smaller website name */
+    line-height: normal; /* Adjust line height */
+  }
+
+  .main-section {
+    padding: 16px 0px; /* Reduce main section vertical padding */
+    margin-top: 70px; /* Adjust margin if header height changed */
+  }
+
+  .send-receive-div,
+  .sharing-info-section {
+    padding: 20px; /* Reduce padding for main content blocks */
+    gap: 20px; /* Reduce gap in content blocks */
+  }
+  .append-div {
+    gap: 10px; /* Reduce gap in append div */
+  }
+
+
+  .subhead-text {
+    font-size: 20px; /* Smaller subheadings */
+  }
+
+  .dropzone {
+    height: 200px; /* Smaller dropzone */
+    padding: 15px;
+  }
+  .dropzone-text {
+    font-size: 16px; /* Smaller text in dropzone */
+    line-height: 1.4;
+  }
+  .dropzone.dropzone-append {
+      height: 120px; /* Adjust append dropzone height */
+  }
+  .dropzone-icon {
+      width: 36px;
+      height: 36px;
+  }
+
+
+  .drive-code-input,
+  input[type="text"] {
+    font-size: 14px; /* Smaller font in inputs */
+    height: 42px; /* Adjust input height */
+    padding: 8px 12px;
+  }
+
+  button,
+  .join-drive-button,
+  .file-list-button { /* Target file list download buttons too */
+    font-size: 14px; /* Smaller font in buttons */
+    padding: 10px 12px; /* Adjust button padding */
+    height: 42px; /* Consistent button height */
+  }
+   .join-drive-button.loading {
+    font-size: 14px; /* Ensure loading state matches */
+  }
+.copy-button {
+  width: 40px;
+  height: 40px;
+}
+.copy-button svg {
+    width: 20px; /* Explicit size for SVG */
+    height: 20px;
+    flex-shrink: 0; /* Prevent SVG from shrinking */
+}
+.level-delete-button {
+    width: 30px; /* Container size */
+    height: 30px;
+}
+.level-delete-button svg {
+    width: 18px; /* Explicit size for SVG */
+    height: 18px;
+    flex-shrink: 0; /* Prevent SVG from shrinking */
+}
+
+
+
+
+  /* Move stacking of link-details to this breakpoint */
+  .link-details {
+    flex-direction: column; /* Stack QR and right details */
+    align-items: center; /* Center items when stacked */
+    gap: 16px;
+  }
+  /* Adjust QR container size for tablet */
+  .qr-code-container {
+    width: 160px;
+    height: 160px;
+  }
+  .link-details-right-div {
+    align-items: center; /* Center text elements */
+    text-align: center;
+    gap: 12px; /* Space between link and code display */
+    width: 100%; /* Ensure it takes full width when stacked */
+  }
+   .subcontainer-padding { /* Drive link container */
+      /* flex-direction: column; */ /* Keep side-by-side */
+      align-items: center; /* Keep vertical alignment centered */
+      gap: 8px; /* Keep gap */
+      padding: 10px; /* Reduce padding */
+      width: 100%; /* Ensure it takes full width */
+      box-sizing: border-box; /* Include padding in width */
+  }
+  .drive-link-text {
+    font-size: 16px; /* Smaller drive link text */
+  }
+  .drive-code-value {
+    font-size: 30px; /* Smaller drive code display */
+    line-height: 1.1;
+  }
+
+  .folder-name-text,
+  .file-name-text {
+    font-size: 16px; /* Smaller file/folder names */
+  }
+  .file-size {
+    font-size: 12px; /* Smaller file size text */
+  }
+  
+  .folder-arrow-icon,
+  .folder-icon-svg,
+  .file-icon-svg {
+    width: 20px; /* Smaller icons in file list */
+    height: 20px;
+  }
+  .arrow-folder-div {
+      gap: 8px; /* Reduce gap for folder arrow and icon/name */
+  }
+  .level-div {
+      padding: 12px 16px; /* Reduce padding in file list rows */
+  }
+  
+  .file-list-empty-textfield,
+  .error-field,
+  .info-for-user {
+      font-size: 13px; /* Smaller text for info/error/empty messages */
+      padding: 8px 12px;
+  }
+  .error-icon, .info-icon {
+      width: 20px;
+      height: 20px;
+  }
+
+}
+
+
+@media (max-width: 480px) {
+  body {
+    padding: 0 8px; /* Further reduce body padding */
+  }
+  .app-header {
+    /* Consider stacking header items if needed, or further reducing sizes */
+    /* For now, just reducing padding further */
+    padding: 10px 5px;
+  }
+   .website-logo-icon,
+   .github-icon {
+    width: 32px;
+    height: 32px;
+  }
+  .website-name-text {
+    font-size: 20px;
+  }
+  .main-section {
+    margin-top: 60px; /* Adjust if header is smaller */
+  }
+
+  .send-receive-div,
+  .sharing-info-section {
+    padding: 15px; /* Further reduce padding */
+    gap: 15px;
+  }
+   .append-div {
+    gap: 8px;
+  }
+
+  .subhead-text {
+    font-size: 18px;
+  }
+  .subhead svg { /* Target SVGs directly in subhead */
+      width: 20px;
+      height: 20px;
+  }
+
+
+  .dropzone {
+    height: 160px;
+  }
+  .dropzone-text {
+    font-size: 14px;
+  }
+  .dropzone.dropzone-append {
+      height: 100px;
+  }
+   .dropzone-icon {
+      width: 32px;
+      height: 32px;
+  }
+
+  .receive-subcontainer {
+    flex-direction: column; /* Stack input and button */
+    align-items: stretch; /* Make items take full width */
+    gap: 12px; /* Add gap when stacked */
+  }
+  .drive-code-input,
+  .join-drive-button {
+    width: 100%; /* Full width when stacked */
+    max-width: none; /* Remove max-width for button if it had one */
+    margin-right: 0; /* Remove margin if any */
+  }
+  /* .join-drive-button {
+      margin-top: 12px;
+  } */ /* Gap handles this now */
+
+  /* .link-details stacking moved to 768px breakpoint */
+  .qr-code-container {
+    width: 120px; /* Smaller QR code for mobile */
+    height: 120px;
+    /* margin-bottom: 16px; */ /* Gap handles this */
+  }
+  /* .link-details-right-div alignment moved to 768px breakpoint */
+  .subcontainer-padding { /* Drive link container */
+      /* flex-direction: column; */ /* REMOVE - Keep link and button side-by-side */
+      align-items: center; /* Keep vertical alignment centered */
+      gap: 8px; /* Keep gap */
+      padding: 10px; /* Reduce padding */
+      width: 100%; /* Ensure it takes full width */
+      box-sizing: border-box; /* Include padding in width */
+  }
+  .drive-link-text {
+    font-size: 14px; /* Smaller link text */
+    /* width: 100%; */ /* Already set in base style */
+    /* box-sizing: border-box; */ /* Already set in base style */
+  }
+  .drive-code-value {
+    font-size: 24px; /* Smaller drive code */
+  }
+  .copy-button {
+    width: 36px;
+    height: 36px;
+  }
+  .copy-button svg {
+      width: 18px; /* Explicit size for SVG */
+      height: 18px;
+      flex-shrink: 0; /* Prevent SVG from shrinking */
+  }
+
+  .folder-name-text,
+  .file-name-text {
+    font-size: 14px;
+  }
+  .file-size {
+    font-size: 11px;
+  }
+  .level-div {
+      padding: 10px 12px; /* Further reduce padding in file list rows */
+  }
+  .file-list-button {
+      padding: 8px 10px;
+      height: 38px;
+      font-size: 13px;
+  }
+  .level-delete-button {
+      width: 26px; /* Container size */
+      height: 26px;
+  }
+   .level-delete-button svg {
+      width: 16px; /* Explicit size for SVG */
+      height: 16px;
+      flex-shrink: 0; /* Prevent SVG from shrinking */
+  }
 }
