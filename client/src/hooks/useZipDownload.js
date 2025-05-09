@@ -28,6 +28,7 @@ export function useZipDownload({
   const lastSpeedCheckBytes = useRef(0);
   const downloadStartTime = useRef(0);
   const currentZipOperation = useRef(null); // Stores info about the current operation { pcId, filesToDownload: Map<transferId, fileMeta>, folderPathFilter?: string }
+  const heartbeatIntervalRef = useRef(null); // For receiver-side heartbeat
 
   const resetZipState = () => {
     setIsZipping(false);
@@ -46,6 +47,10 @@ export function useZipDownload({
         cleanupWebRTCInstance(currentZipOperation.current.pcId);
     }
     currentZipOperation.current = null;
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
   };
 
   // Modified to accept an optional folderPathFilter
@@ -285,6 +290,15 @@ export function useZipDownload({
     });
     // Store total size after loop
     currentZipOperation.current.totalSize = totalSizeToDownload;
+
+    // Start heartbeat for this pcId
+    if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+    heartbeatIntervalRef.current = setInterval(() => {
+      if (socket.connected) {
+        console.log(`[useZipDownload] Sending heartbeat for pcId: ${pcId}`);
+        socket.emit('heartbeat-zip', { room: driveCode, pcId });
+      }
+    }, 15000); // Send heartbeat every 15 seconds
 
 
     // REMOVED Speed/ETR Calculation Interval - Moved into onmessage handler

@@ -50,6 +50,7 @@ function App() {
   const { postMessage } = useServiceWorker();
   const pendingSignals = useRef({});
   window.pendingSignals = pendingSignals.current;
+  const activeZipPcHeartbeats = useRef({}); // Tracks heartbeats for sender's main PCs for zip ops
 
   // Cleanup toast timeout on unmount
   useEffect(() => {
@@ -273,11 +274,32 @@ function App() {
   // --- SENDER: On socket reconnect, re-emit file list ---
   useEffect(() => {
     const handler = () => {
+      console.log('[App Sender] Socket connect/reconnect event triggered.');
+
+      // Aggressively clean up all existing WebRTC states
+      console.log('[App Sender] Cleaning up ALL existing PeerConnections and DataChannels on (re)connect.');
+      Object.keys(peerConns.current).forEach(pcId => {
+        cleanupWebRTCInstance(pcId); // This will also handle associated data channels if pc._associatedTransferIds exists
+      });
+      // Ensure dataChannels that might not have been associated with a PC (e.g. if PC creation failed mid-way) are also cleared
+      Object.keys(dataChannels.current).forEach(dcId => {
+         const dc = dataChannels.current[dcId];
+         if (dc) {
+           try {
+             if (dc.readyState !== "closed") dc.close();
+           } catch (e) { /* ignore */ }
+           delete dataChannels.current[dcId];
+         }
+      });
+      pendingSignals.current = {}; // Clear all pending signals
+      console.log('[App Sender] All WebRTC states and pending signals cleared.');
+
       if (!(driveCode && filesRef.current.length > 0)) {
-        console.log('[App Sender] Socket connected, but no driveCode or files to share yet.');
+        console.log('[App Sender] Socket connected, but no active driveCode or files to share yet.');
         return;
       }
-      console.log('[App Sender] Socket (re)connected. Re-emitting file-list for room:', driveCode);
+
+      console.log('[App Sender] Socket (re)connected. Re-asserting room and re-emitting file-list for room:', driveCode);
       const filesMeta = filesRef.current.map(({ name, size, type, fileId, path }) => ({
         name,
         size,
@@ -288,14 +310,55 @@ function App() {
       socket.emit("create-room", driveCode); // Re-assert room presence
       socket.emit("file-list", { room: driveCode, filesMeta });
     };
+
     socket.on("connect", handler);
-    // Initial emit if already connected and hosting
+
+    // Initial emit if already connected and hosting when component mounts
     if (socket.connected && driveCode && filesRef.current.length > 0) {
-        console.log('[App Sender] Initial connection already active. Emitting file-list for room:', driveCode);
+        console.log('[App Sender] Component mounted with active socket and drive. Emitting file-list for room:', driveCode);
+        // Call handler directly, but ensure it doesn't cause issues if called too early
+        // The cleanup inside handler should be safe.
         handler();
     }
-    return () => socket.off("connect", handler);
-  }, [driveCode, socket]); // Removed files from dependency array, using filesRef.current inside
+
+    return () => {
+      socket.off("connect", handler);
+    };
+  }, [driveCode, socket, cleanupWebRTCInstance]); // Added cleanupWebRTCInstance to dependencies
+
+  // --- SENDER: Handle heartbeats from receivers for zip operations ---
+  useEffect(() => {
+    const heartbeatHandler = (data) => {
+      if (data && data.pcId && activeZipPcHeartbeats.current.hasOwnProperty(data.pcId)) {
+        console.log(`[App Sender] Received heartbeat for active zip PC: ${data.pcId}`);
+        activeZipPcHeartbeats.current[data.pcId] = Date.now();
+      } else {
+        console.warn(`[App Sender] Received heartbeat for unknown or inactive zip PC:`, data);
+      }
+    };
+    socket.on('heartbeat-zip', heartbeatHandler);
+    return () => socket.off('heartbeat-zip', heartbeatHandler);
+  }, [socket]);
+
+  // --- SENDER: Periodically check for stale zip PeerConnections via heartbeats ---
+  useEffect(() => {
+    const HEARTBEAT_TIMEOUT_MS = 60000; // 60 seconds
+    const CHECK_INTERVAL_MS = 30000; // Check every 30 seconds
+
+    const intervalId = setInterval(() => {
+      const now = Date.now();
+      console.log('[App Sender] Checking for stale zip PeerConnections...');
+      Object.keys(activeZipPcHeartbeats.current).forEach(pcId => {
+        if (now - activeZipPcHeartbeats.current[pcId] > HEARTBEAT_TIMEOUT_MS) {
+          console.warn(`[App Sender] Zip PC ${pcId} timed out due to no heartbeat. Cleaning up.`);
+          cleanupWebRTCInstance(pcId); // This will also remove it from peerConns
+          delete activeZipPcHeartbeats.current[pcId]; // Remove from heartbeat tracking
+        }
+      });
+    }, CHECK_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
+  }, [cleanupWebRTCInstance]); // cleanupWebRTCInstance is stable due to useCallback if App.js uses it
 
   // --- SENDER: Listen for download-file and start appropriate WebRTC ---
   useEffect(() => {
@@ -408,6 +471,8 @@ function App() {
           }
           pc._associatedTransferIds = new Set(); // Initialize set to track associated data channels
           peerConns.current[pcIdToUse] = pc;
+          activeZipPcHeartbeats.current[pcIdToUse] = Date.now(); // Start tracking heartbeat
+          console.log(`[App Sender] Started heartbeat tracking for new zip PC: ${pcIdToUse}`);
 
           // Setup handlers for the NEW main PC
           pc.onicecandidate = (event) => {
@@ -825,6 +890,8 @@ function App() {
         }
       });
       delete pc._associatedTransferIds; // Clean up the tracking set itself
+      delete activeZipPcHeartbeats.current[id]; // Stop tracking heartbeat for this PC
+      console.log(`[App cleanup] Stopped heartbeat tracking for zip PC: ${id}`);
     } else {
       // This might be a cleanup for a single file's DataChannel directly, or a PC that wasn't a zip main PC
       const dc = dataChannels.current[id];
