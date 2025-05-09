@@ -6,11 +6,11 @@ export const SIGNALING_SERVER_URL =
     : "ws://localhost:3000";
 // Base STUN servers - Google Only
 const baseIceServers = [
-  // Google STUN servers (using multiple can sometimes help redundancy)
-  { urls: "stun:stun.l.google.com:19302" },
-  { urls: "stun:stun1.l.google.com:19302" },
-  { urls: "stun:stun2.l.google.com:19302" },
-  // Adding public TURN server for testing NAT traversal
+  // Google STUN servers by IP (use IPs you've verified by pinging stun.l.google.com, stun1.l.google.com etc.)
+  // Note: IPs can change, this is for testing DNS resolution hypothesis.
+  { urls: "stun:74.125.250.129:19302" }, // IP from your ping
+  { urls: "stun:172.217.192.127:19302" }, // Example of another Google STUN IP
+  // Fallback to OpenRelay TURN servers
   {
     urls: "turn:openrelay.metered.ca:80",
     username: "openrelayproject",
@@ -36,7 +36,7 @@ const finalIceServers = [...baseIceServers];
 // REMOVED Conditional TURN logic
 // if (twilioAccountSid && twilioAuthToken) { ... }
 
-console.log("ICE Servers Configured (including test TURN):", finalIceServers); // Log the actual config
+console.log("ICE Servers Configured (IP STUNs + Test TURN):", finalIceServers); // Log the actual config
 
 export const ICE_SERVERS = finalIceServers;
 
