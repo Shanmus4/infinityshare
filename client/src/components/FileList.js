@@ -23,7 +23,7 @@ const DeleteIcon = () => (
 const DownloadIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="25" viewBox="0 0 24 25" fill="none">
     <path d="M4.125 21.5C3.42881 21.5 2.76113 21.2234 2.26884 20.7312C1.77656 20.2389 1.5 19.5712 1.5 18.875V15.125C1.5 14.8266 1.61853 14.5405 1.8295 14.3295C2.04048 14.1185 2.32663 14 2.625 14C2.92337 14 3.20952 14.1185 3.4205 14.3295C3.63147 14.5405 3.75 14.8266 3.75 15.125V18.875C3.75 19.082 3.918 19.25 4.125 19.25H19.875C19.9745 19.25 20.0698 19.2105 20.1402 19.1402C20.2105 19.0698 20.25 18.9745 20.25 18.875V15.125C20.25 14.8266 20.3685 14.5405 20.5795 14.3295C20.7905 14.1185 21.0766 14 21.375 14C21.6734 14 21.9595 14.1185 22.1705 14.3295C22.3815 14.5405 22.5 14.8266 22.5 15.125V18.875C22.5 19.5712 22.2234 20.2389 21.7312 20.7312C21.2389 21.2234 20.5712 21.5 19.875 21.5H4.125Z" fill="black"/>
-    <path d="M10.875 12.0335V3.5C10.875 3.20163 10.9935 2.91548 11.2045 2.7045C11.4155 2.49353 11.7016 2.375 12 2.375C12.2984 2.375 12.5845 2.49353 12.7955 2.7045C13.0065 2.91548 13.125 3.20163 13.125 3.5V12.0335L16.08 9.08C16.1844 8.9756 16.3083 8.89278 16.4448 8.83628C16.5812 8.77978 16.7274 8.7507 16.875 8.7507C17.0226 8.7507 17.1688 8.77978 17.3053 8.83628C17.4417 8.89278 17.5656 8.9756 17.67 9.08C17.7744 9.1844 17.8572 9.30834 17.9137 9.44475C17.9702 9.58116 17.9993 9.72736 17.9993 9.875C17.9993 10.0226 17.9702 10.1688 17.9137 10.3053C17.8572 10.4417 17.7744 10.5656 17.67 10.67L12.795 15.545C12.5841 15.7557 12.2981 15.874 12 15.874C11.7019 15.874 11.4159 15.7557 11.205 15.545L6.33 10.67C6.2256 10.5656 6.14279 10.4417 6.08628 10.3053C6.02978 10.1688 6.0007 10.0226 6.0007 9.875C6.0007 9.72736 6.02978 9.58116 6.08628 9.44475C6.14279 9.30834 6.2256 9.1844 6.33 9.08C6.4344 8.9756 6.55834 8.89278 6.69475 8.83628C6.83116 8.77978 6.97736 8.7507 7.125 8.7507C7.27265 8.7507 7.41885 8.27978 7.55525 8.83628C7.69166 8.89278 7.8156 8.9756 7.92 9.08L10.875 12.0335Z" fill="black"/>
+    <path d="M10.875 12.0335V3.5C10.875 3.20163 10.9935 2.91548 11.2045 2.7045C11.4155 2.49353 11.7016 2.375 12 2.375C12.2984 2.375 12.5845 2.49353 12.7955 2.7045C13.0065 2.91548 13.125 3.20163 13.125 3.5V12.0335L16.08 9.08C16.1844 8.9756 16.3083 8.89278 16.4448 8.83628C16.5812 8.77978 16.7274 8.7507 16.875 8.7507C17.0226 8.7507 17.1688 8.27978 17.3053 8.83628C17.4417 8.89278 17.5656 8.9756 17.67 9.08C17.7744 9.1844 17.8572 9.30834 17.9137 9.44475C17.9702 9.58116 17.9993 9.72736 17.9993 9.875C17.9993 10.0226 17.9702 10.1688 17.9137 10.3053C17.8572 10.4417 17.7744 10.5656 17.67 10.67L12.795 15.545C12.5841 15.7557 12.2981 15.874 12 15.874C11.7019 15.874 11.4159 15.7557 11.205 15.545L6.33 10.67C6.2256 10.5656 6.14279 10.4417 6.08628 10.3053C6.02978 10.1688 6.0007 10.0226 6.0007 9.875C6.0007 9.72736 6.02978 9.58116 6.08628 9.44475C6.14279 9.30834 6.2256 9.1844 6.33 9.08C6.4344 8.9756 6.55834 8.89278 6.69475 8.83628C6.83116 8.77978 6.97736 8.7507 7.125 8.7507C7.27265 8.7507 7.41885 8.27978 7.55525 8.83628C7.69166 8.89278 7.8156 8.9756 7.92 9.08L10.875 12.0335Z" fill="black"/>
   </svg>
 );
 
@@ -219,13 +219,13 @@ function RenderNode({
   onDeleteFolder,
   onDownloadFolder,
   // Props for inline progress - These will be handled globally in App.js now
-  // isZipping,
-  // zippingFolderPath,
-  // zipProgress,
-  // downloadSpeed,
-  // etr,
-  // formatSpeed,
-  // formatEtr
+  isZipping, // Still needed to disable other folder download buttons
+  // zippingFolderPath, // No longer needed here
+  // zipProgress, // No longer needed here
+  // downloadSpeed, // No longer needed here
+  // etr, // No longer needed here
+  // formatSpeed, // No longer needed here
+  // formatEtr // No longer needed here
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const indent = level * 16; // Base indentation in pixels
@@ -246,10 +246,9 @@ function RenderNode({
     const showDownloadIconButtonForFolder =
       isSender === false && typeof onDownloadFolder === "function" && fullPath;
     
-    // Folder download button disabling is handled by App.js `isZipping` state
-    // passed to the global progress bar, not individually here anymore.
-    // const isCurrentlyZippingThisFolder = isZipping && zippingFolderPath === fullPath;
-    // const isDownloadDisabled = isZipping && !isCurrentlyZippingThisFolder; 
+    // Disable folder download if any zip operation is active
+    const isFolderDownloadDisabled = isZipping;
+
 
     return (
       <div className="structure">
@@ -292,13 +291,13 @@ function RenderNode({
           )}
           {showDownloadIconButtonForFolder && (
             <button
-              className={`level-action-button level-download-icon-button`} // Removed disabled logic here, handled by App.js
+              className={`level-action-button level-download-icon-button ${isFolderDownloadDisabled ? 'disabled' : ''}`}
               onClick={(e) => {
                 e.stopPropagation();
                 onDownloadFolder(fullPath);
               }}
               title={`Download folder "${name}" as zip`}
-              // disabled={isDownloadDisabled || isCurrentlyZippingThisFolder} // Removed
+              disabled={isFolderDownloadDisabled}
             >
               <DownloadIcon />
             </button>
@@ -330,13 +329,7 @@ function RenderNode({
                   isDownloading={isDownloading}
                   onDeleteFolder={onDeleteFolder}
                   onDownloadFolder={onDownloadFolder}
-                  // isZipping={isZipping} // Removed
-                  // zippingFolderPath={zippingFolderPath} // Removed
-                  // zipProgress={zipProgress} // Removed
-                  // downloadSpeed={downloadSpeed} // Removed
-                  // etr={etr} // Removed
-                  // formatSpeed={formatSpeed} // Removed
-                  // formatEtr={formatEtr} // Removed
+                  isZipping={isZipping} // Pass down for disabling other folders
                 />
               ))}
           </div>
@@ -438,7 +431,7 @@ function FileList({
   onDeleteFolder,
   onDownloadFolder,
   // Add progress props - these are no longer needed here as progress is global
-  // isZipping,
+  isZipping, // Still needed to pass down to RenderNode for disabling other folder downloads
   // zippingFolderPath,
   // zipProgress,
   // downloadSpeed,
@@ -498,14 +491,14 @@ function FileList({
             isDownloading={isDownloading}
             onDeleteFolder={onDeleteFolder}
             onDownloadFolder={onDownloadFolder}
-            // Pass progress props down - these are now handled globally
-            // isZipping={isZipping}
-            // zippingFolderPath={zippingFolderPath}
-            // zipProgress={zipProgress}
-            // downloadSpeed={downloadSpeed}
-            // etr={etr}
-            // formatSpeed={formatSpeed}
-            // formatEtr={formatEtr}
+            // Pass progress props down
+            isZipping={isZipping}
+            // zippingFolderPath={zippingFolderPath} // Removed
+            // zipProgress={zipProgress} // Removed
+            // downloadSpeed={downloadSpeed} // Removed
+            // etr={etr} // Removed
+            // formatSpeed={formatSpeed} // Removed
+            // formatEtr={formatEtr} // Removed
           />
         ))}
     </div>
