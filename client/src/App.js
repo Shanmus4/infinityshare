@@ -1391,61 +1391,61 @@ function App() {
                 </button>
               </div>
 
-              {/* Info for user during zipping */}
               {isZipping && (
-                <div className="info-for-user receiver-info-zipping">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="25"
-                    viewBox="0 0 24 25"
-                    fill="none"
-                    className="info-icon"
-                  >
-                    <path
-                      d="M10.875 17.375C10.875 17.6734 10.9935 17.9595 11.2045 18.1705C11.4155 18.3815 11.7016 18.5 12 18.5C12.2984 18.5 12.5845 18.3815 12.7955 18.1705C13.0065 17.9595 13.125 17.6734 13.125 17.375C13.125 17.0766 13.0065 16.7905 12.7955 16.5795C12.5845 16.3685 12.2984 16.25 12 16.25C11.7016 16.25 11.4155 16.3685 11.2045 16.5795C10.9935 16.7905 10.875 17.0766 10.875 17.375ZM11.25 10.25V14.5625C11.25 14.6656 11.3344 14.75 11.4375 14.75H12.5625C12.6656 14.75 12.75 14.6656 12.75 14.5625V10.25C12.75 10.1469 12.6656 10.0625 12.5625 10.0625H11.4375C11.3344 10.0625 11.25 10.1469 11.25 10.25ZM22.3992 20.5625L12.6492 3.6875C12.5039 3.43672 12.2531 3.3125 12 3.3125C11.7469 3.3125 11.4937 3.43672 11.3508 3.6875L1.60078 20.5625C1.3125 21.0641 1.67344 21.6875 2.25 21.6875H21.75C22.3266 21.6875 22.6875 21.0641 22.3992 20.5625ZM4.03594 19.9086L12 6.12266L19.9641 19.9086H4.03594Z"
-                      fill="#6F5700"
-                    />
-                  </svg>
-                  <span className="info-text">
-                    The files you requested are downloading and getting zipped.
-                    Please do not close or refresh the page while this process
-                    is active.
-                  </span>
-                </div>
-              )}
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Info for user during zipping */}
+                  <div className="info-for-user receiver-info-zipping">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="25"
+                      viewBox="0 0 24 25"
+                      fill="none"
+                      className="info-icon"
+                    >
+                      <path
+                        d="M10.875 17.375C10.875 17.6734 10.9935 17.9595 11.2045 18.1705C11.4155 18.3815 11.7016 18.5 12 18.5C12.2984 18.5 12.5845 18.3815 12.7955 18.1705C13.0065 17.9595 13.125 17.6734 13.125 17.375C13.125 17.0766 13.0065 16.7905 12.7955 16.5795C12.5845 16.3685 12.2984 16.25 12 16.25C11.7016 16.25 11.4155 16.3685 11.2045 16.5795C10.9935 16.7905 10.875 17.0766 10.875 17.375ZM11.25 10.25V14.5625C11.25 14.6656 11.3344 14.75 11.4375 14.75H12.5625C12.6656 14.75 12.75 14.6656 12.75 14.5625V10.25C12.75 10.1469 12.6656 10.0625 12.5625 10.0625H11.4375C11.3344 10.0625 11.25 10.1469 11.25 10.25ZM22.3992 20.5625L12.6492 3.6875C12.5039 3.43672 12.2531 3.3125 12 3.3125C11.7469 3.3125 11.4937 3.43672 11.3508 3.6875L1.60078 20.5625C1.3125 21.0641 1.67344 21.6875 2.25 21.6875H21.75C22.3266 21.6875 22.6875 21.0641 22.3992 20.5625ZM4.03594 19.9086L12 6.12266L19.9641 19.9086H4.03594Z"
+                        fill="#6F5700"
+                      />
+                    </svg>
+                    <span className="info-text">
+                      The files you requested are downloading and getting zipped.
+                      Please do not close or refresh the page while this process
+                      is active.
+                    </span>
+                  </div>
 
-              {/* Global Progress Display for "Download All" or specific folder */}
-              {isZipping && (
-                <div className="progress-display-container">
-                   <div className="progress-filename-text">
-                    {zippingFolderPath
-                      ? `Downloading and Zipping: ${zippingFolderPath.split('/').pop()}.zip`
-                      : "Downloading and Zipping All Files..."}
-                  </div>
-                  <div className="progress-bar-wrapper">
-                    <div
-                      className="progress-bar-fill"
-                      style={{ width: `${zipProgress}%` }}
-                    ></div>
-                    <div className="progress-bar-text">
-                      {zipProgress.toFixed(1)}%
+                  {/* Global Progress Display for "Download All" or specific folder */}
+                  <div className="progress-display-container">
+                     <div className="progress-filename-text">
+                      {zippingFolderPath
+                        ? `Downloading and Zipping: ${zippingFolderPath.split('/').pop()}.zip`
+                        : "Downloading and Zipping All Files..."}
                     </div>
-                  </div>
-                  <div className="progress-stats-container">
-                    <span>
-                      Speed:{" "}
-                      <span className="stat-value">
-                        {formatSpeed(downloadSpeed)}
+                    <div className="progress-bar-wrapper">
+                      <div
+                        className="progress-bar-fill"
+                        style={{ width: `${zipProgress}%` }}
+                      ></div>
+                      <div className="progress-bar-text">
+                        {zipProgress.toFixed(1)}%
+                      </div>
+                    </div>
+                    <div className="progress-stats-container">
+                      <span>
+                        Speed:{" "}
+                        <span className="stat-value">
+                          {formatSpeed(downloadSpeed)}
+                        </span>
                       </span>
-                    </span>
-                    <span>
-                      ETA: <span className="stat-value">{formatEtr(etr)}</span>
-                    </span>
-                  </div>
-                  <div className="progress-info-text">
-                    Please wait, the download will start automatically when
-                    zipping is complete
+                      <span>
+                        ETA: <span className="stat-value">{formatEtr(etr)}</span>
+                      </span>
+                    </div>
+                    <div className="progress-info-text">
+                      Please wait, the download will start automatically when
+                      zipping is complete
+                    </div>
                   </div>
                 </div>
               )}

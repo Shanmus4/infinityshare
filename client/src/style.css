@@ -526,6 +526,7 @@ button:disabled {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 1;
+  line-clamp: 1; /* Limit to one line */
   flex: 1 0 0; /* Use flex: 1 0 0 as provided */
   overflow: hidden;
   color: var(--Black-Pure-Black, #000);
@@ -793,10 +794,6 @@ button:disabled {
   transform: translate(3px, 3px); /* Adjusted to match shadow */
   box-shadow: none; /* Remove shadow on active */
   background: none; /* Ensure no background change on active */
-}
-
-.level-download-icon-button {
-  /* No specific styles needed beyond .level-action-button for now */
 }
 
 .folder-children-container {
@@ -1278,10 +1275,6 @@ button:disabled {
     align-items: flex-start;
     gap: 4px;
   }
-}
-
-.receiver-info-zipping {
-  margin-bottom: 16px; /* Add some space below it before the progress bar or file list */
 }
 
 .level-action-button.disabled svg,
