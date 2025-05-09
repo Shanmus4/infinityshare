@@ -9,7 +9,18 @@ const baseIceServers = [
   // Google STUN servers (using multiple can sometimes help redundancy)
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
-  { urls: "stun:stun2.l.google.com:19302" }
+  { urls: "stun:stun2.l.google.com:19302" },
+  // Adding public TURN server for testing NAT traversal
+  {
+    urls: "turn:openrelay.metered.ca:80",
+    username: "openrelayproject",
+    credential: "openrelayproject"
+  },
+  {
+    urls: "turn:openrelay.metered.ca:443",
+    username: "openrelayproject",
+    credential: "openrelayproject"
+  }
 ];
 
 // Twilio TURN server credentials from environment variables - REMOVED
@@ -25,7 +36,7 @@ const finalIceServers = [...baseIceServers];
 // REMOVED Conditional TURN logic
 // if (twilioAccountSid && twilioAuthToken) { ... }
 
-console.log("Using Google STUN servers only for ICE configuration."); // Log the current config
+console.log("ICE Servers Configured (including test TURN):", finalIceServers); // Log the actual config
 
 export const ICE_SERVERS = finalIceServers;
 
