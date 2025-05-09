@@ -272,21 +272,30 @@ function App() {
 
   // --- SENDER: On socket reconnect, re-emit file list ---
   useEffect(() => {
-    if (!(driveCode && files.length > 0)) return;
     const handler = () => {
-      // Include path in metadata sent on reconnect
-      const filesMeta = files.map(({ name, size, type, fileId, path }) => ({
+      if (!(driveCode && filesRef.current.length > 0)) {
+        console.log('[App Sender] Socket connected, but no driveCode or files to share yet.');
+        return;
+      }
+      console.log('[App Sender] Socket (re)connected. Re-emitting file-list for room:', driveCode);
+      const filesMeta = filesRef.current.map(({ name, size, type, fileId, path }) => ({
         name,
         size,
         type,
         fileId,
-        path, // <--- ADDED
+        path,
       }));
+      socket.emit("create-room", driveCode); // Re-assert room presence
       socket.emit("file-list", { room: driveCode, filesMeta });
     };
     socket.on("connect", handler);
+    // Initial emit if already connected and hosting
+    if (socket.connected && driveCode && filesRef.current.length > 0) {
+        console.log('[App Sender] Initial connection already active. Emitting file-list for room:', driveCode);
+        handler();
+    }
     return () => socket.off("connect", handler);
-  }, [driveCode, files, socket]);
+  }, [driveCode, socket]); // Removed files from dependency array, using filesRef.current inside
 
   // --- SENDER: Listen for download-file and start appropriate WebRTC ---
   useEffect(() => {
@@ -304,8 +313,14 @@ function App() {
       folderPath, // <-- New path info
     }) => {
       console.log(
-        `[App Sender] Received download-file request. isZip=${isZipRequest}, isFolder=${isFolderRequest}, mainPcId=${mainPcId}, transferFileId=${transferFileId}, requestedFileId=${requestedFileId}, folderPath=${folderPath}`
+        `[App Sender DEBUG] downloadHandler triggered. Room: ${room}, FileID: ${requestedFileId}, TransferID: ${transferFileId}, MainPCID: ${mainPcId}, isZip: ${isZipRequest}, isFolder: ${isFolderRequest}`
       );
+
+      if (!socket.connected) {
+        console.error('[App Sender DEBUG] downloadHandler: Socket not connected. Aborting.');
+        setError("Sender not connected to signaling server. Please check connection.");
+        return;
+      }
 
       // Always use filesRef.current to find the file
       const fileObj = filesRef.current.find(
@@ -377,13 +392,20 @@ function App() {
         // --- Create Main PeerConnection if it doesn't exist ---
         if (!pc) {
           console.log(
-            `[App Sender] Creating NEW main PeerConnection for ${
+            `[App Sender DEBUG] Creating NEW main PeerConnection for ${
               isZipRequest ? "zip" : "folder"
-            } request: ${pcIdToUse}`
+            } request. PC ID: ${pcIdToUse}`
           );
           isNewPc = true;
           // cleanupWebRTCInstance(pcIdToUse); // Cleanup previous instance if any (optional)
-          pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS }); // Use imported ICE_SERVERS
+          try {
+            pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS });
+            console.log(`[App Sender DEBUG] Successfully created new RTCPeerConnection for ${pcIdToUse}`, pc);
+          } catch (e) {
+            console.error(`[App Sender DEBUG] FAILED to create new RTCPeerConnection for ${pcIdToUse}:`, e);
+            setError(`Sender: Failed to initialize WebRTC connection: ${e.message}`);
+            return; // Critical failure
+          }
           pc._associatedTransferIds = new Set(); // Initialize set to track associated data channels
           peerConns.current[pcIdToUse] = pc;
 
@@ -580,9 +602,13 @@ function App() {
             `[App Sender] Creating and sending OFFER for main PC ${pcIdToUse}`
           );
           pc.createOffer()
-            .then((offer) => pc.setLocalDescription(offer))
+            .then((offer) => {
+              console.log(`[App Sender DEBUG] Offer created for ${pcIdToUse}:`, offer);
+              return pc.setLocalDescription(offer);
+            })
             .then(() => {
               if (pc.localDescription) {
+                console.log(`[App Sender DEBUG] Local description set for ${pcIdToUse}. Emitting signal.`);
                 socket.emit("signal", {
                   room: driveCode,
                   fileId: pcIdToUse,
@@ -590,22 +616,18 @@ function App() {
                 });
               } else {
                 console.error(
-                  `[App Sender] Local description not set before emitting offer for ${pcIdToUse}`
+                  `[App Sender DEBUG] Local description NOT SET after setLocalDescription for ${pcIdToUse}. Cannot emit offer.`
                 );
+                setError("Sender: Failed to set local description for WebRTC.");
+                cleanupWebRTCInstance(pcIdToUse);
               }
             })
             .catch((e) => {
               console.error(
-                `[App Sender] Error creating offer for ${pcIdToUse}:`,
+                `[App Sender DEBUG] Error during offer creation/setLocalDescription for ${pcIdToUse}:`,
                 e
               );
-              // setError && // Changed to console.error
-              //   setError(
-              //     `Sender: Failed to create offer for ${
-              //       isZipRequest ? "zip" : "folder"
-              //     } download.`
-              //   );
-              console.error(`Sender: Failed to create offer for ${isZipRequest ? "zip" : "folder"} download for ${pcIdToUse}. Error: ${e}`);
+              setError(`Sender: Failed to create WebRTC offer: ${e.message}`);
               cleanupWebRTCInstance(pcIdToUse); // Clean up failed PC
             });
         }
@@ -1112,7 +1134,7 @@ function App() {
             className="home-icon header-icon-svg" // Added common class
           >
             <path d="M0 0h24v24H0V0z" fill="none"/>
-            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8h5z"/>
+            <path d="M10 19v-5h4v5c0 .55.45 1 1 1h3c.55 0 1-.45 1-1v-7h1.7c.46 0 .68-.57.33-.87L12.67 3.6c-.38-.34-.96-.34-1.34 0l-8.36 7.53c-.34.3-.13.87.33.87H5v7c0 .55.45 1 1 1h3c.55 0 1-.45 1-1z"/>
           </svg>
         </div>
         <a
@@ -1468,6 +1490,20 @@ function App() {
                 </button>
               </div>
 
+              {/* General error display (not specific to zipping process) */}
+              {(error || zipError) && ( // Show 'error' or 'zipError'
+                <div className="error-subcontainer receiver-error-subcontainer" style={{ marginBottom: '16px' }}> {/* Added margin-bottom */}
+                  <div className="error-field">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" className="error-icon">
+                      <path d="M12 17C12.2833 17 12.521 16.904 12.713 16.712C12.905 16.52 13.0007 16.2827 13 16C12.9993 15.7173 12.9033 15.48 12.712 15.288C12.5207 15.096 12.2833 15 12 15C11.7167 15 11.4793 15.096 11.288 15.288C11.0967 15.48 11.0007 15.7173 11 16C10.9993 16.2827 11.0953 16.5203 11.288 16.713C11.4807 16.9057 11.718 17.0013 12 17ZM11 13H13V7H11V13ZM12 22C10.6167 22 9.31667 21.7373 8.1 21.212C6.88334 20.6867 5.825 19.9743 4.925 19.075C4.025 18.1757 3.31267 17.1173 2.788 15.9C2.26333 14.6827 2.00067 13.3827 2 12C1.99933 10.6173 2.262 9.31733 2.788 8.1C3.314 6.88267 4.02633 5.82433 4.925 4.925C5.82367 4.02567 6.882 3.31333 8.1 2.788C9.318 2.26267 10.618 2 12 2C13.382 2 14.682 2.26267 15.9 2.788C17.118 3.31333 18.1763 4.02567 19.075 4.925C19.9737 5.82433 20.6863 6.88267 21.213 8.1C21.7397 9.31733 22.002 10.6173 22 12C21.998 13.3827 21.7353 14.6827 21.212 15.9C20.6887 17.1173 19.9763 18.1757 19.075 19.075C18.1737 19.9743 17.1153 20.687 15.9 21.213C14.6847 21.739 13.3847 22.0013 12 22ZM12 20C14.2333 20 16.125 19.225 17.675 17.675C19.225 16.125 20 14.2333 20 12C20 9.76667 19.225 7.875 17.675 6.325C16.125 4.775 14.2333 4 12 4C9.76667 4 7.875 4.775 6.325 6.325C4.775 7.875 4 9.76667 4 12C4 14.2333 4.775 16.125 6.325 17.675C7.875 19.225 9.76667 20 12 20Z"
+                        fill="#98282A"
+                      />
+                    </svg>
+                    <span className="error-text">{error || zipError}</span>
+                  </div>
+                </div>
+              )}
+
               {isZipping && (
                 <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {/* Info for user during zipping */}
@@ -1491,10 +1527,10 @@ function App() {
                       is active.
                     </span>
                   </div>
-
+                  
                   {/* Global Progress Display for "Download All" or specific folder */}
                   <div className="progress-display-container">
-                    <div className="progress-filename-text">
+                     <div className="progress-filename-text">
                       {zipConnectionStatus === 'interrupted' 
                         ? (zipError || "Connection interrupted, waiting for sender...")
                         : zippingFolderPath
@@ -1531,7 +1567,7 @@ function App() {
                       </>
                     )}
                     {zipConnectionStatus === 'failed' && zipError && (
-                        <div className="progress-info-text error-text">{zipError}</div>
+                        <div className="progress-info-text error-text">{zipError}</div> // This specifically shows zipError if connection failed
                     )}
                   </div>
                 </div>
@@ -1552,20 +1588,6 @@ function App() {
                 // formatSpeed={formatSpeed} // Removed
                 // formatEtr={formatEtr} // Removed
               />
-              {/* Display errors from App state and the unified zip hook */}
-              {/* Removed ErrorBanner for receiver as per request, but re-adding for general errors */}
-              {(error || zipError) && (
-                <div className="error-subcontainer receiver-error-subcontainer">
-                  <div className="error-field">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" className="error-icon">
-                      <path d="M12 17C12.2833 17 12.521 16.904 12.713 16.712C12.905 16.52 13.0007 16.2827 13 16C12.9993 15.7173 12.9033 15.48 12.712 15.288C12.5207 15.096 12.2833 15 12 15C11.7167 15 11.4793 15.096 11.288 15.288C11.0967 15.48 11.0007 15.7173 11 16C10.9993 16.2827 11.0953 16.5203 11.288 16.713C11.4807 16.9057 11.718 17.0013 12 17ZM11 13H13V7H11V13ZM12 22C10.6167 22 9.31667 21.7373 8.1 21.212C6.88334 20.6867 5.825 19.9743 4.925 19.075C4.025 18.1757 3.31267 17.1173 2.788 15.9C2.26333 14.6827 2.00067 13.3827 2 12C1.99933 10.6173 2.262 9.31733 2.788 8.1C3.314 6.88267 4.02633 5.82433 4.925 4.925C5.82367 4.02567 6.882 3.31333 8.1 2.788C9.318 2.26267 10.618 2 12 2C13.382 2 14.682 2.26267 15.9 2.788C17.118 3.31333 18.1763 4.02567 19.075 4.925C19.9737 5.82433 20.6863 6.88267 21.213 8.1C21.7397 9.31733 22.002 10.6173 22 12C21.998 13.3827 21.7353 14.6827 21.212 15.9C20.6887 17.1173 19.9763 18.1757 19.075 19.075C18.1737 19.9743 17.1153 20.687 15.9 21.213C14.6847 21.739 13.3847 22.0013 12 22ZM12 20C14.2333 20 16.125 19.225 17.675 17.675C19.225 16.125 20 14.2333 20 12C20 9.76667 19.225 7.875 17.675 6.325C16.125 4.775 14.2333 4 12 4C9.76667 4 7.875 4.775 6.325 6.325C4.775 7.875 4 9.76667 4 12C4 14.2333 4.775 16.125 6.325 17.675C7.875 19.225 9.76667 20 12 20Z"
-                        fill="#98282A"
-                      />
-                    </svg>
-                    <span className="error-text">{error || zipError}</span>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>

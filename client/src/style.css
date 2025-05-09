@@ -113,20 +113,18 @@ body {
 
 .header-icon-svg { /* Common styling for icon SVGs */
   aspect-ratio: 1/1;
-  fill: var(--Black-Pure-Black, #000); /* Default fill to black */
+  fill: var(--Primary-Green); /* Changed default fill to Primary Green */
   display: block; /* Ensure SVG behaves as a block */
 }
 
 .home-icon { 
   width: 44px; 
   height: 44px;
-  /* fill: var(--Primary-Green); */ /* Example: if you want home icon green */
 }
 
 .github-icon {
-  width: 40px; /* Assuming GitHub icon should be 40px */
+  width: 40px; 
   height: 40px;
-  /* fill: var(--Black-Pure-Black); */ /* Already black by default from header-icon-svg */
 }
 
 /* Main Content Styling */
@@ -869,9 +867,16 @@ button:disabled {
   .app-header {
     padding: 12px 10px; /* Reduce header padding */
   }
-  .website-logo-icon,
-  .github-icon {
-    width: 36px; /* Smaller icons in header */
+  .website-logo-icon { /* Keep website logo size if different */
+    width: 36px; 
+    height: 36px;
+  }
+  .home-icon { /* Responsive size for home icon */
+    width: 40px;
+    height: 40px;
+  }
+  .github-icon { /* Responsive size for github icon */
+    width: 36px; 
     height: 36px;
   }
   .website-name-text {
