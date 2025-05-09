@@ -148,8 +148,10 @@ export function useZipDownload({
       console.log(`[useZipDownload] PC connection state change for ${pcId}: ${pc.connectionState}. ICE State: ${pc.iceConnectionState}, Signaling State: ${pc.signalingState}`);
       if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
         console.error(`[useZipDownload] Main PC ${pcId} entered ${pc.connectionState} state. ICE: ${pc.iceConnectionState}, Signaling: ${pc.signalingState}`);
-        setError('Zip download connection failed.');
-        resetZipState(); // Cleanup on failure
+        setError('Connection to sender lost. Please ensure sender keeps the tab active and try downloading the folder/all files again.');
+        // Do NOT call resetZipState() immediately. Let the user retry.
+        // Subsequent call to startZipProcess will call resetZipState.
+        setIsZipping(false); // Allow retry by setting isZipping to false. Progress will remain.
       }
     };
     pc.onsignalingstatechange = () => console.log(`[useZipDownload] PC signaling state change for ${pcId}: ${pc.signalingState}. ICE State: ${pc.iceConnectionState}, Connection State: ${pc.connectionState}`);
