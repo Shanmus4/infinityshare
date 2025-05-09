@@ -553,12 +553,11 @@ function App() {
           sendChunk(); // Start sending
         };
 
-        dc.onerror = (err) => {
-          // setError && // Changed to console.error
-          //   setError(`Sender: DataChannel error for ${fileObj.name}.`);
+        dc.onerror = (event) => { // event is RTCErrorEvent
+          const errorDetail = event.error ? `${event.error.name}: ${event.error.message}` : 'Unknown DataChannel error';
           console.error(
-            `[App Sender] DataChannel error for transferId: ${useTransferFileId}. Error: ${err}`,
-            err
+            `[App Sender] DataChannel error for transferId: ${useTransferFileId}. Error: ${errorDetail}`,
+            event
           );
           delete dataChannels.current[useTransferFileId]; // Clean up failed channel ref
         };
@@ -790,6 +789,11 @@ function App() {
     } catch (e) {}
     delete peerConns.current[fileId];
     delete dataChannels.current[fileId];
+    // Also delete any pending signals for this fileId
+    if (pendingSignals.current && pendingSignals.current[fileId]) {
+      console.log(`[App cleanup] Deleting pending signals for ${fileId}`);
+      delete pendingSignals.current[fileId];
+    }
   }
 
   // Integrate the unified useZipDownload hook

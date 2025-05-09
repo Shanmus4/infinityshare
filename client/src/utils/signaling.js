@@ -4,11 +4,13 @@ export const SIGNALING_SERVER_URL =
   process.env.NODE_ENV === 'production'
     ? process.env.REACT_APP_SIGNALING_SERVER_URL // This will be set in Netlify/Vercel
     : "ws://localhost:3000";
-// ICE servers: Google STUN first, then OpenRelay TURN as fallback
+// ICE servers: Multiple STUN servers, then OpenRelay TURN as fallback
 const baseIceServers = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
   { urls: "stun:stun2.l.google.com:19302" },
+  { urls: "stun:global.stun.twilio.com:3478?transport=udp" },
+  // Fallback to OpenRelay TURN servers
   {
     urls: "turn:openrelay.metered.ca:80",
     username: "openrelayproject",
@@ -40,7 +42,7 @@ const finalIceServers = [...baseIceServers];
 // REMOVED Conditional TURN logic
 // if (twilioAccountSid && twilioAuthToken) { ... }
 
-console.log("ICE Servers Configured (STUNs and TURN fallbacks):", finalIceServers); // Log the actual config
+console.log("ICE Servers Configured (Multiple STUNs + Test TURN):", finalIceServers); // Log the actual config
 
 export const ICE_SERVERS = finalIceServers;
 

@@ -108,8 +108,18 @@ export function useZipDownload({
 
     currentZipOperation.current = { pcId, filesToDownload: filesToDownloadMap, folderPathFilter }; // Store current operation details
 
+    // More aggressive cleanup of any old zip-pc connections from peerConns
+    // Note: dataChannels are typically cleaned up when their pc is, or on their own close/error.
+    Object.keys(peerConns.current).forEach(key => {
+      if (key.startsWith('zip-pc-') && key !== pcId) { // Don't cleanup the one we are about to create if somehow it was pre-existing
+        console.log(`[useZipDownload] Aggressively cleaning up old zip PC: ${key}`);
+        cleanupWebRTCInstance(key);
+      }
+    });
+    
     // --- Setup PeerConnection ---
-    cleanupWebRTCInstance(pcId); // Ensure clean state
+    // cleanupWebRTCInstance(pcId); // Ensure clean state - pcId is new, so this would only clean if makeFileId somehow repeated, which is unlikely.
+                                 // The loop above should handle stale ones.
     const pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS });
     peerConns.current[pcId] = pc;
 

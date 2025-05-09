@@ -124,9 +124,8 @@ export function startWebRTC({
       sendChunk();
     };
     dc.onerror = (event) => { // event is RTCErrorEvent
-      // Keep minimal error logging
-      console.error('[WebRTC] Sender: DataChannel error', event?.error || event);
-      // setError && setError(`Sender: DataChannel error: ${event?.error?.message || 'Unknown error'}`); // Changed to console.error
+      const errorDetail = event.error ? `${event.error.name}: ${event.error.message}` : 'Unknown DataChannel error';
+      console.error(`[WebRTC] Sender: DataChannel error for ${fileId}: ${errorDetail}`, event);
     };
     pc.createOffer().then(offer => {
       pc.setLocalDescription(offer);
@@ -204,10 +203,10 @@ export function startWebRTC({
         receivedBytes += (e.data.byteLength || e.data.size || 0);
       }
     };
-    dc.onerror = (err) => {
+    dc.onerror = (event) => { // event is RTCErrorEvent
       // Single download logic
-      console.error('[WebRTC] Receiver: DataChannel error during single download', fileId, err);
-      // setError && setError(`Receiver: DataChannel error for ${fileId}.`); // Changed to console.error
+      const errorDetail = event.error ? `${event.error.name}: ${event.error.message}` : 'Unknown DataChannel error';
+      console.error(`[WebRTC] Receiver: DataChannel error for ${fileId}: ${errorDetail}`, event);
     };
     dc.onclose = () => { // Add onclose log for receiver DC
         console.log(`[WebRTC Single Receiver] DataChannel closed for ${fileId}`);
