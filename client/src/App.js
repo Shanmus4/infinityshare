@@ -475,17 +475,17 @@ function App() {
           dc.send(`META:${fileObj.name}:${fileObj.size}`);
 
           // File sending logic (adapted from startZipSenderConnection)
-          const chunkSize = 8 * 1024;
+          const chunkSize = 64 * 1024; // Increased chunk size to 64KB
           let offset = 0;
-          const MAX_BUFFERED_AMOUNT = 512 * 1024;
-          dc.bufferedAmountLowThreshold = 256 * 1024;
+          const MAX_BUFFERED_AMOUNT = 1024 * 1024; // Increased max buffered amount to 1MB
+          dc.bufferedAmountLowThreshold = 512 * 1024; // Increased threshold to 512KB
 
           function sendChunk() {
             if (offset < fileObj.size) {
               if (dc.bufferedAmount > MAX_BUFFERED_AMOUNT) {
                 dc.onbufferedamountlow = () => {
                   dc.onbufferedamountlow = null;
-                  setTimeout(sendChunk, 10);
+                  setTimeout(sendChunk, 0); // Changed delay to 0 for more aggressive sending
                 };
                 return;
               }

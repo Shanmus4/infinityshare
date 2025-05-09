@@ -79,17 +79,17 @@ export function startWebRTC({
       console.log(`[WebRTC Single Sender] Data channel opened for ${fileId}`);
       console.log(`[WebRTC Single Sender] Sending META for ${fileId}: ${file.name}:${file.size}`);
       dc.send(`META:${file.name}:${file.size}`);
-      const chunkSize = 8 * 1024; // Further reduced chunk size to 8KB
+      const chunkSize = 64 * 1024; // Increased chunk size to 64KB
       let offset = 0;
-      const MAX_BUFFERED_AMOUNT = 512 * 1024; // Further reduced max buffered amount to 512KB
-      dc.bufferedAmountLowThreshold = 256 * 1024; // 256KB threshold
+      const MAX_BUFFERED_AMOUNT = 1024 * 1024; // Increased max buffered amount to 1MB
+      dc.bufferedAmountLowThreshold = 512 * 1024; // Increased threshold to 512KB
       function sendChunk() {
         if (offset < file.size) {
           if (dc.bufferedAmount > MAX_BUFFERED_AMOUNT) {
             //console.log('[WebRTC] Sender: Buffer full, waiting to drain for', fileId);
             dc.onbufferedamountlow = () => {
               dc.onbufferedamountlow = null;
-              setTimeout(sendChunk, 10); // Add small delay to allow processing
+              setTimeout(sendChunk, 0); // Changed delay to 0 for more aggressive sending
             };
             return;
           }
