@@ -1097,26 +1097,43 @@ function App() {
         </svg>
         <span className="website-name-text">InfinityShare</span>
       </div>
-      <a
-        href="https://github.com/Shanmus4/infinityshare"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="github-link"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="48"
-          height="48"
-          viewBox="0 0 48 48"
-          fill="none"
-          className="github-icon"
+      <div className="header-icons-right">
+        <div
+          className="home-link header-icon-link" // Added common class for styling
+          onClick={() => (window.location.href = "/")}
+          title="Home"
         >
-          <path
-            d="M24 4C21.3736 4 18.7728 4.51732 16.3463 5.52241C13.9198 6.5275 11.715 8.00069 9.85786 9.85786C6.10714 13.6086 4 18.6957 4 24C4 32.84 9.74 40.34 17.68 43C18.68 43.16 19 42.54 19 42V38.62C13.46 39.82 12.28 35.94 12.28 35.94C11.36 33.62 10.06 33 10.06 33C8.24 31.76 10.2 31.8 10.2 31.8C12.2 31.94 13.26 33.86 13.26 33.86C15 36.9 17.94 36 19.08 35.52C19.26 34.22 19.78 33.34 20.34 32.84C15.9 32.34 11.24 30.62 11.24 23C11.24 20.78 12 19 13.3 17.58C13.1 17.08 12.4 15 13.5 12.3C13.5 12.3 15.18 11.76 19 14.34C20.58 13.9 22.3 13.68 24 13.68C25.7 13.68 27.42 13.9 29 14.34C32.82 11.76 34.5 12.3 34.5 12.3C35.6 15 34.9 17.08 34.7 17.58C36 19 36.76 20.78 36.76 23C36.76 30.64 32.08 32.32 27.62 32.82C28.34 33.44 29 34.66 29 36.52V42C29 42.54 29.32 43.18 30.34 43C38.28 40.32 44 32.84 44 24C44 21.3736 43.4827 18.7728 42.4776 16.3463C41.4725 13.9198 39.9993 11.715 38.1421 9.85786C36.285 8.00069 34.0802 6.5275 31.6537 5.52241C29.2272 4.51732 26.6264 4 24 4Z"
-            fill="black"
-          />
-        </svg>
-      </a>
+          <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            height="48px" 
+            viewBox="0 0 24 24" 
+            width="48px" 
+            fill="#000000" // Standard black fill for Material Icons
+            className="home-icon header-icon-svg" // Added common class
+          >
+            <path d="M0 0h24v24H0V0z" fill="none"/>
+            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8h5z"/>
+          </svg>
+        </div>
+        <a
+          href="https://github.com/Shanmus4/infinityshare"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="github-link header-icon-link" // Added common class
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            height="48px"
+            viewBox="0 0 24 24"
+            width="48px"
+            fill="#000000"
+            className="github-icon header-icon-svg" // Added common class
+          >
+            {/* GitHub path data is more complex, assuming it's correct and just ensuring size/class consistency */}
+            <path d="M12 1.27a11 11 0 00-3.48 21.46c.55.1.73-.24.73-.53v-1.84c-3.03.65-3.67-1.46-3.67-1.46a2.89 2.89 0 00-1.21-1.58c-.99-.68.08-.66.08-.66a2.29 2.29 0 011.66 1.12 2.33 2.33 0 003.19.91 2.32 2.32 0 01.68-1.45c-2.43-.28-4.98-1.22-4.98-5.42a4.25 4.25 0 011.11-2.91 3.93 3.93 0 01.11-2.88s.92-.3 3 1.12a10.3 10.3 0 015.44 0c2.08-1.42 3-1.12 3-1.12a3.93 3.93 0 01.11 2.88 4.25 4.25 0 011.11 2.91c0 4.21-2.55 5.14-4.99 5.42a2.58 2.58 0 01.73 2v2.92c0 .29.18.63.73.53A11 11 0 0012 1.27z"/>
+          </svg>
+        </a>
+      </div>
     </div>
   );
 

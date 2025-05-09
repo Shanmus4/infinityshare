@@ -91,11 +91,42 @@ body {
   align-items: center;
 }
 
-.github-icon {
-  width: 48px;
-  height: 48px;
-  flex-shrink: 0;
+.header-icons-right {
+  display: flex;
+  align-items: center;
+  gap: 16px; /* Gap between home and GitHub icons */
+}
+
+.header-icon-link {
+  display: flex; /* For alignment of SVG within */
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 4px; /* Optional: if you want a little padding around icons */
+  border-radius: 50%; /* Optional: for a circular hover effect */
+  transition: background-color 0.2s ease;
+}
+
+.header-icon-link:hover {
+  background-color: rgba(0,0,0,0.05); /* Subtle hover effect */
+}
+
+.header-icon-svg { /* Common styling for icon SVGs */
   aspect-ratio: 1/1;
+  fill: var(--Black-Pure-Black, #000); /* Default fill to black */
+  display: block; /* Ensure SVG behaves as a block */
+}
+
+.home-icon { 
+  width: 44px; 
+  height: 44px;
+  /* fill: var(--Primary-Green); */ /* Example: if you want home icon green */
+}
+
+.github-icon {
+  width: 40px; /* Assuming GitHub icon should be 40px */
+  height: 40px;
+  /* fill: var(--Black-Pure-Black); */ /* Already black by default from header-icon-svg */
 }
 
 /* Main Content Styling */
