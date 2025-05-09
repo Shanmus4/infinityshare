@@ -317,7 +317,8 @@ function App() {
           `[App] Sender: File not found for requestedFileId: ${requestedFileId}. filesRef.current:`,
           filesRef.current
         ); // Keep error
-        setError("File not found for download. Please re-upload or refresh.");
+        console.error("File not found for download. Please re-upload or refresh.");
+        // setError("File not found for download. Please re-upload or refresh."); // Changed to console.error
         return;
       }
       // console.log(`[App] Sender: Found fileObj`);
@@ -338,7 +339,8 @@ function App() {
           `[App] Sender: File index not found for fileId: ${fileObj.fileId}. filesRef.current:`,
           filesRef.current
         ); // Keep error
-        setError("File index not found for download.");
+        console.error("File index not found for download.");
+        // setError("File index not found for download."); // Changed to console.error
         return;
       }
       // console.log(`[App] Sender: Found fileIndex`);
@@ -356,11 +358,16 @@ function App() {
               isZipRequest ? "Zip" : "Folder"
             } request received without mainPcId!`
           );
-          setError(
+          console.error(
             `${
               isZipRequest ? "Zip" : "Folder"
             } download error: Missing connection ID.`
           );
+          // setError(
+          //   `${
+          //     isZipRequest ? "Zip" : "Folder"
+          //   } download error: Missing connection ID.`
+          // ); // Changed to console.error
           return;
         }
 
