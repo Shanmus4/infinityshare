@@ -384,6 +384,7 @@ function App() {
           isNewPc = true;
           // cleanupWebRTCInstance(pcIdToUse); // Cleanup previous instance if any (optional)
           pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS }); // Use imported ICE_SERVERS
+          pc._associatedTransferIds = new Set(); // Initialize set to track associated data channels
           peerConns.current[pcIdToUse] = pc;
 
           // Setup handlers for the NEW main PC
@@ -469,6 +470,9 @@ function App() {
         const dc = pc.createDataChannel(useTransferFileId); // Label channel with unique transfer ID
         dc.binaryType = "arraybuffer";
         dataChannels.current[useTransferFileId] = dc; // Store channel by transfer ID
+        if (peerConns.current[pcIdToUse] && peerConns.current[pcIdToUse]._associatedTransferIds) {
+          peerConns.current[pcIdToUse]._associatedTransferIds.add(useTransferFileId);
+        }
 
         // --- Setup Data Channel Handlers (File Sending Logic) ---
         dc.onopen = () => {
@@ -778,21 +782,60 @@ function App() {
   }, []);
 
   // --- Minimal WebRTC logic helpers ---
-  function cleanupWebRTCInstance(fileId) {
-    const pc = peerConns.current[fileId];
-    const dc = dataChannels.current[fileId];
-    try {
-      if (dc && dc.readyState !== "closed") dc.close();
-    } catch (e) {}
-    try {
-      if (pc && pc.signalingState !== "closed") pc.close();
-    } catch (e) {}
-    delete peerConns.current[fileId];
-    delete dataChannels.current[fileId];
-    // Also delete any pending signals for this fileId
-    if (pendingSignals.current && pendingSignals.current[fileId]) {
-      console.log(`[App cleanup] Deleting pending signals for ${fileId}`);
-      delete pendingSignals.current[fileId];
+  function cleanupWebRTCInstance(id) { // Renamed parameter for clarity
+    const pc = peerConns.current[id];
+
+    // If this ID corresponds to a main PeerConnection that had associated DataChannels (e.g., for a zip operation)
+    if (pc && pc._associatedTransferIds) {
+      console.log(`[App cleanup] Cleaning up main PC ${id} and its ${pc._associatedTransferIds.size} associated DataChannels.`);
+      pc._associatedTransferIds.forEach(transferId => {
+        const associatedDc = dataChannels.current[transferId];
+        if (associatedDc) {
+          try {
+            if (associatedDc.readyState !== "closed") {
+              associatedDc.close();
+              console.log(`[App cleanup] Closed associated DataChannel ${transferId} for main PC ${id}`);
+            }
+          } catch (e) {
+            console.warn(`[App cleanup] Error closing associated DataChannel ${transferId}:`, e);
+          }
+          delete dataChannels.current[transferId]; // Remove from global tracking
+        }
+      });
+      delete pc._associatedTransferIds; // Clean up the tracking set itself
+    } else {
+      // This might be a cleanup for a single file's DataChannel directly, or a PC that wasn't a zip main PC
+      const dc = dataChannels.current[id];
+      if (dc) {
+        try {
+          if (dc.readyState !== "closed") {
+            dc.close();
+            console.log(`[App cleanup] Closed DataChannel ${id}`);
+          }
+        } catch (e) {
+          console.warn(`[App cleanup] Error closing DataChannel ${id}:`, e);
+        }
+        delete dataChannels.current[id];
+      }
+    }
+
+    // Clean up the PeerConnection itself
+    if (pc) {
+      try {
+        if (pc.signalingState !== "closed") {
+          pc.close();
+          console.log(`[App cleanup] Closed PeerConnection ${id}`);
+        }
+      } catch (e) {
+        console.warn(`[App cleanup] Error closing PeerConnection ${id}:`, e);
+      }
+      delete peerConns.current[id];
+    }
+
+    // Also delete any pending signals for this id
+    if (pendingSignals.current && pendingSignals.current[id]) {
+      console.log(`[App cleanup] Deleting pending signals for ${id}`);
+      delete pendingSignals.current[id];
     }
   }
 
@@ -805,6 +848,7 @@ function App() {
     etr, // Add etr
     error: zipError, // Alias to avoid state name conflict
     zippingFolderPath, // Get the path of the folder being zipped
+    connectionStatus: zipConnectionStatus, // Get connection status for zip downloads
   } = useZipDownload({
     receiverFilesMeta,
     driveCode,
@@ -1433,35 +1477,45 @@ function App() {
 
                   {/* Global Progress Display for "Download All" or specific folder */}
                   <div className="progress-display-container">
-                     <div className="progress-filename-text">
-                      {zippingFolderPath
-                        ? `Downloading and Zipping: ${zippingFolderPath.split('/').pop()}.zip`
-                        : "Downloading and Zipping All Files..."}
+                    <div className="progress-filename-text">
+                      {zipConnectionStatus === 'interrupted' 
+                        ? (zipError || "Connection interrupted, waiting for sender...")
+                        : zippingFolderPath
+                          ? `Downloading and Zipping: ${zippingFolderPath.split('/').pop()}.zip`
+                          : "Downloading and Zipping All Files..."}
                     </div>
-                    <div className="progress-bar-wrapper">
-                      <div
-                        className="progress-bar-fill"
-                        style={{ width: `${zipProgress}%` }}
-                      ></div>
-                      <div className="progress-bar-text">
-                        {zipProgress.toFixed(1)}%
-                      </div>
-                    </div>
-                    <div className="progress-stats-container">
-                      <span>
-                        Speed:{" "}
-                        <span className="stat-value">
-                          {formatSpeed(downloadSpeed)}
-                        </span>
-                      </span>
-                      <span>
-                        ETA: <span className="stat-value">{formatEtr(etr)}</span>
-                      </span>
-                    </div>
-                    <div className="progress-info-text">
-                      Please wait, the download will start automatically when
-                      zipping is complete
-                    </div>
+                    {zipConnectionStatus !== 'failed' && ( // Hide progress bar if connection totally failed and reset
+                      <>
+                        <div className="progress-bar-wrapper">
+                          <div
+                            className="progress-bar-fill"
+                            style={{ width: `${zipProgress}%` }}
+                          ></div>
+                          <div className="progress-bar-text">
+                            {zipProgress.toFixed(1)}%
+                          </div>
+                        </div>
+                        <div className="progress-stats-container">
+                          <span>
+                            Speed:{" "}
+                            <span className="stat-value">
+                              {zipConnectionStatus === 'interrupted' ? "--" : formatSpeed(downloadSpeed)}
+                            </span>
+                          </span>
+                          <span>
+                            ETA: <span className="stat-value">{zipConnectionStatus === 'interrupted' ? "--" : formatEtr(etr)}</span>
+                          </span>
+                        </div>
+                        <div className="progress-info-text">
+                          {zipConnectionStatus === 'interrupted'
+                            ? "Download will resume if sender reconnects."
+                            : "Please wait, the download will start automatically when zipping is complete."}
+                        </div>
+                      </>
+                    )}
+                    {zipConnectionStatus === 'failed' && zipError && (
+                        <div className="progress-info-text error-text">{zipError}</div>
+                    )}
                   </div>
                 </div>
               )}

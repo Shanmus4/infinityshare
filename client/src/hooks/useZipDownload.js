@@ -21,6 +21,7 @@ export function useZipDownload({
   const [downloadSpeed, setDownloadSpeed] = useState(0);
   const [etr, setEtr] = useState(null);
   const [zippingFolderPath, setZippingFolderPath] = useState(null); // Track which folder is zipping
+  const [connectionStatus, setConnectionStatus] = useState('stable'); // 'stable', 'interrupted', 'failed'
   const fileData = useRef({});
   const totalBytesReceived = useRef(0);
   const lastSpeedCheckTime = useRef(0);
@@ -35,6 +36,7 @@ export function useZipDownload({
     setDownloadSpeed(0);
     setEtr(null);
     setZippingFolderPath(null); // Reset folder path on completion/error
+    setConnectionStatus('stable'); // Reset connection status
     fileData.current = {};
     totalBytesReceived.current = 0;
     lastSpeedCheckTime.current = 0;
@@ -136,11 +138,38 @@ export function useZipDownload({
       }
     };
     pc.onconnectionstatechange = () => {
-      console.log(`[useZipDownload] PC connection state change for ${pcId}: ${pc.connectionState}. ICE State: ${pc.iceConnectionState}, Signaling State: ${pc.signalingState}`);
-      if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
-        console.error(`[useZipDownload] Main PC ${pcId} entered ${pc.connectionState} state. ICE: ${pc.iceConnectionState}, Signaling: ${pc.signalingState}`);
-        setError('Zip download connection failed. Please try again.'); // Updated error message
-        resetZipState(); // Reverted to calling resetZipState immediately on failure
+      const newState = pc.connectionState;
+      console.log(`[useZipDownload] PC connection state change for ${pcId}: ${newState}. ICE State: ${pc.iceConnectionState}, Signaling State: ${pc.signalingState}`);
+      
+      switch (newState) {
+        case 'connected':
+          setConnectionStatus('stable');
+          setError(''); // Clear any previous interruption errors
+          console.log(`[useZipDownload] PC ${pcId} connected.`);
+          break;
+        case 'disconnected':
+          // This state can sometimes be temporary.
+          setConnectionStatus('interrupted');
+          setError('Connection interrupted. Attempting to reconnect...');
+          console.warn(`[useZipDownload] PC ${pcId} disconnected. Waiting for potential auto-reconnect.`);
+          // Don't resetZipState here, give it a chance to reconnect.
+          break;
+        case 'failed':
+          setConnectionStatus('interrupted'); // Or 'failed' if we decide 'failed' is not recoverable
+          setError('Connection failed. Waiting to see if sender reconnects or retries.');
+          console.error(`[useZipDownload] Main PC ${pcId} failed. ICE: ${pc.iceConnectionState}, Signaling: ${pc.signalingState}`);
+          // Still don't resetZipState immediately. The user might retry, or sender might re-initiate.
+          // However, the current operation is likely stalled.
+          break;
+        case 'closed':
+          setConnectionStatus('failed');
+          setError('Zip download connection closed. Please try again.');
+          console.error(`[useZipDownload] Main PC ${pcId} closed. This is likely final.`);
+          resetZipState(); // For 'closed', it's usually definitive.
+          break;
+        default:
+          // For states like 'new', 'connecting'
+          break;
       }
     };
     pc.onsignalingstatechange = () => console.log(`[useZipDownload] PC signaling state change for ${pcId}: ${pc.signalingState}. ICE State: ${pc.iceConnectionState}, Connection State: ${pc.connectionState}`);
@@ -338,6 +367,6 @@ export function useZipDownload({
       });
   };
 
-  // Expose the unified function and the zipping folder path
-  return { startZipProcess, isZipping, zipProgress, downloadSpeed, etr, error, zippingFolderPath };
+  // Expose the unified function and the zipping folder path, and connectionStatus
+  return { startZipProcess, isZipping, zipProgress, downloadSpeed, etr, error, zippingFolderPath, connectionStatus };
 }

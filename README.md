@@ -27,14 +27,14 @@ File Send is a modern web application for secure, direct peer-to-peer (P2P) file
 - **Service Worker:** (`/client/public/service-worker.js`) Handles streaming downloads for single files and enables PWA app shell caching. Registered via `client/src/serviceWorkerRegistration.js`.
 - **Manifest File:** (`/client/public/manifest.json`) Provides PWA metadata.
 - **Testing:** Pytest structure exists (`/tests`), but tests for the signaling server are not yet implemented.
-- **Monorepo:** Contains `/client`, `/server` (unused?), `/signaling-server`, `/tests`.
+- **Monorepo:** Contains `/client`, `/signaling-server`, `/tests`. The `/server` directory has been removed as it was unused.
 
 ## Directory Structure
 
 ```
 /file-send/
   /client/           # React frontend (main application logic)
-  /server/           # Node.js backend (Currently unused? Needs review)
+  /server/           # (Removed - Was unused)
   /signaling-server/ # Standalone Node.js + Socket.io signaling server (Active)
   /tests/            # Pytest tests (planned for signaling-server)
   PLANNING.md        # Project architecture and guidelines
@@ -60,7 +60,7 @@ File Send is a modern web application for secure, direct peer-to-peer (P2P) file
     # Navigate to the project root directory
     cd client && npm install
     cd ../signaling-server && npm install
-    # cd ../server && npm install # Skip this, as /server seems unused
+    # cd ../server && npm install # Skip this, as /server has been removed
     ```
 3.  **Start the Signaling Server:**
     ```sh
