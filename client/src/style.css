@@ -141,9 +141,9 @@ body {
 }
 
 /* .subhead-icon { */ /* Removed as SVG is now direct child of .subhead */
-/* width: 24px; */
-/* height: 24px; */
-/* aspect-ratio: 1/1; */
+  /* width: 24px; */
+  /* height: 24px; */
+  /* aspect-ratio: 1/1; */
 /* } */
 
 .subhead-text {
@@ -796,23 +796,13 @@ button:disabled {
 }
 
 .level-download-icon-button {
-  /* Specific styles if needed, otherwise inherits from level-action-button */
+  /* No specific styles needed beyond .level-action-button for now */
 }
 
-/* Remove old progress/empty/error styles if replaced */
 .folder-children-container {
   /* Wrapper for nested items */
   width: 100%;
   padding-left: 0; /* Reset padding, indentation is on level-div */
-  /* border-left: 1px dashed #ccc; */ /* Removed border */
-}
-/* .folder-progress-container { ... } */
-/* ... etc ... */
-.file-list-empty {
-  /* Old style, will be replaced by file-list-empty-textfield usage */
-  color: #aaa;
-  font-style: italic;
-  padding: 20px;
 }
 
 .file-list-empty-textfield {
@@ -1172,7 +1162,21 @@ button:disabled {
   gap: 8px;
   align-self: stretch;
   border: 1px solid var(--Black-Pure-Black, #000);
+  width: 100%;
+  margin-bottom: 24px; /* Space before file list */
+  border-radius: 3px; /* Added from previous global-zip-progress-container */
+  background-color: var(--Grey-Light-Grey, #f4f5f0); /* Added from previous */
 }
+
+.progress-filename-text {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--Black-Black, #0D0D0D);
+  margin-bottom: 8px; /* Space between filename and progress bar */
+  text-align: left; /* Align to the start of the container */
+  word-break: break-all; /* Ensure long filenames wrap */
+}
+
 
 .progress-bar-wrapper {
   width: 100%; /* Max width will be controlled by parent, can set max-width if needed */
@@ -1250,6 +1254,8 @@ button:disabled {
   font-weight: 300;
   line-height: normal;
   width: 100%; /* Ensure it takes full width and centers */
+  text-align: center; /* Center the text */
+  margin-top: 4px; /* Small space above this text */
 }
 
 .receiver-error-subcontainer {
@@ -1272,7 +1278,7 @@ button:disabled {
     max-width: none; /* Remove max-width if set */
   }
   .progress-bar-wrapper {
-    /* max-width: 100%; */ /* Allow it to be responsive */
+    width: 100%; /* Make progress bar responsive on smaller screens */
   }
   .progress-stats-container {
     flex-direction: column;
@@ -1282,5 +1288,10 @@ button:disabled {
 }
 
 .receiver-info-zipping {
-  margin-bottom: 16px; /* Add some space below it before the progress bar or file list */
+ margin-bottom: 16px; /* Add some space below it before the progress bar or file list */
+}
+
+.level-action-button.disabled svg,
+.level-download-icon-button.disabled svg {
+  opacity: 0.3 !important; /* Ensure opacity is applied for disabled icon */
 }

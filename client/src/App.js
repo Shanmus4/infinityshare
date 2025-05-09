@@ -3,7 +3,7 @@ import FileList from "./components/FileList";
 import DropzoneArea from "./components/DropzoneArea";
 import QRCodeBlock from "./components/QRCodeBlock";
 // import DriveLinkBlock from "./components/DriveLinkBlock"; // Removed import
-import ErrorBanner from "./components/ErrorBanner";
+// import ErrorBanner from "./components/ErrorBanner"; // Removed for receiver
 import { useSocket } from "./hooks/useSocket";
 import { useServiceWorker } from "./hooks/useServiceWorker";
 import { startWebRTC } from "./hooks/useWebRTC"; // For single file downloads
@@ -807,27 +807,34 @@ function App() {
 
   // --- REMOVE useFolderDownload hook integration ---
 
-  // --- SENDER: Warn before leaving/reloading ---
+  // --- CONSOLIDATED: Warn before leaving/reloading ---
   useEffect(() => {
     const handleBeforeUnload = (event) => {
-      if (step === "uploaded" && files.length > 0) {
+      let confirmationMessage = "";
+      let needsConfirmation = false;
+
+      if (step === 'uploaded' && files.length > 0) {
+        confirmationMessage = 'Leaving or reloading will stop the file transfer. Keep this page open to continue sharing.';
+        needsConfirmation = true;
+      } else if (step === 'receiver' && isZipping) {
+        confirmationMessage = 'Files are currently being downloaded and zipped. Leaving or reloading now may interrupt the process. Are you sure you want to leave?';
+        needsConfirmation = true;
+      }
+
+      if (needsConfirmation) {
         event.preventDefault();
-        // Standard way to show browser confirmation dialog with a custom message
-        const confirmationMessage =
-          "Leaving or reloading will stop the file transfer. Keep this page open to continue sharing.";
         event.returnValue = confirmationMessage; // For older browsers
         return confirmationMessage; // For modern browsers
       }
     };
 
-    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [step, files]); // Re-run if step or files change
+  }, [step, files, isZipping]); // Dependencies for the consolidated handler
 
-  // Update this function in your app - look for it in App.js or similar file
 
   // This function is ONLY for single file downloads now
   function sendSWMetaAndChunk(fileId, chunk, filename, mimeType, fileSize) {
@@ -984,14 +991,22 @@ function App() {
   }
 
   function formatEtr(seconds) {
-    if (seconds === null || seconds === Infinity || seconds < 0) {
+    if (seconds === null || seconds === Infinity || seconds < 0 || isNaN(seconds)) {
       return "--:--";
     }
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`;
+  
+    const totalSeconds = Math.floor(seconds);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+  
+    if (hours > 0) {
+      return `${hours}h ${minutes.toString().padStart(2, "0")}m`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${secs.toString().padStart(2, "0")}s`;
+    } else {
+      return `${secs}s`;
+    }
   }
   // -----------------------------
 
@@ -1400,15 +1415,19 @@ function App() {
                 </div>
               )}
 
-              {/* Global Progress Display for "Download All" - Placed below the top div */}
-              {isZipping && !zippingFolderPath && (
+              {/* Global Progress Display for "Download All" or specific folder */}
+              {isZipping && (
                 <div className="progress-display-container">
+                   <div className="progress-filename-text">
+                    {zippingFolderPath
+                      ? `Downloading and Zipping: ${zippingFolderPath.split('/').pop()}.zip`
+                      : "Downloading and Zipping All Files..."}
+                  </div>
                   <div className="progress-bar-wrapper">
                     <div
                       className="progress-bar-fill"
                       style={{ width: `${zipProgress}%` }}
                     ></div>
-                    {/* TODO: Implement inverse text color logic here if possible with CSS, or via JS state */}
                     <div className="progress-bar-text">
                       {zipProgress.toFixed(1)}%
                     </div>
@@ -1421,7 +1440,7 @@ function App() {
                       </span>
                     </span>
                     <span>
-                      ETR: <span className="stat-value">{formatEtr(etr)}</span>
+                      ETA: <span className="stat-value">{formatEtr(etr)}</span>
                     </span>
                   </div>
                   <div className="progress-info-text">
@@ -1438,34 +1457,27 @@ function App() {
                 isDownloading={isDownloading}
                 onDownloadFolder={handleDownloadFolder}
                 isZipping={isZipping}
-                zippingFolderPath={zippingFolderPath}
-                zipProgress={zipProgress}
-                downloadSpeed={downloadSpeed}
-                etr={etr}
-                formatSpeed={formatSpeed}
-                formatEtr={formatEtr}
+                // zippingFolderPath={zippingFolderPath} // Removed, global display now
+                // zipProgress={zipProgress} // Removed
+                // downloadSpeed={downloadSpeed} // Removed
+                // etr={etr} // Removed
+                // formatSpeed={formatSpeed} // Removed
+                // formatEtr={formatEtr} // Removed
               />
               {/* Display errors from App state and the unified zip hook */}
-              {(error || zipError) && (
+              {/* Removed ErrorBanner for receiver as per request */}
+              {/* {(error || zipError) && (
                 <div className="error-subcontainer receiver-error-subcontainer">
                   <div className="error-field">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      className="error-icon"
-                    >
-                      <path
-                        d="M12 17C12.2833 17 12.521 16.904 12.713 16.712C12.905 16.52 13.0007 16.2827 13 16C12.9993 15.7173 12.9033 15.48 12.712 15.288C12.5207 15.096 12.2833 15 12 15C11.7167 15 11.4793 15.096 11.288 15.288C11.0967 15.48 11.0007 15.7173 11 16C10.9993 16.2827 11.0953 16.5203 11.288 16.713C11.4807 16.9057 11.718 17.0013 12 17ZM11 13H13V7H11V13ZM12 22C10.6167 22 9.31667 21.7373 8.1 21.212C6.88334 20.6867 5.825 19.9743 4.925 19.075C4.025 18.1757 3.31267 17.1173 2.788 15.9C2.26333 14.6827 2.00067 13.3827 2 12C1.99933 10.6173 2.262 9.31733 2.788 8.1C3.314 6.88267 4.02633 5.82433 4.925 4.925C5.82367 4.02567 6.882 3.31333 8.1 2.788C9.318 2.26267 10.618 2 12 2C13.382 2 14.682 2.26267 15.9 2.788C17.118 3.31333 18.1763 4.02567 19.075 4.925C19.9737 5.82433 20.6863 6.88267 21.213 8.1C21.7397 9.31733 22.002 10.6173 22 12C21.998 13.3827 21.7353 14.6827 21.212 15.9C20.6887 17.1173 19.9763 18.1757 19.075 19.075C18.1737 19.9743 17.1153 20.687 15.9 21.213C14.6847 21.739 13.3847 22.0013 12 22ZM12 20C14.2333 20 16.125 19.225 17.675 17.675C19.225 16.125 20 14.2333 20 12C20 9.76667 19.225 7.875 17.675 6.325C16.125 4.775 14.2333 4 12 4C9.76667 4 7.875 4.775 6.325 6.325C4.775 7.875 4 9.76667 4 12C4 14.2333 4.775 16.125 6.325 17.675C7.875 19.225 9.76667 20 12 20Z"
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" className="error-icon">
+                      <path d="M12 17C12.2833 17 12.521 16.904 12.713 16.712C12.905 16.52 13.0007 16.2827 13 16C12.9993 15.7173 12.9033 15.48 12.712 15.288C12.5207 15.096 12.2833 15 12 15C11.7167 15 11.4793 15.096 11.288 15.288C11.0967 15.48 11.0007 15.7173 11 16C10.9993 16.2827 11.0953 16.5203 11.288 16.713C11.4807 16.9057 11.718 17.0013 12 17ZM11 13H13V7H11V13ZM12 22C10.6167 22 9.31667 21.7373 8.1 21.212C6.88334 20.6867 5.825 19.9743 4.925 19.075C4.025 18.1757 3.31267 17.1173 2.788 15.9C2.26333 14.6827 2.00067 13.3827 2 12C1.99933 10.6173 2.262 9.31733 2.788 8.1C3.314 6.88267 4.02633 5.82433 4.925 4.925C5.82367 4.02567 6.882 3.31333 8.1 2.788C9.318 2.26267 10.618 2 12 2C13.382 2 14.682 2.26267 15.9 2.788C17.118 3.31333 18.1763 4.02567 19.075 4.925C19.9737 5.82433 20.6863 6.88267 21.213 8.1C21.7397 9.31733 22.002 10.6173 22 12C21.998 13.3827 21.7353 14.6827 21.212 15.9C20.6887 17.1173 19.9763 18.1757 19.075 19.075C18.1737 19.9743 17.1153 20.687 15.9 21.213C14.6847 21.739 13.3847 22.0013 12 22ZM12 20C14.2333 20 16.125 19.225 17.675 17.675C19.225 16.125 20 14.2333 20 12C20 9.76667 19.225 7.875 17.675 6.325C16.125 4.775 14.2333 4 12 4C9.76667 4 7.875 4.775 6.325 6.325C4.775 7.875 4 9.76667 4 12C4 14.2333 4.775 16.125 6.325 17.675C7.875 19.225 9.76667 20 12 20Z"
                         fill="#98282A"
                       />
                     </svg>
                     <span className="error-text">{error || zipError}</span>
                   </div>
                 </div>
-              )}
+              )} */}
             </div>
           </div>
         </div>
