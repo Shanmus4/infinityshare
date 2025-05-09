@@ -1172,7 +1172,7 @@ button:disabled {
 }
 
 .progress-bar-wrapper {
-  width: 874px; /* As per spec */
+  width: 100%; /* As per spec */
   height: 24px;
   border: 1px solid var(--Black-Pure-Black, #000);
   background-color: var(

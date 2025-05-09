@@ -4,35 +4,11 @@ export const SIGNALING_SERVER_URL =
   process.env.NODE_ENV === 'production'
     ? process.env.REACT_APP_SIGNALING_SERVER_URL // This will be set in Netlify/Vercel
     : "ws://localhost:3000";
-// ICE servers: Expanded STUN list, then OpenRelay TURN as fallback
+// ICE servers: Google STUN servers only for this test
 const baseIceServers = [
-  // Google STUN servers
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
-  { urls: "stun:stun2.l.google.com:19302" },
-  { urls: "stun:stun3.l.google.com:19302" },
-  { urls: "stun:stun4.l.google.com:19302" },
-  // Twilio STUN server
-  { urls: "stun:global.stun.twilio.com:3478" },
-  // Other public STUN servers
-  { urls: "stun:stun.nextcloud.com:443" }, // Typically uses UDP and TCP
-  { urls: "stun:stun.stunprotocol.org:3478" },
-  // Fallback to OpenRelay TURN servers (UDP and TCP)
-  {
-    urls: "turn:openrelay.metered.ca:80", // UDP preferred by default
-    username: "openrelayproject",
-    credential: "openrelayproject"
-  },
-  {
-    urls: "turn:openrelay.metered.ca:443", // UDP preferred by default
-    username: "openrelayproject",
-    credential: "openrelayproject"
-  },
-  {
-    urls: "turn:openrelay.metered.ca:443?transport=tcp", // TCP fallback
-    username: "openrelayproject",
-    credential: "openrelayproject"
-  }
+  { urls: "stun:stun2.l.google.com:19302" }
 ];
 
 // Twilio TURN server credentials from environment variables - REMOVED
@@ -48,7 +24,7 @@ const finalIceServers = [...baseIceServers];
 // REMOVED Conditional TURN logic
 // if (twilioAccountSid && twilioAuthToken) { ... }
 
-console.log("ICE Servers Configured (Expanded STUNs + TURN fallbacks):", finalIceServers); // Log the actual config
+console.log("ICE Servers Configured (Google STUN only for test):", finalIceServers); // Log the actual config
 
 export const ICE_SERVERS = finalIceServers;
 

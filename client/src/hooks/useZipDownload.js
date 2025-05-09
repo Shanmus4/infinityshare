@@ -108,18 +108,9 @@ export function useZipDownload({
 
     currentZipOperation.current = { pcId, filesToDownload: filesToDownloadMap, folderPathFilter }; // Store current operation details
 
-    // More aggressive cleanup of any old zip-pc connections from peerConns
-    // Note: dataChannels are typically cleaned up when their pc is, or on their own close/error.
-    Object.keys(peerConns.current).forEach(key => {
-      if (key.startsWith('zip-pc-') && key !== pcId) { // Don't cleanup the one we are about to create if somehow it was pre-existing
-        console.log(`[useZipDownload] Aggressively cleaning up old zip PC: ${key}`);
-        cleanupWebRTCInstance(key);
-      }
-    });
-    
     // --- Setup PeerConnection ---
-    // cleanupWebRTCInstance(pcId); // Ensure clean state - pcId is new, so this would only clean if makeFileId somehow repeated, which is unlikely.
-                                 // The loop above should handle stale ones.
+    // The resetZipState() called earlier should have cleaned up the previous currentZipOperation's pcId.
+    // A new pcId is generated for this new operation.
     const pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS });
     peerConns.current[pcId] = pc;
 
@@ -148,10 +139,8 @@ export function useZipDownload({
       console.log(`[useZipDownload] PC connection state change for ${pcId}: ${pc.connectionState}. ICE State: ${pc.iceConnectionState}, Signaling State: ${pc.signalingState}`);
       if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
         console.error(`[useZipDownload] Main PC ${pcId} entered ${pc.connectionState} state. ICE: ${pc.iceConnectionState}, Signaling: ${pc.signalingState}`);
-        setError('Connection to sender lost. Please ensure sender keeps the tab active and try downloading the folder/all files again.');
-        // Do NOT call resetZipState() immediately. Let the user retry.
-        // Subsequent call to startZipProcess will call resetZipState.
-        setIsZipping(false); // Allow retry by setting isZipping to false. Progress will remain.
+        setError('Zip download connection failed. Please try again.'); // Updated error message
+        resetZipState(); // Reverted to calling resetZipState immediately on failure
       }
     };
     pc.onsignalingstatechange = () => console.log(`[useZipDownload] PC signaling state change for ${pcId}: ${pc.signalingState}. ICE State: ${pc.iceConnectionState}, Connection State: ${pc.connectionState}`);
