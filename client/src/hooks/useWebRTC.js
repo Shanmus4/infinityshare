@@ -35,7 +35,8 @@ export function startWebRTC({
   pc.onconnectionstatechange = () => {
     console.log(`[WebRTC Single] Connection state change for ${fileId}: ${pc.connectionState}`);
      if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
-      setError && setError(`WebRTC connection failed or disconnected for ${fileId}. State: ${pc.connectionState}`);
+      console.error(`[WebRTC Single] WebRTC connection failed or disconnected for ${fileId}. State: ${pc.connectionState}`);
+      // setError && setError(`WebRTC connection failed or disconnected for ${fileId}. State: ${pc.connectionState}`); // Changed to console.error
       // Consider cleanup here too? cleanupWebRTCInstance(fileId);
     }
   };
@@ -105,10 +106,10 @@ export function startWebRTC({
                 setTimeout(sendChunk, 0); // Use setTimeout to prevent call stack overflow
               } else {
                 console.error('[WebRTC] Sender: Data channel not open:', dc.readyState);
-                setError && setError('Sender: DataChannel closed unexpectedly');
+                // setError && setError('Sender: DataChannel closed unexpectedly'); // Changed to console.error
               }
             } catch (err) {
-              setError && setError('Sender: DataChannel send failed: ' + err.message);
+              // setError && setError('Sender: DataChannel send failed: ' + err.message); // Changed to console.error
               console.error('[WebRTC] Sender: DataChannel send error', err);
               // Try to recover with a delay
               setTimeout(sendChunk, 1000);
@@ -125,7 +126,7 @@ export function startWebRTC({
     dc.onerror = (event) => { // event is RTCErrorEvent
       // Keep minimal error logging
       console.error('[WebRTC] Sender: DataChannel error', event?.error || event);
-      setError && setError(`Sender: DataChannel error: ${event?.error?.message || 'Unknown error'}`);
+      // setError && setError(`Sender: DataChannel error: ${event?.error?.message || 'Unknown error'}`); // Changed to console.error
     };
     pc.createOffer().then(offer => {
       pc.setLocalDescription(offer);
@@ -206,7 +207,7 @@ export function startWebRTC({
     dc.onerror = (err) => {
       // Single download logic
       console.error('[WebRTC] Receiver: DataChannel error during single download', fileId, err);
-      setError && setError(`Receiver: DataChannel error for ${fileId}.`);
+      // setError && setError(`Receiver: DataChannel error for ${fileId}.`); // Changed to console.error
     };
     dc.onclose = () => { // Add onclose log for receiver DC
         console.log(`[WebRTC Single Receiver] DataChannel closed for ${fileId}`);

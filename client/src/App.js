@@ -421,11 +421,11 @@ function App() {
               pc.connectionState === "closed"
             ) {
               console.error(
-                `[App Sender] Main PC ${pcIdToUse} failed/disconnected/closed.`
+                `[App Sender] Main PC ${pcIdToUse} failed/disconnected/closed. State: ${pc.connectionState}`
               );
-              setError(
-                `${isZipRequest ? "Zip" : "Folder"} download connection failed.`
-              );
+              // setError(
+              //   `${isZipRequest ? "Zip" : "Folder"} download connection failed.`
+              // ); // Changed to console.error
               // Consider cleanup of associated channels if needed
               cleanupWebRTCInstance(pcIdToUse);
             }
@@ -504,32 +504,33 @@ function App() {
                       `[App Sender] Data channel not open for ${useTransferFileId}:`,
                       dc.readyState
                     );
-                    setError &&
-                      setError(
-                        `Sender: DataChannel closed unexpectedly for ${fileObj.name}`
-                      );
+                    // setError && // Changed to console.error
+                    //   setError(
+                    //     `Sender: DataChannel closed unexpectedly for ${fileObj.name}`
+                    //   );
+                    console.error(`Sender: DataChannel closed unexpectedly for ${fileObj.name}`);
                     // Don't cleanup main PC here, just this channel? Or let connection state handle it.
                     delete dataChannels.current[useTransferFileId];
                   }
                 } catch (err) {
-                  setError &&
-                    setError(
-                      `Sender: DataChannel send failed for ${fileObj.name}: ${err.message}`
-                    );
+                  // setError && // Changed to console.error
+                  //   setError(
+                  //     `Sender: DataChannel send failed for ${fileObj.name}: ${err.message}`
+                  //   );
                   console.error(
-                    `[App Sender] DataChannel send error for ${useTransferFileId}:`,
+                    `[App Sender] DataChannel send error for ${useTransferFileId}: ${err.message}`,
                     err
                   );
                   delete dataChannels.current[useTransferFileId];
                 }
               };
-              reader.onerror = (e) => {
+                reader.onerror = (e) => {
                 console.error(
                   `[App Sender] FileReader error for ${useTransferFileId}:`,
                   e
                 );
-                setError &&
-                  setError(`Sender: FileReader error for ${fileObj.name}`);
+                // setError && // Changed to console.error
+                //   setError(`Sender: FileReader error for ${fileObj.name}`);
                 delete dataChannels.current[useTransferFileId];
               };
               reader.readAsArrayBuffer(slice);
@@ -546,10 +547,10 @@ function App() {
         };
 
         dc.onerror = (err) => {
-          setError &&
-            setError(`Sender: DataChannel error for ${fileObj.name}.`);
+          // setError && // Changed to console.error
+          //   setError(`Sender: DataChannel error for ${fileObj.name}.`);
           console.error(
-            `[App Sender] DataChannel error for transferId: ${useTransferFileId}`,
+            `[App Sender] DataChannel error for transferId: ${useTransferFileId}. Error: ${err}`,
             err
           );
           delete dataChannels.current[useTransferFileId]; // Clean up failed channel ref
@@ -588,12 +589,13 @@ function App() {
                 `[App Sender] Error creating offer for ${pcIdToUse}:`,
                 e
               );
-              setError &&
-                setError(
-                  `Sender: Failed to create offer for ${
-                    isZipRequest ? "zip" : "folder"
-                  } download.`
-                );
+              // setError && // Changed to console.error
+              //   setError(
+              //     `Sender: Failed to create offer for ${
+              //       isZipRequest ? "zip" : "folder"
+              //     } download.`
+              //   );
+              console.error(`Sender: Failed to create offer for ${isZipRequest ? "zip" : "folder"} download for ${pcIdToUse}. Error: ${e}`);
               cleanupWebRTCInstance(pcIdToUse); // Clean up failed PC
             });
         }
@@ -651,6 +653,7 @@ function App() {
 
   // --- RECEIVER: Download request ---
   const handleDownloadRequest = (fileId) => {
+    setError(""); // Clear previous errors
     if (downloadingFiles.has(fileId)) return;
     setDownloadingFiles((prev) => new Set(prev).add(fileId));
     const fileMeta = receiverFilesMeta.find((f) => f.fileId === fileId);
@@ -934,11 +937,13 @@ function App() {
 
   // --- RECEIVER: Download Folder ---
   const handleDownloadFolder = (folderPath) => {
+    setError(""); // Clear previous errors
     // Call the unified zip process function with the folder path filter
     startZipProcess(folderPath); // Pass folderPath as the filter
   };
 
   const handleJoinDrive = (codeToJoin) => {
+    setError(""); // Clear previous errors
     setIsJoiningDrive(true); // Start loading
     const upperCode = codeToJoin.toUpperCase();
     // Basic validation
