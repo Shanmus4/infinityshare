@@ -583,7 +583,7 @@ function App() {
               if (dc.bufferedAmount > MAX_BUFFERED_AMOUNT) {
                 dc.onbufferedamountlow = () => {
                   dc.onbufferedamountlow = null;
-                  setTimeout(sendChunk, 0); // Changed delay to 0 for more aggressive sending
+                  Promise.resolve().then(sendChunk); // Use microtask for faster re-queue
                 };
                 return;
               }
@@ -595,8 +595,7 @@ function App() {
                   if (dc.readyState === "open") {
                     dc.send(e.target.result);
                     offset += nextChunkSize;
-                    // requestAnimationFrame(sendChunk); // Switch from rAF
-                    setTimeout(sendChunk, 0); // Use setTimeout to yield but continue loop
+                    Promise.resolve().then(sendChunk); // Use microtask for faster re-queue
                   } else {
                     console.error(
                       `[App Sender] Data channel not open for ${useTransferFileId}:`,

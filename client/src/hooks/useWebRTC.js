@@ -90,7 +90,7 @@ export function startWebRTC({
             //console.log('[WebRTC] Sender: Buffer full, waiting to drain for', fileId);
             dc.onbufferedamountlow = () => {
               dc.onbufferedamountlow = null;
-              setTimeout(sendChunk, 0); // Changed delay to 0 for more aggressive sending
+              Promise.resolve().then(sendChunk); // Use microtask for faster re-queue
             };
             return;
           }
@@ -103,7 +103,7 @@ export function startWebRTC({
                 dc.send(e.target.result);
                 //console.log('[WebRTC] Sender: Sent chunk for', fileId, file?.name, 'offset', offset, 'size', nextChunkSize);
                 offset += nextChunkSize;
-                setTimeout(sendChunk, 0); // Use setTimeout to prevent call stack overflow
+                Promise.resolve().then(sendChunk); // Use microtask for faster re-queue
               } else {
                 console.error('[WebRTC] Sender: Data channel not open:', dc.readyState);
                 // setError && setError('Sender: DataChannel closed unexpectedly'); // Changed to console.error
@@ -111,8 +111,8 @@ export function startWebRTC({
             } catch (err) {
               // setError && setError('Sender: DataChannel send failed: ' + err.message); // Changed to console.error
               console.error('[WebRTC] Sender: DataChannel send error', err);
-              // Try to recover with a delay
-              setTimeout(sendChunk, 1000);
+              // Try to recover with a delay, but still use microtask for the retry
+              setTimeout(() => Promise.resolve().then(sendChunk), 1000);
             }
           };
           reader.readAsArrayBuffer(slice);

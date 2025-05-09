@@ -108,22 +108,23 @@ body {
 }
 
 .header-icon-link:hover {
-  background-color: rgba(0,0,0,0.05); /* Subtle hover effect */
+  background-color: rgba(0, 0, 0, 0.05); /* Subtle hover effect */
 }
 
-.header-icon-svg { /* Common styling for icon SVGs */
+.header-icon-svg {
+  /* Common styling for icon SVGs */
   aspect-ratio: 1/1;
   fill: var(--Primary-Green); /* Changed default fill to Primary Green */
   display: block; /* Ensure SVG behaves as a block */
 }
 
-.home-icon { 
-  width: 44px; 
+.home-icon {
+  width: 44px;
   height: 44px;
 }
 
 .github-icon {
-  width: 40px; 
+  width: 40px;
   height: 40px;
 }
 
@@ -397,7 +398,7 @@ button {
 
 button:disabled {
   background: #bbb !important;
-  color: #eee !important;
+  color: #4e4e4e !important;
   cursor: not-allowed !important;
   opacity: 1 !important;
   pointer-events: none !important;
@@ -867,16 +868,19 @@ button:disabled {
   .app-header {
     padding: 12px 10px; /* Reduce header padding */
   }
-  .website-logo-icon { /* Keep website logo size if different */
-    width: 36px; 
+  .website-logo-icon {
+    /* Keep website logo size if different */
+    width: 36px;
     height: 36px;
   }
-  .home-icon { /* Responsive size for home icon */
+  .home-icon {
+    /* Responsive size for home icon */
     width: 40px;
     height: 40px;
   }
-  .github-icon { /* Responsive size for github icon */
-    width: 36px; 
+  .github-icon {
+    /* Responsive size for github icon */
+    width: 36px;
     height: 36px;
   }
   .website-name-text {
