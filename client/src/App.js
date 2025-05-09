@@ -390,7 +390,7 @@ function App() {
           pc.onicecandidate = (event) => {
             if (event.candidate) {
               console.log(
-                `[App Sender] Emitting ICE candidate for main PC ${pcIdToUse}`
+                `[App Sender] Gathered ICE candidate for main PC ${pcIdToUse}: Type: ${event.candidate.type}, Address: ${event.candidate.address}, Port: ${event.candidate.port}, Protocol: ${event.candidate.protocol}`, event.candidate
               );
               socket.emit("signal", {
                 room: driveCode,

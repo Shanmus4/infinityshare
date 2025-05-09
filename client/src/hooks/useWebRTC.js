@@ -64,7 +64,7 @@ export function startWebRTC({
   // Always set onicecandidate for both sender and receiver
   pc.onicecandidate = (event) => {
     if (event.candidate) {
-      console.log(`[WebRTC Single] Emitting ICE candidate for ${fileId}:`, event.candidate.type, event.candidate.sdpMid, event.candidate.sdpMLineIndex);
+      console.log(`[WebRTC Single] Gathered ICE candidate for ${fileId}: Type: ${event.candidate.type}, Address: ${event.candidate.address}, Port: ${event.candidate.port}, Protocol: ${event.candidate.protocol}`, event.candidate);
       socket.emit('signal', { room: driveCode, fileId, data: { candidate: event.candidate } });
     } else {
        console.log(`[WebRTC Single] End of ICE candidates for ${fileId}.`);

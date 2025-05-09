@@ -124,7 +124,12 @@ export function useZipDownload({
     peerConns.current[pcId] = pc;
 
     pc.onicecandidate = (event) => {
-      if (event.candidate) socket.emit('signal', { room: driveCode, fileId: pcId, data: { candidate: event.candidate } });
+      if (event.candidate) {
+        console.log(`[useZipDownload] Gathered ICE candidate for ${pcId}: Type: ${event.candidate.type}, Address: ${event.candidate.address}, Port: ${event.candidate.port}, Protocol: ${event.candidate.protocol}`, event.candidate);
+        socket.emit('signal', { room: driveCode, fileId: pcId, data: { candidate: event.candidate } });
+      } else {
+        console.log(`[useZipDownload] End of ICE candidates for ${pcId}.`);
+      }
     };
     pc.onicecandidateerror = (event) => {
       console.error(`[useZipDownload] ICE candidate error for ${pcId}:`, event);
