@@ -2,22 +2,15 @@
 
 ## Active Tasks
 
-- [x] **Analysis:** Analyze the codebase and understand the project (User Request 2025-05-07, Completed 2025-05-07)
-  - Reviewed `PLANNING.md` and `TASK.md`.
-  - Examined `client/src/App.js` (main component, state, WebRTC orchestration).
-  - Examined `signaling-server/index.js` (Socket.IO based signaling).
-  - Examined `client/src/hooks/useWebRTC.js` (single file WebRTC logic).
-  - Examined `client/src/hooks/useZipDownload.js` (multi-file/folder WebRTC and JSZip integration).
-  - Examined `client/public/service-worker.js` (streaming downloads for single files).
-- [ ] **UI Styling:** Apply CSS changes provided by the user for colors, fonts, and general styling. (User Request 2025-05-07)
 - [ ] **SEO:** Add `og:url` and `twitter:url` to `client/public/index.html` after deployment. (Discovered 2025-05-07)
-- [ ] **UI:** Fix general UI issues and improve responsiveness (User Request)
-- [ ] **Feature:** Add mobile-optimized UI
 - [ ] **Improvement/Security:** Implement rate limiting on `signaling-server` events (e.g., `create-room`, `join-room`) to prevent abuse. (Discovered 2025-05-04)
 - [ ] **Deployment:** Configure TLS/SSL for production deployment (Mentioned in docs) - **Partially Done (2025-05-04):** Signaling server (`signaling-server/index.js`) updated to support HTTPS via `SSL_CERT_PATH` and `SSL_KEY_PATH` environment variables. Actual certificate provisioning and web server (hosting client) HTTPS configuration still required in deployment environment.
 
 ## Completed Tasks (Verified 2025-05-04)
 
+- [x] **UI Styling:** Apply CSS changes provided by the user for colors, fonts, and general styling. (User Request 2025-05-07)
+- [x] **UI:** Fix general UI issues and improve responsiveness (User Request)
+- [x] **Feature:** Add mobile-optimized UI
 - [x] **UI & Feature:** Implement folder structure display and actions (User Request 2025-05-04, Completed 2025-05-04 3:05 PM)
   - Captured `file.path` in `App.js`.
   - Implemented expandable/collapsible tree view in `FileList.js`.
