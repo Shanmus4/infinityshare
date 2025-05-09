@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+    import { useState, useRef, useCallback } from 'react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { ICE_SERVERS } from '../utils/signaling';
@@ -116,7 +116,19 @@ export function useZipDownload({
     pc.onicecandidate = (event) => {
       if (event.candidate) socket.emit('signal', { room: driveCode, fileId: pcId, data: { candidate: event.candidate } });
     };
-    pc.onicecandidateerror = (event) => console.error(`[useZipDownload] ICE candidate error for ${pcId}:`, event);
+    pc.onicecandidateerror = (event) => {
+      console.error(`[useZipDownload] ICE candidate error for ${pcId}:`, event);
+      if (event.errorCode) {
+        console.error(`  Error Code: ${event.errorCode}, Host Candidate: ${event.hostCandidate}, Server URL: ${event.url}, Text: ${event.errorText}`);
+        if (event.errorCode !== 701) { // 701 is often ignorable (e.g. TURN server not reachable)
+          setError(`ICE candidate error: ${event.errorCode}`); // Use the hook's setError
+        } else {
+          console.warn(`[useZipDownload] ICE candidate error 701 (ignorable) for ${pcId}:`, event.errorText);
+        }
+      } else {
+        setError('ICE candidate error (unknown code)'); // Use the hook's setError
+      }
+    };
     pc.onconnectionstatechange = () => {
       console.log(`[useZipDownload] PC connection state change for ${pcId}: ${pc.connectionState}. ICE State: ${pc.iceConnectionState}, Signaling State: ${pc.signalingState}`);
       if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
