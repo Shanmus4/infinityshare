@@ -20,6 +20,13 @@ const DeleteIcon = () => (
   </svg>
 );
 
+const DownloadIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="25" viewBox="0 0 24 25" fill="none">
+    <path d="M4.125 21.5C3.42881 21.5 2.76113 21.2234 2.26884 20.7312C1.77656 20.2389 1.5 19.5712 1.5 18.875V15.125C1.5 14.8266 1.61853 14.5405 1.8295 14.3295C2.04048 14.1185 2.32663 14 2.625 14C2.92337 14 3.20952 14.1185 3.4205 14.3295C3.63147 14.5405 3.75 14.8266 3.75 15.125V18.875C3.75 19.082 3.918 19.25 4.125 19.25H19.875C19.9745 19.25 20.0698 19.2105 20.1402 19.1402C20.2105 19.0698 20.25 18.9745 20.25 18.875V15.125C20.25 14.8266 20.3685 14.5405 20.5795 14.3295C20.7905 14.1185 21.0766 14 21.375 14C21.6734 14 21.9595 14.1185 22.1705 14.3295C22.3815 14.5405 22.5 14.8266 22.5 15.125V18.875C22.5 19.5712 22.2234 20.2389 21.7312 20.7312C21.2389 21.2234 20.5712 21.5 19.875 21.5H4.125Z" fill="black"/>
+    <path d="M10.875 12.0335V3.5C10.875 3.20163 10.9935 2.91548 11.2045 2.7045C11.4155 2.49353 11.7016 2.375 12 2.375C12.2984 2.375 12.5845 2.49353 12.7955 2.7045C13.0065 2.91548 13.125 3.20163 13.125 3.5V12.0335L16.08 9.08C16.1844 8.9756 16.3083 8.89278 16.4448 8.83628C16.5812 8.77978 16.7274 8.7507 16.875 8.7507C17.0226 8.7507 17.1688 8.77978 17.3053 8.83628C17.4417 8.89278 17.5656 8.9756 17.67 9.08C17.7744 9.1844 17.8572 9.30834 17.9137 9.44475C17.9702 9.58116 17.9993 9.72736 17.9993 9.875C17.9993 10.0226 17.9702 10.1688 17.9137 10.3053C17.8572 10.4417 17.7744 10.5656 17.67 10.67L12.795 15.545C12.5841 15.7557 12.2981 15.874 12 15.874C11.7019 15.874 11.4159 15.7557 11.205 15.545L6.33 10.67C6.2256 10.5656 6.14279 10.4417 6.08628 10.3053C6.02978 10.1688 6.0007 10.0226 6.0007 9.875C6.0007 9.72736 6.02978 9.58116 6.08628 9.44475C6.14279 9.30834 6.2256 9.1844 6.33 9.08C6.4344 8.9756 6.55834 8.89278 6.69475 8.83628C6.83116 8.77978 6.97736 8.7507 7.125 8.7507C7.27265 8.7507 7.41885 8.77978 7.55525 8.83628C7.69166 8.89278 7.8156 8.9756 7.92 9.08L10.875 12.0335Z" fill="black"/>
+  </svg>
+);
+
 // --- Specific File Type Icons ---
 const ImageIcon = () => (
   <svg className="file-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#24A094"> {/* Changed to fill */}
@@ -113,10 +120,10 @@ function RenderNode({
     const hasChildren = Object.keys(node.children).length > 0;
     const fullPath = node.fullPath;
     const showDeleteButton = isSender === true && typeof onDeleteFolder === 'function' && fullPath;
-    const showDownloadButton = isSender === false && typeof onDownloadFolder === 'function' && fullPath;
+    const showDownloadIconButtonForFolder = isSender === false && typeof onDownloadFolder === 'function' && fullPath;
 
     const isCurrentlyZippingThisFolder = isZipping && zippingFolderPath === fullPath;
-    const isDownloadDisabled = isZipping && !isCurrentlyZippingThisFolder;
+    const isDownloadDisabled = isZipping && !isCurrentlyZippingThisFolder; // Disable if another folder/all is zipping
 
     return (
       <div className="structure"> {/* Each folder/file gets its own structure container */}
@@ -132,38 +139,39 @@ function RenderNode({
           </div>
           {showDeleteButton && (
             <button
-              className="level-delete-button"
+              className="level-action-button level-delete-button"
               onClick={(e) => { e.stopPropagation(); onDeleteFolder(fullPath); }}
               title={`Delete folder "${name}" and all its contents`}
             >
               <DeleteIcon />
             </button>
           )}
-          {showDownloadButton && (
+          {showDownloadIconButtonForFolder && (
              <button
-               className="file-list-button" // Keep specific button class if needed
+               className={`level-action-button level-download-icon-button ${isDownloadDisabled || isCurrentlyZippingThisFolder ? 'disabled' : ''}`}
                onClick={(e) => { e.stopPropagation(); onDownloadFolder(fullPath); }}
                title={`Download folder "${name}" as zip`}
-               disabled={isDownloadDisabled}
+               disabled={isDownloadDisabled || isCurrentlyZippingThisFolder}
              >
-               {isCurrentlyZippingThisFolder ? `Zipping...` : 'Download'}
+               <DownloadIcon />
              </button>
            )}
         </div>
         {/* Inline Progress Display for this folder */}
-        {isCurrentlyZippingThisFolder && (
-          <div className="folder-progress-container" style={{ marginLeft: indent + 24 }}> {/* Indent progress */}
-            <div className="folder-progress-bar-bg">
-              <div className="folder-progress-bar-fg" style={{ width: `${zipProgress}%` }}>
-                {zipProgress.toFixed(1)}%
+        {isCurrentlyZippingThisFolder && node.type === 'folder' && (
+           <div className="progress-display-container" style={{ marginLeft: indent + 16, marginRight: indent + 16, marginBottom: indent + 16, padding: '16px' }}> {/* Adjusted padding and indent */}
+             <div className="progress-bar-wrapper">
+               <div className="progress-bar-fill" style={{ width: `${zipProgress}%` }}></div>
+               <div className="progress-bar-text">
+                 {zipProgress.toFixed(1)}%
               </div>
             </div>
-            <div className="folder-progress-stats">
-              <span>Speed: {formatSpeed(downloadSpeed)}</span>
-              <span>ETR: {formatEtr(etr)}</span>
-            </div>
-            <div className="folder-progress-wait-text">
-               (Please wait, the download will start automatically when zipping is complete)
+             <div className="progress-stats-container">
+               <span>Speed: <span className="stat-value">{formatSpeed(downloadSpeed)}</span></span>
+               <span>ETR: <span className="stat-value">{formatEtr(etr)}</span></span>
+             </div>
+             <div className="progress-info-text">
+               Please wait, the download will start automatically when zipping is complete
             </div>
           </div>
         )}
@@ -215,7 +223,7 @@ function RenderNode({
        try { isCurrentlyDownloading = isDownloading(file.fileId); } catch (e) { console.error(`[RenderNode] Error calling isDownloading(${file.fileId}):`, e); }
     }
     const showDeleteButton = isSender === true && typeof onDelete === 'function';
-    const showDownloadButton = isSender === false && typeof onDownload === 'function';
+    const showDownloadIconButton = isSender === false && typeof onDownload === 'function'; // For the icon button
 
     // Apply file-level class and dynamic indentation
     const fileLevelClass = level > 0 ? 'file-level' : ''; // Apply only if nested
@@ -232,15 +240,16 @@ function RenderNode({
               <span className="file-size">({fileSize})</span>
            </div>
            {showDeleteButton && (
-             <button className="level-delete-button" onClick={() => onDelete(file.fileId)} title={`Delete file "${displayName}"`}>
+             <button className="level-action-button level-delete-button" onClick={() => onDelete(file.fileId)} title={`Delete file "${displayName}"`}>
                <DeleteIcon />
              </button>
            )}
-           {showDownloadButton && (
-             <button className="file-list-button" onClick={() => onDownload(file.fileId)} disabled={isCurrentlyDownloading}>
-               {isCurrentlyDownloading ? 'Downloading…' : 'Download'}
+           {showDownloadIconButton && (
+             <button className="level-action-button level-download-icon-button" onClick={() => onDownload(file.fileId)} disabled={isCurrentlyDownloading} title={`Download file "${displayName}"`}>
+               <DownloadIcon />
              </button>
            )}
+           {/* The text "Download" button is removed as per new instruction to replace delete icon with download icon */}
         </div>
       </div>
     );

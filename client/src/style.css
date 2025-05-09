@@ -141,9 +141,9 @@ body {
 }
 
 /* .subhead-icon { */ /* Removed as SVG is now direct child of .subhead */
-  /* width: 24px; */
-  /* height: 24px; */
-  /* aspect-ratio: 1/1; */
+/* width: 24px; */
+/* height: 24px; */
+/* aspect-ratio: 1/1; */
 /* } */
 
 .subhead-text {
@@ -655,7 +655,8 @@ button:disabled {
 }
 
 /* Styles for the new div-based structure */
-.drive-contents-div > .structure { /* Apply border only to direct children of drive-contents-div */
+.drive-contents-div > .structure {
+  /* Apply border only to direct children of drive-contents-div */
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -751,7 +752,8 @@ button:disabled {
   text-overflow: ellipsis;
 }
 
-.level-delete-button {
+.level-action-button {
+  /* New base class for action buttons in file list */
   /* Style for the delete button icon */
   width: 32px;
   height: 32px;
@@ -767,18 +769,18 @@ button:disabled {
   align-items: center; /* Added for centering icon */
 }
 
-.level-delete-button svg {
+.level-action-button svg {
   display: block;
   /* width: 100%; */ /* Let explicit size in MQ control this */
   /* height: 100%; */
 }
-.level-delete-button {
+.level-action-button {
   /* ... existing styles ... */
   border: 1px solid var(--Black-Pure-Black, #000); /* Added border */
   transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
 }
 
-.level-delete-button:hover {
+.level-action-button:hover {
   /* Add shadow on hover */
   box-shadow: 3px 3px 0px 0px var(--Black-Pure-Black, #000);
   background: none; /* Ensure no background change on hover */
@@ -786,11 +788,15 @@ button:disabled {
 /* Removed hover fill change */
 /* .level-delete-button:hover svg path { ... } */
 
-.level-delete-button:active {
+.level-action-button:active {
   /* Add transform on active */
   transform: translate(3px, 3px); /* Adjusted to match shadow */
   box-shadow: none; /* Remove shadow on active */
   background: none; /* Ensure no background change on active */
+}
+
+.level-download-icon-button {
+  /* Specific styles if needed, otherwise inherits from level-action-button */
 }
 
 /* Remove old progress/empty/error styles if replaced */
@@ -802,7 +808,8 @@ button:disabled {
 }
 /* .folder-progress-container { ... } */
 /* ... etc ... */
-.file-list-empty { /* Old style, will be replaced by file-list-empty-textfield usage */
+.file-list-empty {
+  /* Old style, will be replaced by file-list-empty-textfield usage */
   color: #aaa;
   font-style: italic;
   padding: 20px;
@@ -868,7 +875,6 @@ button:disabled {
     gap: 10px; /* Reduce gap in append div */
   }
 
-
   .subhead-text {
     font-size: 20px; /* Smaller subheadings */
   }
@@ -882,13 +888,12 @@ button:disabled {
     line-height: 1.4;
   }
   .dropzone.dropzone-append {
-      height: 120px; /* Adjust append dropzone height */
+    height: 120px; /* Adjust append dropzone height */
   }
   .dropzone-icon {
-      width: 36px;
-      height: 36px;
+    width: 36px;
+    height: 36px;
   }
-
 
   .drive-code-input,
   input[type="text"] {
@@ -899,35 +904,34 @@ button:disabled {
 
   button,
   .join-drive-button,
-  .file-list-button { /* Target file list download buttons too */
+  .file-list-button {
+    /* Target file list download buttons too */
     font-size: 14px; /* Smaller font in buttons */
     padding: 10px 12px; /* Adjust button padding */
     height: 42px; /* Consistent button height */
   }
-   .join-drive-button.loading {
+  .join-drive-button.loading {
     font-size: 14px; /* Ensure loading state matches */
   }
-.copy-button {
-  width: 40px;
-  height: 40px;
-}
-.copy-button svg {
+  .copy-button {
+    width: 40px;
+    height: 40px;
+  }
+  .copy-button svg {
     width: 20px; /* Explicit size for SVG */
     height: 20px;
     flex-shrink: 0; /* Prevent SVG from shrinking */
-}
-.level-delete-button {
+  }
+  .level-action-button {
+    /* Target base class for responsiveness */
     width: 30px; /* Container size */
     height: 30px;
-}
-.level-delete-button svg {
+  }
+  .level-action-button svg {
     width: 18px; /* Explicit size for SVG */
     height: 18px;
     flex-shrink: 0; /* Prevent SVG from shrinking */
-}
-
-
-
+  }
 
   /* Move stacking of link-details to this breakpoint */
   .link-details {
@@ -946,13 +950,14 @@ button:disabled {
     gap: 12px; /* Space between link and code display */
     width: 100%; /* Ensure it takes full width when stacked */
   }
-   .subcontainer-padding { /* Drive link container */
-      /* flex-direction: column; */ /* Keep side-by-side */
-      align-items: center; /* Keep vertical alignment centered */
-      gap: 8px; /* Keep gap */
-      padding: 10px; /* Reduce padding */
-      width: 100%; /* Ensure it takes full width */
-      box-sizing: border-box; /* Include padding in width */
+  .subcontainer-padding {
+    /* Drive link container */
+    /* flex-direction: column; */ /* Keep side-by-side */
+    align-items: center; /* Keep vertical alignment centered */
+    gap: 8px; /* Keep gap */
+    padding: 10px; /* Reduce padding */
+    width: 100%; /* Ensure it takes full width */
+    box-sizing: border-box; /* Include padding in width */
   }
   .drive-link-text {
     font-size: 16px; /* Smaller drive link text */
@@ -969,7 +974,7 @@ button:disabled {
   .file-size {
     font-size: 12px; /* Smaller file size text */
   }
-  
+
   .folder-arrow-icon,
   .folder-icon-svg,
   .file-icon-svg {
@@ -977,25 +982,24 @@ button:disabled {
     height: 20px;
   }
   .arrow-folder-div {
-      gap: 8px; /* Reduce gap for folder arrow and icon/name */
+    gap: 8px; /* Reduce gap for folder arrow and icon/name */
   }
   .level-div {
-      padding: 12px 16px; /* Reduce padding in file list rows */
+    padding: 12px 16px; /* Reduce padding in file list rows */
   }
-  
+
   .file-list-empty-textfield,
   .error-field,
   .info-for-user {
-      font-size: 13px; /* Smaller text for info/error/empty messages */
-      padding: 8px 12px;
+    font-size: 13px; /* Smaller text for info/error/empty messages */
+    padding: 8px 12px;
   }
-  .error-icon, .info-icon {
-      width: 20px;
-      height: 20px;
+  .error-icon,
+  .info-icon {
+    width: 20px;
+    height: 20px;
   }
-
 }
-
 
 @media (max-width: 480px) {
   body {
@@ -1006,8 +1010,8 @@ button:disabled {
     /* For now, just reducing padding further */
     padding: 10px 5px;
   }
-   .website-logo-icon,
-   .github-icon {
+  .website-logo-icon,
+  .github-icon {
     width: 32px;
     height: 32px;
   }
@@ -1023,18 +1027,18 @@ button:disabled {
     padding: 15px; /* Further reduce padding */
     gap: 15px;
   }
-   .append-div {
+  .append-div {
     gap: 8px;
   }
 
   .subhead-text {
     font-size: 18px;
   }
-  .subhead svg { /* Target SVGs directly in subhead */
-      width: 20px;
-      height: 20px;
+  .subhead svg {
+    /* Target SVGs directly in subhead */
+    width: 20px;
+    height: 20px;
   }
-
 
   .dropzone {
     height: 160px;
@@ -1043,11 +1047,11 @@ button:disabled {
     font-size: 14px;
   }
   .dropzone.dropzone-append {
-      height: 100px;
+    height: 100px;
   }
-   .dropzone-icon {
-      width: 32px;
-      height: 32px;
+  .dropzone-icon {
+    width: 32px;
+    height: 32px;
   }
 
   .receive-subcontainer {
@@ -1072,13 +1076,14 @@ button:disabled {
     /* margin-bottom: 16px; */ /* Gap handles this */
   }
   /* .link-details-right-div alignment moved to 768px breakpoint */
-  .subcontainer-padding { /* Drive link container */
-      /* flex-direction: column; */ /* REMOVE - Keep link and button side-by-side */
-      align-items: center; /* Keep vertical alignment centered */
-      gap: 8px; /* Keep gap */
-      padding: 10px; /* Reduce padding */
-      width: 100%; /* Ensure it takes full width */
-      box-sizing: border-box; /* Include padding in width */
+  .subcontainer-padding {
+    /* Drive link container */
+    /* flex-direction: column; */ /* REMOVE - Keep link and button side-by-side */
+    align-items: center; /* Keep vertical alignment centered */
+    gap: 8px; /* Keep gap */
+    padding: 10px; /* Reduce padding */
+    width: 100%; /* Ensure it takes full width */
+    box-sizing: border-box; /* Include padding in width */
   }
   .drive-link-text {
     font-size: 14px; /* Smaller link text */
@@ -1093,9 +1098,9 @@ button:disabled {
     height: 36px;
   }
   .copy-button svg {
-      width: 18px; /* Explicit size for SVG */
-      height: 18px;
-      flex-shrink: 0; /* Prevent SVG from shrinking */
+    width: 18px; /* Explicit size for SVG */
+    height: 18px;
+    flex-shrink: 0; /* Prevent SVG from shrinking */
   }
 
   .folder-name-text,
@@ -1106,20 +1111,176 @@ button:disabled {
     font-size: 11px;
   }
   .level-div {
-      padding: 10px 12px; /* Further reduce padding in file list rows */
+    padding: 10px 12px; /* Further reduce padding in file list rows */
   }
   .file-list-button {
-      padding: 8px 10px;
-      height: 38px;
-      font-size: 13px;
+    padding: 8px 10px;
+    height: 38px;
+    font-size: 13px;
   }
-  .level-delete-button {
-      width: 26px; /* Container size */
-      height: 26px;
+  .level-action-button {
+    /* Target base class for responsiveness */
+    width: 26px; /* Container size */
+    height: 26px;
   }
-   .level-delete-button svg {
-      width: 16px; /* Explicit size for SVG */
-      height: 16px;
-      flex-shrink: 0; /* Prevent SVG from shrinking */
+  .level-action-button svg {
+    width: 16px; /* Explicit size for SVG */
+    height: 16px;
+    flex-shrink: 0; /* Prevent SVG from shrinking */
   }
+}
+
+/* Receiver View Specific Styles */
+.receiver-view-container > .subhead {
+  /* Target direct child subhead for "Files in Drive" */
+  width: 100%;
+  justify-content: flex-start; /* Align "Files in Drive" text to the left */
+  margin-bottom: 16px; /* Add some space below the title */
+}
+
+.receiver-top-div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  align-self: stretch;
+  width: 100%;
+  margin-bottom: 24px; /* Space before file list or progress */
+}
+
+.download-all-button {
+  /* Uses .join-drive-button styles by default */
+  /* Add any overrides if needed */
+  min-width: 180px; /* Ensure it has some minimum width */
+}
+
+.download-all-button.disabled {
+  background: #bbb !important;
+  color: #eee !important;
+  cursor: not-allowed !important;
+  opacity: 1 !important; /* Override general button disabled opacity if needed */
+  box-shadow: none; /* Remove shadow when disabled */
+  transform: none; /* Remove transform when disabled */
+}
+
+/* New Progress Bar Styles */
+.progress-display-container {
+  /* Renamed from .global-zip-progress-container */
+  display: flex;
+  padding: 24px 16px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  align-self: stretch;
+  border: 1px solid var(--Black-Pure-Black, #000);
+}
+
+.progress-bar-wrapper {
+  width: 100%; /* Max width will be controlled by parent, can set max-width if needed */
+  /* max-width: 874px; */ /* As per spec, but might be too wide for mobile. Let's make it responsive. */
+  height: 24px;
+  border: 1px solid var(--Black-Pure-Black, #000);
+  background-color: var(
+    --White-Pure-White,
+    #fff
+  ); /* Background for the non-progress part */
+  position: relative; /* For positioning text */
+  overflow: hidden; /* To ensure fill doesn't go out */
+}
+
+.progress-bar-fill {
+  background: var(--Primary-Green, #24a094);
+  height: 100%;
+  transition: width 0.2s ease-out; /* Smooth progress animation */
+  /* No rounded corners */
+}
+
+.progress-bar-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 24px; /* Match height */
+  color: var(--Black-Pure-Black, #000); /* Default to black */
+  z-index: 1; /* Ensure it's above the fill for the inverse effect */
+  /* mix-blend-mode: difference; */ /* This can create the inverse effect but might need careful handling */
+}
+
+/* This is a common trick for inverse text color on progress bars */
+/* We'll need JS to toggle this class or use a more complex CSS setup */
+.progress-bar-text.inverse {
+  color: var(--White-Pure-White, #fff);
+}
+
+.progress-stats-container {
+  /* Renamed from .progress-stats */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  align-self: stretch;
+  width: 100%; /* Ensure it takes full width */
+}
+
+.progress-stats-container span {
+  /* For "Speed:" and "ETR:" labels */
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: normal;
+  color: var(--Black-Pure-Black, #000);
+}
+
+.progress-stats-container .stat-value {
+  /* For the actual speed/ETA values */
+  color: var(--Primary-Green, #24a094);
+  font-weight: 500; /* Make values slightly bolder */
+}
+
+.progress-info-text {
+  /* Renamed from .progress-wait-text */
+  color: var(--Black-Black, #0d0d0d);
+  font-family: "Mabry Pro";
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 300;
+  line-height: normal;
+  width: 100%; /* Ensure it takes full width and centers */
+}
+
+.receiver-error-subcontainer {
+  margin-top: 0; /* Remove top margin if it's the only thing after FileList */
+}
+
+/* Responsive adjustments for receiver top div */
+@media (max-width: 768px) {
+  /* Or your preferred mobile breakpoint like 480px */
+  .receiver-top-div {
+    flex-direction: column;
+    align-items: stretch; /* Make items take full width when stacked */
+    gap: 16px; /* Add some gap when stacked */
+  }
+  .receiver-top-div .drive-code-display-div {
+    align-items: center; /* Center the drive code text when stacked */
+  }
+  .download-all-button {
+    width: 100%; /* Make button full width when stacked */
+    max-width: none; /* Remove max-width if set */
+  }
+  .progress-bar-wrapper {
+    /* max-width: 100%; */ /* Allow it to be responsive */
+  }
+  .progress-stats-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
+
+.receiver-info-zipping {
+  margin-bottom: 16px; /* Add some space below it before the progress bar or file list */
 }
