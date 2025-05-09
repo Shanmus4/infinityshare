@@ -141,9 +141,9 @@ body {
 }
 
 /* .subhead-icon { */ /* Removed as SVG is now direct child of .subhead */
-  /* width: 24px; */
-  /* height: 24px; */
-  /* aspect-ratio: 1/1; */
+/* width: 24px; */
+/* height: 24px; */
+/* aspect-ratio: 1/1; */
 /* } */
 
 .subhead-text {
@@ -1163,20 +1163,16 @@ button:disabled {
   align-self: stretch;
   border: 1px solid var(--Black-Pure-Black, #000);
   width: 100%;
-  margin-bottom: 24px; /* Space before file list */
-  border-radius: 3px; /* Added from previous global-zip-progress-container */
-  background-color: var(--Grey-Light-Grey, #f4f5f0); /* Added from previous */
 }
 
 .progress-filename-text {
   font-size: 16px;
   font-weight: 500;
-  color: var(--Black-Black, #0D0D0D);
+  color: var(--Black-Black, #0d0d0d);
   margin-bottom: 8px; /* Space between filename and progress bar */
   text-align: left; /* Align to the start of the container */
   word-break: break-all; /* Ensure long filenames wrap */
 }
-
 
 .progress-bar-wrapper {
   width: 874px; /* As per spec */
@@ -1253,8 +1249,6 @@ button:disabled {
   font-weight: 300;
   line-height: normal;
   width: 100%; /* Ensure it takes full width and centers */
-  text-align: center; /* Center the text */
-  margin-top: 4px; /* Small space above this text */
 }
 
 .receiver-error-subcontainer {
@@ -1287,7 +1281,7 @@ button:disabled {
 }
 
 .receiver-info-zipping {
- margin-bottom: 16px; /* Add some space below it before the progress bar or file list */
+  margin-bottom: 16px; /* Add some space below it before the progress bar or file list */
 }
 
 .level-action-button.disabled svg,
