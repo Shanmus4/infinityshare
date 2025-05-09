@@ -2,11 +2,18 @@
 
 ## Active Tasks
 
-- [ ] **SEO:** Add `og:url` and `twitter:url` to `client/public/index.html` after deployment. (Discovered 2025-05-07)
 - [ ] **Improvement/Security:** Implement rate limiting on `signaling-server` events (e.g., `create-room`, `join-room`) to prevent abuse. (Discovered 2025-05-04)
-- [ ] **Deployment:** Configure TLS/SSL for production deployment (Mentioned in docs) - **Partially Done (2025-05-04):** Signaling server (`signaling-server/index.js`) updated to support HTTPS via `SSL_CERT_PATH` and `SSL_KEY_PATH` environment variables. Actual certificate provisioning and web server (hosting client) HTTPS configuration still required in deployment environment.
 
 ## Completed Tasks (Verified 2025-05-04)
+
+- [x] **SEO:** Add `og:url` and `twitter:url` to `client/public/index.html` after deployment. (Discovered 2025-05-07, Completed 2025-05-09 - Actual URL `https://infinityshare.netlify.app/` added.)
+- [x] **Deployment:** Configure and deploy frontend (Netlify/Vercel) and signaling server (Render/Fly.io). (User Request 2025-05-09, Completed 2025-05-09 - Steps provided, user execution and URL updates done. Netlify redirect rule for client-side routing added.)
+  - Signaling server configured for `process.env.PORT` and HTTP (SSL termination by platform).
+  - Frontend `SIGNALING_SERVER_URL` configured for production environment variable.
+  - Frontend build process outlined.
+  - Deployment steps for Render (signaling) and Netlify (frontend) provided.
+  - CORS and frontend URL environment variables explained.
+  - Added `client/public/_redirects` file for Netlify to handle client-side routing (e.g., `/DRIVE_CODE?as=receiver`).
 
 - [x] **UI Styling:** Apply CSS changes provided by the user for colors, fonts, and general styling. (User Request 2025-05-07)
 - [x] **UI:** Fix general UI issues and improve responsiveness (User Request)
