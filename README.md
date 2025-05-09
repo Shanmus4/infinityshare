@@ -17,13 +17,15 @@ File Send is a modern web application for secure, direct peer-to-peer (P2P) file
 - No file storage on any server.
 - Sender must keep the tab open; closing it ends the session.
 - Warning displayed to sender before closing/reloading the tab.
+- **Progressive Web App (PWA) Support:** Installable on desktop and mobile devices for an app-like experience with basic offline app shell caching. (Install on iOS via Safari's "Add to Home Screen" option).
 
 ## Architecture & Tech Stack
 
 - **Frontend:** React.js, react-dropzone, qrcode.react, socket.io-client, jszip, file-saver.
 - **Signaling Server:** Standalone Node.js + socket.io server (`/signaling-server`) handles room management and WebRTC signaling relay. **This is the only active backend component.**
 - **WebRTC:** Direct P2P communication via `RTCDataChannel`.
-- **Service Worker:** (`/client/public/service-worker.js`) Handles streaming downloads for single files.
+- **Service Worker:** (`/client/public/service-worker.js`) Handles streaming downloads for single files and enables PWA app shell caching. Registered via `client/src/serviceWorkerRegistration.js`.
+- **Manifest File:** (`/client/public/manifest.json`) Provides PWA metadata.
 - **Testing:** Pytest structure exists (`/tests`), but tests for the signaling server are not yet implemented.
 - **Monorepo:** Contains `/client`, `/server` (unused?), `/signaling-server`, `/tests`.
 
@@ -72,27 +74,13 @@ File Send is a modern web application for secure, direct peer-to-peer (P2P) file
     npm start
     # Keep this terminal running
     ```
-5.  Open your browser to the address provided by the frontend (usually `http://localhost:3000` or similar).
+5.  Open your browser to the address provided by the frontend (usually `http://localhost:3001` or your configured port).
 
 ## Configuration
 
-### TURN Server Credentials (Optional but Recommended)
+### ICE Servers (STUN/TURN)
 
-For file transfers to work reliably across different network types (especially those with strict firewalls), TURN servers are often required. This application is configured to use Twilio's TURN servers.
-
-1.  **Sign up** for a free or paid Twilio account at [https://www.twilio.com/](https://www.twilio.com/).
-2.  Find your **Account SID** and **Auth Token** in your Twilio console dashboard.
-3.  Create a file named `.env` in the `/client` directory.
-4.  Add your credentials to the `.env` file like this:
-
-    ```dotenv
-    REACT_APP_TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-    REACT_APP_TWILIO_AUTH_TOKEN=your_auth_token_here
-    ```
-
-5.  Restart the client development server (`npm start` in the `/client` directory) if it's already running to load the new environment variables.
-
-If these environment variables are not set, the application will still function using STUN servers only, but file transfers might fail in some network conditions. The `.gitignore` file is configured to prevent `.env` files from being committed to Git.
+The application is configured in `client/src/utils/signaling.js` to use a list of public STUN servers (Google, Twilio) and public TURN servers (OpenRelay) as a fallback. This helps in establishing peer-to-peer connections across various network types. No external credentials are required for these public servers, but their availability and performance are not guaranteed.
 
 ### Signaling Server CORS Origins
 
@@ -119,24 +107,11 @@ SSL_CERT_PATH=/path/to/cert.pem SSL_KEY_PATH=/path/to/key.pem node index.js
 If these variables are not set, the server will run using HTTP.
 ### Client Signaling Server URL
 
-The React client needs to know the address of the running signaling server. This is currently hardcoded in `client/src/utils/signaling.js`:
+The React client determines the signaling server URL based on the environment:
+-   **Production:** It uses the `REACT_APP_SIGNALING_SERVER_URL` environment variable (set during the build/deployment process, e.g., in Netlify).
+-   **Development:** It defaults to `ws://localhost:3000` (or your signaling server's local address).
 
-```javascript
-export const SIGNALING_SERVER_URL = "wss://b9c2-49-207-206-28.ngrok-free.app"; // Example URL
-```
-
-If you are hosting the signaling server yourself (not using the example ngrok URL), you **must** update this constant to point to your signaling server's WebSocket address (using `ws://` for local development without SSL or `wss://` for production with SSL).
-
-**Recommendation:** For better configuration, consider modifying the code to use an environment variable instead, similar to the Twilio credentials:
-
-1.  Update `client/src/utils/signaling.js`:
-    ```javascript
-    export const SIGNALING_SERVER_URL = process.env.REACT_APP_SIGNALING_SERVER_URL || "ws://localhost:3000"; // Default for local dev
-    ```
-2.  Add the variable to your `/client/.env` file:
-    ```dotenv
-    REACT_APP_SIGNALING_SERVER_URL=wss://your-signaling-server.com
-    ```
+This is configured in `client/src/utils/signaling.js`.
 ## Testing
 
 - **Signaling Server Tests:** Pytest structure is set up in `/tests`, but tests need to be implemented.

@@ -6,6 +6,12 @@
 
 ## Completed Tasks (Verified 2025-05-04)
 
+- [x] **Feature: PWA Configuration** (User Request 2025-05-09, Completed 2025-05-09)
+  - Created `client/public/manifest.json` with app metadata.
+  - Linked manifest in `client/public/index.html`.
+  - Added `client/src/serviceWorkerRegistration.js` for CRA PWA service worker lifecycle.
+  - Updated `client/src/index.js` to call `serviceWorkerRegistration.register()`.
+  - Added `apple-touch-icon` link to `client/public/index.html` for better iOS home screen icon.
 - [x] **SEO:** Add `og:url` and `twitter:url` to `client/public/index.html` after deployment. (Discovered 2025-05-07, Completed 2025-05-09 - Actual URL `https://infinityshare.netlify.app/` added.)
 - [x] **Deployment:** Configure and deploy frontend (Netlify/Vercel) and signaling server (Render/Fly.io). (User Request 2025-05-09, Completed 2025-05-09 - Steps provided, user execution and URL updates done. Netlify redirect rule for client-side routing added.)
   - Signaling server configured for `process.env.PORT` and HTTP (SSL termination by platform).

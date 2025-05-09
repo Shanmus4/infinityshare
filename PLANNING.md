@@ -8,7 +8,8 @@ Develop a web-based application for direct peer-to-peer (P2P) file transfers bet
 - **Backend:** *Currently unused* `/server` directory with Node.js + Express. Needs review for removal.
 - **Signaling Server:** Standalone Node.js + socket.io server for room management and WebRTC signaling relay. This is the active backend component.
 - **WebRTC:** Used for direct P2P file transfer via `RTCDataChannel`.
-- **Service Worker:** (`client/public/service-worker.js`) Intercepts download requests, streams data received via WebRTC to the browser for saving. Used for single file downloads.
+- **Service Worker:** (`client/public/service-worker.js`) Intercepts download requests for single file streaming and enables PWA app shell caching. Registered via `client/src/serviceWorkerRegistration.js`.
+- **PWA Support:** Includes `client/public/manifest.json` for installability ("Add to Home Screen") and app-like experience.
 - **Security:** WebRTC encryption (DTLS). TLS/SSL for signaling server (requires setup for production).
 - **Testing:** Pytest structure exists in `/tests`, but no tests are implemented yet.
 
@@ -37,6 +38,7 @@ Develop a web-based application for direct peer-to-peer (P2P) file transfers bet
 - Client-side session handling (state management, URL parsing)
 - Warning before closing/reloading sender tab
 - Standalone signaling server for relaying messages
+- **Progressive Web App (PWA):** Installable to home screen with basic offline app shell caching.
 
 ## Naming, Structure & Conventions
 - All code modular, max 500 lines/file (split into modules/helpers if needed) - *Note: `client/src/App.js` exceeds this limit and needs refactoring.*
