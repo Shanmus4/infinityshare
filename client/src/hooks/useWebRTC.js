@@ -46,8 +46,14 @@ export function startWebRTC({
     console.error(`[WebRTC Single] ICE candidate error for ${fileId}:`, event);
     if (event.errorCode) {
        console.error(`  Error Code: ${event.errorCode}, Host Candidate: ${event.hostCandidate}, Server URL: ${event.url}, Text: ${event.errorText}`);
+       if (event.errorCode !== 701) {
+        setError && setError(`ICE candidate gathering error for ${fileId}. Code: ${event.errorCode}`);
+       } else {
+        console.warn(`[WebRTC Single] ICE candidate error 701 (ignorable) for ${fileId}:`, event.errorText);
+       }
+    } else {
+      setError && setError(`ICE candidate gathering error for ${fileId}. Code: N/A`);
     }
-    setError && setError(`ICE candidate gathering error for ${fileId}. Code: ${event.errorCode || 'N/A'}`);
     // Consider cleanup here too? cleanupWebRTCInstance(fileId);
   };
   // --- End Detailed Logging ---

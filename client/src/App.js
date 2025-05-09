@@ -1386,7 +1386,7 @@ function App() {
                   disabled={isDownloadAllDisabled}
                 >
                   {isZipping && !zippingFolderPath
-                    ? `Zipping... (${zipProgress.toFixed(0)}%)`
+                    ? `Downloading... (${zipProgress.toFixed(0)}%)`
                     : "Download All"}
                 </button>
               </div>
@@ -1457,6 +1457,7 @@ function App() {
                 isDownloading={isDownloading}
                 onDownloadFolder={handleDownloadFolder}
                 isZipping={isZipping}
+                setError={setError} // Pass setError to FileList
                 // zippingFolderPath={zippingFolderPath} // Removed, global display now
                 // zipProgress={zipProgress} // Removed
                 // downloadSpeed={downloadSpeed} // Removed
@@ -1465,8 +1466,8 @@ function App() {
                 // formatEtr={formatEtr} // Removed
               />
               {/* Display errors from App state and the unified zip hook */}
-              {/* Removed ErrorBanner for receiver as per request */}
-              {/* {(error || zipError) && (
+              {/* Removed ErrorBanner for receiver as per request, but re-adding for general errors */}
+              {(error || zipError) && (
                 <div className="error-subcontainer receiver-error-subcontainer">
                   <div className="error-field">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" className="error-icon">
@@ -1477,7 +1478,7 @@ function App() {
                     <span className="error-text">{error || zipError}</span>
                   </div>
                 </div>
-              )} */}
+              )}
             </div>
           </div>
         </div>

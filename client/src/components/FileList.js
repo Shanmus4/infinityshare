@@ -225,7 +225,8 @@ function RenderNode({
   // downloadSpeed, // No longer needed here
   // etr, // No longer needed here
   // formatSpeed, // No longer needed here
-  // formatEtr // No longer needed here
+  // formatEtr, // No longer needed here
+  setError,
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const indent = level * 16; // Base indentation in pixels
@@ -294,10 +295,14 @@ function RenderNode({
               className={`level-action-button level-download-icon-button ${isFolderDownloadDisabled ? 'disabled' : ''}`}
               onClick={(e) => {
                 e.stopPropagation();
+                if (isFolderDownloadDisabled) {
+                  setError("Cannot have multiple folder downloads.");
+                  return;
+                }
                 onDownloadFolder(fullPath);
               }}
               title={`Download folder "${name}" as zip`}
-              disabled={isFolderDownloadDisabled}
+              // disabled={isFolderDownloadDisabled} // Removed HTML attribute
             >
               <DownloadIcon />
             </button>
@@ -330,6 +335,7 @@ function RenderNode({
                   onDeleteFolder={onDeleteFolder}
                   onDownloadFolder={onDownloadFolder}
                   isZipping={isZipping} // Pass down for disabling other folders
+                  setError={setError}
                 />
               ))}
           </div>
@@ -401,8 +407,14 @@ function RenderNode({
           {showDownloadIconButton && (
             <button
               className={`level-action-button level-download-icon-button ${isCurrentlyDownloading ? 'disabled' : ''}`}
-              onClick={() => onDownload(file.fileId)}
-              disabled={isCurrentlyDownloading}
+              onClick={() => {
+                if (isCurrentlyDownloading) {
+                  setError("File downloaded already, refresh page to download again.");
+                  return;
+                }
+                onDownload(file.fileId);
+              }}
+              // disabled={isCurrentlyDownloading} // Removed HTML attribute
               title={`Download file "${displayName}"`}
             >
               <DownloadIcon />
@@ -438,6 +450,7 @@ function FileList({
   // etr,
   // formatSpeed,
   // formatEtr,
+  setError,
 }) {
   if (!Array.isArray(files)) {
     console.error("[FileList] Error: 'files' prop is not an array.", files);
@@ -499,6 +512,7 @@ function FileList({
             // etr={etr} // Removed
             // formatSpeed={formatSpeed} // Removed
             // formatEtr={formatEtr} // Removed
+            setError={setError}
           />
         ))}
     </div>
