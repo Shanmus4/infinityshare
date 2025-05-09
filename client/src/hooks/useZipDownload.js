@@ -118,13 +118,14 @@ export function useZipDownload({
     };
     pc.onicecandidateerror = (event) => console.error(`[useZipDownload] ICE candidate error for ${pcId}:`, event);
     pc.onconnectionstatechange = () => {
-      console.log(`[useZipDownload] PC connection state change for ${pcId}: ${pc.connectionState}`);
+      console.log(`[useZipDownload] PC connection state change for ${pcId}: ${pc.connectionState}. ICE State: ${pc.iceConnectionState}, Signaling State: ${pc.signalingState}`);
       if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
+        console.error(`[useZipDownload] Main PC ${pcId} entered ${pc.connectionState} state. ICE: ${pc.iceConnectionState}, Signaling: ${pc.signalingState}`);
         setError('Zip download connection failed.');
         resetZipState(); // Cleanup on failure
       }
     };
-    pc.onsignalingstatechange = () => console.log(`[useZipDownload] PC signaling state change for ${pcId}: ${pc.signalingState}`);
+    pc.onsignalingstatechange = () => console.log(`[useZipDownload] PC signaling state change for ${pcId}: ${pc.signalingState}. ICE State: ${pc.iceConnectionState}, Connection State: ${pc.connectionState}`);
 
     // --- Data Channel Handler ---
     pc.ondatachannel = (event) => {
