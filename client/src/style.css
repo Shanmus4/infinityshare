@@ -1182,7 +1182,7 @@ button:disabled {
 
 .download-all-button.disabled {
   background: #bbb !important;
-  color: #eee !important;
+  color: #4e4e4e !important;
   cursor: not-allowed !important;
   opacity: 1 !important; /* Override general button disabled opacity if needed */
   box-shadow: none; /* Remove shadow when disabled */

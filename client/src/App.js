@@ -294,12 +294,14 @@ function App() {
       pendingSignals.current = {}; // Clear all pending signals
       console.log('[App Sender] All WebRTC states and pending signals cleared.');
 
-      if (!(driveCode && filesRef.current.length > 0)) {
-        console.log('[App Sender] Socket connected, but no active driveCode or files to share yet.');
+      if (!driveCode) { // If driveCode itself is lost, we can't do much.
+        console.log('[App Sender] Socket connected, but no active driveCode found in state. Cannot re-establish previous drive.');
         return;
       }
 
-      console.log('[App Sender] Socket (re)connected. Re-asserting room and re-emitting file-list for room:', driveCode);
+      // If driveCode exists, proceed. filesRef.current might be empty if files state was lost,
+      // in which case an empty file list will be correctly emitted.
+      console.log('[App Sender] Socket (re)connected. Re-asserting room and re-emitting file-list for room:', driveCode, 'Files available:', filesRef.current.length);
       const filesMeta = filesRef.current.map(({ name, size, type, fileId, path }) => ({
         name,
         size,
