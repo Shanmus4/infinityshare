@@ -4,6 +4,11 @@
 
 - [ ] **Improvement/Security:** Implement rate limiting on `signaling-server` events (e.g., `create-room`, `join-room`) to prevent abuse. (Discovered 2025-05-04)
 
+## Completed Tasks (Verified 2025-05-10)
+
+- [x] **UI:** Update progress bar text to `(Downloaded Size / Total Size)` with downloaded size in primary green. (User Request 2025-05-10, Completed 2025-05-10)
+  - Modified `client/src/App.js` to update the `progress-bar-text` display.
+
 ## Completed Tasks (Verified 2025-05-04)
 
 - [x] **Feature: PWA Configuration** (User Request 2025-05-09, Completed 2025-05-09)
