@@ -1375,7 +1375,7 @@ function App() {
     return (
       <>
         {" "}
-        {/* Use Fragment to wrap header and main content */}
+        {/* U  se Fragment to wrap header and main content */}
         <AppHeader />
         <div className="main-section">
           <div className="content-div">
