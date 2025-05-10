@@ -291,8 +291,11 @@ function App() {
       // First time uploading, create room and send full list
       let code = "";
       const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-      for (let i = 0; i < 4; i++) { // Generate 4 characters
-        code += characters.charAt(Math.floor(Math.random() * characters.length));
+      for (let i = 0; i < 4; i++) {
+        // Generate 4 characters
+        code += characters.charAt(
+          Math.floor(Math.random() * characters.length)
+        );
       }
       setDriveCode(code);
       // Generate the receiver URL for QR code
@@ -1076,6 +1079,7 @@ function App() {
     error: zipError, // Alias to avoid state name conflict
     zippingFolderPath, // Get the path of the folder being zipped
     connectionStatus: zipConnectionStatus, // Get connection status for zip downloads
+    currentOperationTotalSize, // Get total size for the current zip operation
   } = useZipDownload({
     receiverFilesMeta,
     driveCode,
@@ -1228,10 +1232,11 @@ function App() {
   const handleJoinDrive = (codeToJoin) => {
     setError(""); // Clear previous errors
     setIsJoiningDrive(true); // Start loading
-    const upperCode = codeToJoin.toUpperCase().replace(/[^A-Z]/g, ''); // Ensure only uppercase letters
+    const upperCode = codeToJoin.toUpperCase().replace(/[^A-Z]/g, ""); // Ensure only uppercase letters
 
     // Basic validation
-    if (upperCode && upperCode.length === 4 && /^[A-Z]+$/.test(upperCode)) { // Check for 4 uppercase letters
+    if (upperCode && upperCode.length === 4 && /^[A-Z]+$/.test(upperCode)) {
+      // Check for 4 uppercase letters
       // Navigate to the receiver URL for this code
       // This leverages the existing URL parsing logic on page load
       // Simulate a delay for loading state visibility if navigation is too fast
@@ -1288,7 +1293,7 @@ function App() {
     ) {
       return "--:--";
     }
-
+  
     const totalSeconds = Math.floor(seconds);
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -1301,6 +1306,15 @@ function App() {
     } else {
       return `${secs}s`;
     }
+  }
+
+  function formatBytes(bytes, decimals = 2) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
   }
   // -----------------------------
 
@@ -1473,7 +1487,9 @@ function App() {
                   placeholder="Enter 4 character drive code"
                   value={joinDriveCodeInput}
                   onChange={(e) =>
-                    setJoinDriveCodeInput(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))
+                    setJoinDriveCodeInput(
+                      e.target.value.toUpperCase().replace(/[^A-Z]/g, "")
+                    )
                   }
                   maxLength={4}
                   onKeyDown={(e) => {
@@ -1762,12 +1778,11 @@ function App() {
 
                   {/* Global Progress Display for "Download All" or specific folder */}
                   <div className="progress-display-container">
-                    <div className="progress-filename-text">
+                     <div className="progress-filename-text">
                       {zippingFolderPath
-                        ? `Downloading and Zipping: ${zippingFolderPath
-                            .split("/")
-                            .pop()}.zip`
+                        ? `Downloading and Zipping: ${zippingFolderPath.split("/").pop()}.zip`
                         : "Downloading and Zipping All Files..."}
+                      {isZipping && currentOperationTotalSize > 0 && ` (${formatBytes(currentOperationTotalSize)})`}
                     </div>
                     {/* Informational text about connection status, separate from filename */}
                     {zipConnectionStatus === "interrupted" && (

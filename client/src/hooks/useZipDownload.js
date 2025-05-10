@@ -22,6 +22,7 @@ export function useZipDownload({
   const [etr, setEtr] = useState(null);
   const [zippingFolderPath, setZippingFolderPath] = useState(null); // Track which folder is zipping
   const [connectionStatus, setConnectionStatus] = useState('stable'); // 'stable', 'interrupted', 'failed'
+  const [currentOperationTotalSize, setCurrentOperationTotalSize] = useState(0); // For displaying total size
   const fileData = useRef({});
   const totalBytesReceived = useRef(0);
   const lastSpeedCheckTime = useRef(0);
@@ -38,6 +39,7 @@ export function useZipDownload({
     setEtr(null);
     setZippingFolderPath(null); // Reset folder path on completion/error
     setConnectionStatus('stable'); // Reset connection status
+    setCurrentOperationTotalSize(0); // Reset total size
     fileData.current = {};
     totalBytesReceived.current = 0;
     lastSpeedCheckTime.current = 0;
@@ -311,8 +313,9 @@ export function useZipDownload({
             folderPath: folderPathFilter // Send null if not a folder download
         });
     });
-    // Store total size after loop
+    // Store total size after loop and update state for UI
     currentZipOperation.current.totalSize = totalSizeToDownload;
+    setCurrentOperationTotalSize(totalSizeToDownload);
 
     // Start heartbeat for this pcId
     if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
@@ -404,6 +407,6 @@ export function useZipDownload({
       });
   };
 
-  // Expose the unified function and the zipping folder path, and connectionStatus
-  return { startZipProcess, isZipping, zipProgress, downloadSpeed, etr, error, zippingFolderPath, connectionStatus };
+  // Expose the unified function and the zipping folder path, connectionStatus, and total size
+  return { startZipProcess, isZipping, zipProgress, downloadSpeed, etr, error, zippingFolderPath, connectionStatus, currentOperationTotalSize };
 }
