@@ -160,15 +160,17 @@ export function useZipDownload({
           // Don't resetZipState here, give it a chance to reconnect.
           break;
         case 'failed':
-          setConnectionStatus('interrupted'); // Or 'failed' if we decide 'failed' is not recoverable
-          setError('Connection failed. Waiting to see if sender reconnects or retries.');
-          console.error(`[useZipDownload] Main PC ${pcId} failed. ICE: ${pc.iceConnectionState}, Signaling: ${pc.signalingState}`);
-          // Still don't resetZipState immediately. The user might retry, or sender might re-initiate.
-          // However, the current operation is likely stalled.
+          setConnectionStatus('failed');
+          setError('Connection lost. Please reload the page and ensure the sender tab remains open to try again.');
+          console.error(`[useZipDownload] Main PC ${pcId} failed. ICE: ${pc.iceConnectionState}, Signaling: ${pc.signalingState}. Resetting zip state.`);
+          resetZipState(); // For 'failed', treat as definitive and reset.
           break;
         case 'closed':
           setConnectionStatus('failed');
-          setError('Zip download connection closed. Please try again.');
+          // If already in a failed state from 'failed' event, don't overwrite the more specific message.
+          if (connectionStatus !== 'failed' || !error.includes('Connection lost')) {
+            setError('Zip download connection closed. Please try again.');
+          }
           console.error(`[useZipDownload] Main PC ${pcId} closed. This is likely final.`);
           resetZipState(); // For 'closed', it's usually definitive.
           break;
