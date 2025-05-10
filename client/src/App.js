@@ -143,6 +143,66 @@ function App() {
     };
   }, [socket, handleSignal]); // Use handleSignal from useCallback
 
+  // --- Minimal WebRTC logic helpers ---
+  const cleanupWebRTCInstance = React.useCallback((id) => { // Renamed parameter for clarity
+    const pc = peerConns.current[id];
+
+    // If this ID corresponds to a main PeerConnection that had associated DataChannels (e.g., for a zip operation)
+    if (pc && pc._associatedTransferIds) {
+      console.log(`[App cleanup] Cleaning up main PC ${id} and its ${pc._associatedTransferIds.size} associated DataChannels.`);
+      pc._associatedTransferIds.forEach(transferId => {
+        const associatedDc = dataChannels.current[transferId];
+        if (associatedDc) {
+          try {
+            if (associatedDc.readyState !== "closed") {
+              associatedDc.close();
+              console.log(`[App cleanup] Closed associated DataChannel ${transferId} for main PC ${id}`);
+            }
+          } catch (e) {
+            console.warn(`[App cleanup] Error closing associated DataChannel ${transferId}:`, e);
+          }
+          delete dataChannels.current[transferId]; // Remove from global tracking
+        }
+      });
+      delete pc._associatedTransferIds; // Clean up the tracking set itself
+      delete activeZipPcHeartbeats.current[id]; // Stop tracking heartbeat for this PC
+      console.log(`[App cleanup] Stopped heartbeat tracking for zip PC: ${id}`);
+    } else {
+      // This might be a cleanup for a single file's DataChannel directly, or a PC that wasn't a zip main PC
+      const dc = dataChannels.current[id];
+      if (dc) {
+        try {
+          if (dc.readyState !== "closed") {
+            dc.close();
+            console.log(`[App cleanup] Closed DataChannel ${id}`);
+          }
+        } catch (e) {
+          console.warn(`[App cleanup] Error closing DataChannel ${id}:`, e);
+        }
+        delete dataChannels.current[id];
+      }
+    }
+
+    // Clean up the PeerConnection itself
+    if (pc) {
+      try {
+        if (pc.signalingState !== "closed") {
+          pc.close();
+          console.log(`[App cleanup] Closed PeerConnection ${id}`);
+        }
+      } catch (e) {
+        console.warn(`[App cleanup] Error closing PeerConnection ${id}:`, e);
+      }
+      delete peerConns.current[id];
+    }
+
+    // Also delete any pending signals for this id
+    if (pendingSignals.current && pendingSignals.current[id]) {
+      console.log(`[App cleanup] Deleting pending signals for ${id}`);
+      delete pendingSignals.current[id];
+    }
+  }, [peerConns, dataChannels, pendingSignals, activeZipPcHeartbeats]); // Refs are stable, so this callback is stable
+
   // --- SENDER: Upload files and create drive, or add more files (flat version) ---
   const handleDrop = (acceptedFiles) => {
     console.log(
@@ -905,65 +965,6 @@ function App() {
       navigator.serviceWorker.removeEventListener("message", handler);
   }, []);
 
-  // --- Minimal WebRTC logic helpers ---
-  const cleanupWebRTCInstance = React.useCallback((id) => { // Renamed parameter for clarity
-    const pc = peerConns.current[id];
-
-    // If this ID corresponds to a main PeerConnection that had associated DataChannels (e.g., for a zip operation)
-    if (pc && pc._associatedTransferIds) {
-      console.log(`[App cleanup] Cleaning up main PC ${id} and its ${pc._associatedTransferIds.size} associated DataChannels.`);
-      pc._associatedTransferIds.forEach(transferId => {
-        const associatedDc = dataChannels.current[transferId];
-        if (associatedDc) {
-          try {
-            if (associatedDc.readyState !== "closed") {
-              associatedDc.close();
-              console.log(`[App cleanup] Closed associated DataChannel ${transferId} for main PC ${id}`);
-            }
-          } catch (e) {
-            console.warn(`[App cleanup] Error closing associated DataChannel ${transferId}:`, e);
-          }
-          delete dataChannels.current[transferId]; // Remove from global tracking
-        }
-      });
-      delete pc._associatedTransferIds; // Clean up the tracking set itself
-      delete activeZipPcHeartbeats.current[id]; // Stop tracking heartbeat for this PC
-      console.log(`[App cleanup] Stopped heartbeat tracking for zip PC: ${id}`);
-    } else {
-      // This might be a cleanup for a single file's DataChannel directly, or a PC that wasn't a zip main PC
-      const dc = dataChannels.current[id];
-      if (dc) {
-        try {
-          if (dc.readyState !== "closed") {
-            dc.close();
-            console.log(`[App cleanup] Closed DataChannel ${id}`);
-          }
-        } catch (e) {
-          console.warn(`[App cleanup] Error closing DataChannel ${id}:`, e);
-        }
-        delete dataChannels.current[id];
-      }
-    }
-
-    // Clean up the PeerConnection itself
-    if (pc) {
-      try {
-        if (pc.signalingState !== "closed") {
-          pc.close();
-          console.log(`[App cleanup] Closed PeerConnection ${id}`);
-        }
-      } catch (e) {
-        console.warn(`[App cleanup] Error closing PeerConnection ${id}:`, e);
-      }
-      delete peerConns.current[id];
-    }
-
-    // Also delete any pending signals for this id
-    if (pendingSignals.current && pendingSignals.current[id]) {
-      console.log(`[App cleanup] Deleting pending signals for ${id}`);
-      delete pendingSignals.current[id];
-    }
-  }, [peerConns, dataChannels, pendingSignals, activeZipPcHeartbeats]); // Refs are stable, so this callback is stable
 
   // Integrate the unified useZipDownload hook
   const {
