@@ -150,7 +150,7 @@ function App() {
 
     // If this ID corresponds to a main PeerConnection that had associated DataChannels (e.g., for a zip operation)
     if (pc && pc._associatedTransferIds) {
-      console.log(`[App cleanup] Cleaning up main PC ${id} and its ${pc._associatedTransferIds.size} associated DataChannels.`);
+      console.log(`[App cleanup] Cleaning up main PC ${id} (zip/folder type) and its ${pc._associatedTransferIds.size} associated DataChannels.`);
       pc._associatedTransferIds.forEach(transferId => {
         const associatedDc = dataChannels.current[transferId];
         if (associatedDc) {
@@ -166,10 +166,20 @@ function App() {
         }
       });
       delete pc._associatedTransferIds; // Clean up the tracking set itself
-      delete activeZipPcHeartbeats.current[id]; // Stop tracking heartbeat for this PC
-      console.log(`[App cleanup] Stopped heartbeat tracking for zip PC: ${id}`);
+      if (activeZipPcHeartbeats.current.hasOwnProperty(id)) {
+        delete activeZipPcHeartbeats.current[id]; // Stop tracking heartbeat for this PC
+        console.log(`[App cleanup] Stopped and REMOVED heartbeat tracking for zip PC: ${id}`);
+      } else {
+        console.warn(`[App cleanup] Heartbeat tracking for zip PC ${id} was expected but not found for deletion.`);
+      }
     } else {
-      // This might be a cleanup for a single file's DataChannel directly, or a PC that wasn't a zip main PC
+      // This might be a cleanup for a single file's DataChannel directly (ID is transferId),
+      // or a PC that wasn't a main zip PC (e.g. single file PC, ID is transferId).
+      // It should not be a main zip PC ID if it doesn't have _associatedTransferIds.
+      if (activeZipPcHeartbeats.current.hasOwnProperty(id)) {
+        console.warn(`[App cleanup] PC ${id} was in activeZipPcHeartbeats but NOT identified as a main zip PC (no _associatedTransferIds). Removing from heartbeats.`);
+        delete activeZipPcHeartbeats.current[id];
+      }
       const dc = dataChannels.current[id];
       if (dc) {
         try {
