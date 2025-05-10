@@ -502,19 +502,24 @@ function App() {
             console.log(
               `[App Sender] Main PC connection state change for ${pcIdToUse}: ${pc.connectionState}`
             );
-            if (
-              pc.connectionState === "failed" ||
-              pc.connectionState === "disconnected" ||
-              pc.connectionState === "closed"
-            ) {
-              console.error(
-                `[App Sender] Main PC ${pcIdToUse} failed/disconnected/closed. State: ${pc.connectionState}`
-              );
-              // setError(
-              //   `${isZipRequest ? "Zip" : "Folder"} download connection failed.`
-              // ); // Changed to console.error
-              // Consider cleanup of associated channels if needed
-              cleanupWebRTCInstance(pcIdToUse);
+            switch (pc.connectionState) {
+              case "disconnected":
+                console.warn(
+                  `[App Sender] Main PC ${pcIdToUse} disconnected. State: ${pc.connectionState}. Waiting for potential auto-reconnect.`
+                );
+                // Do NOT cleanup yet, give it a chance to recover.
+                // Heartbeat mechanism will eventually clean up if it stays disconnected for too long.
+                break;
+              case "failed":
+              case "closed":
+                console.error(
+                  `[App Sender] Main PC ${pcIdToUse} ${pc.connectionState}. State: ${pc.connectionState}. Cleaning up.`
+                );
+                cleanupWebRTCInstance(pcIdToUse);
+                break;
+              default:
+                // For 'new', 'connecting', 'connected' - no action needed here.
+                break;
             }
           };
           pc.onsignalingstatechange = () => {
