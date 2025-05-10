@@ -53,8 +53,23 @@ function App() {
   const { enableNoSleep } = useNoSleep();
 
   useEffect(() => {
-    enableNoSleep();
-  }, [enableNoSleep]);
+    const handleFirstInteraction = () => {
+      // console.log('App.js: First user interaction detected, enabling NoSleep.');
+      enableNoSleep();
+      document.body.removeEventListener('click', handleFirstInteraction);
+      document.body.removeEventListener('touchstart', handleFirstInteraction);
+    };
+
+    // console.log('App.js: Setting up NoSleep to enable on first user interaction.');
+    document.body.addEventListener('click', handleFirstInteraction, { once: true });
+    document.body.addEventListener('touchstart', handleFirstInteraction, { once: true });
+
+    return () => {
+      // console.log('App.js: Cleaning up NoSleep first interaction listeners.');
+      document.body.removeEventListener('click', handleFirstInteraction);
+      document.body.removeEventListener('touchstart', handleFirstInteraction);
+    };
+  }, [enableNoSleep]); // enableNoSleep is stable due to useCallback
 
   useEffect(() => {
     return () => {
