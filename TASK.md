@@ -7,11 +7,15 @@
 
 - [x] **UI:** Update progress bar text to display `(Downloaded Size / Total Size)` next to the main operation text (e.g., "Downloading and Zipping All Files..."), with "Downloaded Size" in primary green. (User Request 2025-05-10, Completed 2025-05-10)
   - Modified `client/src/App.js` to update the `.progress-filename-text` display.
-- [x] **Feature: Screen Wake Lock (using NoSleep.js)** (User Request 2025-05-10, Completed 2025-05-10)
-  - Installed `nosleep.js` library in `/client`.
-  - Created `client/src/hooks/useNoSleep.js` to manage NoSleep.js instance.
-  - Integrated `useNoSleep` into `client/src/App.js` to enable screen wake lock when the app mounts.
-  - Corrected hook and function definition order in `App.js` to prevent initialization errors.
+- [x] **Feature: Screen Wake Lock (using NoSleep.js)** (User Request 2025-05-10, Implemented 2025-05-10)
+  - `nosleep.js` library is installed in `/client`.
+  - Integrated `NoSleep.js` directly into `client/src/App.js` as per the library's official usage example:
+    - Imports `NoSleep` from `nosleep.js`.
+    - Uses a `useRef` (e.g., `noSleepRef`) to store the `NoSleep` instance.
+    - A `useEffect` hook initializes `noSleepRef.current = new NoSleep();` on component mount.
+    - Event listeners for 'click' and 'touchstart' are added to `document.body` (with `{ once: true }`). These listeners call a function that enables the wake lock via `noSleepRef.current.enable()`.
+    - The cleanup function in `useEffect` disables the wake lock if active and cleans up the ref and listeners.
+  - The custom `client/src/hooks/useNoSleep.js` file was previously deleted.
 
 ## Completed Tasks (Verified 2025-05-04)
 

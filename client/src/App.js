@@ -8,7 +8,7 @@ import { startWebRTC } from "./hooks/useWebRTC";
 import { makeFileId } from "./utils/fileHelpers";
 import { useZipDownload } from "./hooks/useZipDownload";
 import { ICE_SERVERS } from "./utils/signaling";
-import { useNoSleep } from "./hooks/useNoSleep";
+import NoSleep from 'nosleep.js'; // Import NoSleep
 
 function App() {
   function getInitialStepAndDriveCode() {
@@ -49,18 +49,38 @@ function App() {
   const activeZipPcHeartbeats = useRef({});
   const prevDriveCodeRef = useRef(null);
   const prevStepRef = useRef();
+  const noSleepRef = useRef(null); // Ref to store NoSleep instance
 
-  const { enableNoSleep } = useNoSleep();
-
-  // Attempt to enable NoSleep when the component mounts.
-  // NoSleep.js itself requires a user interaction (e.g. click/touch) anywhere on the page
-  // for the underlying video mechanism to work due to browser autoplay policies.
-  // This call prepares NoSleep; the actual lock engages after user interaction.
   useEffect(() => {
-    // console.log('App.js: Attempting to enable NoSleep on mount.');
-    enableNoSleep();
-    // The useNoSleep hook handles disabling on unmount.
-  }, [enableNoSleep]); // enableNoSleep is stable due to useCallback in the hook.
+    // Initialize NoSleep and set up to enable on first user click
+    // This effect runs only once on mount
+    if (!noSleepRef.current) { // Initialize only if not already done
+      noSleepRef.current = new NoSleep();
+    }
+
+    const enableWakeLockOnClick = () => {
+      if (noSleepRef.current && !noSleepRef.current.isEnabled) {
+        noSleepRef.current.enable().then(() => {
+          console.log('NoSleep.js enabled successfully after user interaction.');
+        }).catch(err => {
+          console.error('Failed to enable NoSleep.js:', err);
+        });
+      }
+      // Listeners are automatically removed due to { once: true }
+    };
+
+    // Add event listeners for the first user interaction to enable NoSleep
+    document.body.addEventListener('click', enableWakeLockOnClick, { once: true });
+    document.body.addEventListener('touchstart', enableWakeLockOnClick, { once: true });
+    
+    return () => {
+      // Only remove listeners if they haven't fired.
+      // NoSleep instance itself is not disabled or nulled here,
+      // allowing the wake lock to persist as per user request.
+      document.body.removeEventListener('click', enableWakeLockOnClick);
+      document.body.removeEventListener('touchstart', enableWakeLockOnClick);
+    };
+  }, []); // Empty dependency array ensures this runs once on mount
 
   useEffect(() => {
     return () => {
