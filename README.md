@@ -1,132 +1,182 @@
-# File Send: Peer-to-Peer File Transfer Web App
+# InfinityShare: Peer-to-Peer File Transfer
 
-## Overview
+**Live Website: [https://infinityshare.netlify.app/](https://infinityshare.netlify.app/)**
 
-File Send is a modern web application for secure, direct peer-to-peer (P2P) file transfers between devices using WebRTC. It enables users to send files without uploading them to any server. Files are shared via QR code or a short drive code, and are never stored on the backend. The app is designed for privacy, speed, and ease of use.
+InfinityShare is a web application for direct, secure, and private peer-to-peer (P2P) file transfers. Share files of any size directly between devices without uploading them to any server.
 
-## Features (Verified 2025-05-03)
+## How to Use InfinityShare
 
-- Upload files via drag-and-drop or file selection.
-- Generate a unique drive code and QR code for sharing.
-- Join a drive using the URL path, drive code input, or by scanning the QR code.
-- Add/delete files dynamically on the sender side (updates receiver list in real-time).
-- Secure, direct peer-to-peer (P2P) file transfer using WebRTC DataChannels (DTLS encryption).
-- Single file download streaming via Service Worker for efficient handling.
-- "Download All" functionality: Downloads all files via WebRTC, zips them in the browser (`JSZip`), and saves (`FileSaver`).
-- Basic progress indication for the "Download All" process.
-- No file storage on any server.
-- Sender must keep the tab open; closing it ends the session.
-- Warning displayed to sender before closing/reloading the tab.
-- **Progressive Web App (PWA) Support:** Installable on desktop and mobile devices for an app-like experience with basic offline app shell caching. (Install on iOS via Safari's "Add to Home Screen" option).
+InfinityShare makes file transfer simple and quick:
 
-## Architecture & Tech Stack
+**1. Sender:**
+   - Open [InfinityShare](https://infinityshare.netlify.app/) in your browser.
+   - Drag and drop files/folders you want to share into the "Send" area, or click to select them.
+   - A unique 4-character "Drive Code" and a QR code will be generated.
+   - Share this Drive Code or QR code with the receiver.
 
-- **Frontend:** React.js, react-dropzone, qrcode.react, socket.io-client, jszip, file-saver.
-- **Signaling Server:** Standalone Node.js + socket.io server (`/signaling-server`) handles room management and WebRTC signaling relay. **This is the only active backend component.**
-- **WebRTC:** Direct P2P communication via `RTCDataChannel`.
-- **Service Worker:** (`/client/public/service-worker.js`) Handles streaming downloads for single files and enables PWA app shell caching. Registered via `client/src/serviceWorkerRegistration.js`.
-- **Manifest File:** (`/client/public/manifest.json`) Provides PWA metadata.
-- **Testing:** Pytest structure exists (`/tests`), but tests for the signaling server are not yet implemented.
-- **Monorepo:** Contains `/client`, `/signaling-server`, `/tests`. The `/server` directory has been removed as it was unused.
+**2. Receiver:**
+   - Open [InfinityShare](https://infinityshare.netlify.app/) on another device.
+   - In the "Receive" section, enter the 4-character Drive Code provided by the sender and click "Join Drive".
+   - Alternatively, if the sender shared a direct link (which includes the drive code), opening that link will automatically attempt to join the drive.
+   - If you have a QR code scanner, you can scan the QR code displayed on the sender's screen to join.
+   - Once connected, you will see the list of shared files.
+   - Click the download icon next to a file/folder to download it, or use the "Download All" button to get all files as a single ZIP archive.
 
-## Directory Structure
+**Important Notes for Optimal Use:**
+*   **Network:** For the fastest transfer speeds, ensure both devices are on the **same local network** (e.g., connected to the same Wi-Fi router or hotspot). While transfers can work over the internet, local network connections are significantly faster.
+*   **Keep Tab Active:** Both the sender and receiver must keep the InfinityShare browser tab **open and active** for the duration of the transfer. Closing the tab or navigating away will interrupt the connection and stop the transfer.
+*   **Screen Sleep:** InfinityShare attempts to keep your device's screen awake during active use (sending or receiving) to prevent transfers from being interrupted, especially on mobile devices. This uses the `NoSleep.js` library.
 
-```
-/file-send/
-  /client/           # React frontend (main application logic)
-  /server/           # (Removed - Was unused)
-  /signaling-server/ # Standalone Node.js + Socket.io signaling server (Active)
-  /tests/            # Pytest tests (planned for signaling-server)
-  PLANNING.md        # Project architecture and guidelines
-  TASK.md            # Active and completed tasks
-  README.md          # This file
-  package.json       # Root package file (monorepo scripts)
-```
+**Progressive Web App (PWA) - Install for an App-Like Experience:**
 
-## Security Model
+InfinityShare is a PWA, meaning you can "install" it on your device for easier access and an experience similar to a native app.
 
-- All file transfers are end-to-end encrypted via WebRTC (DTLS).
-- The signaling server only relays messages and does not store files.
-- **Production:** The signaling server should be configured with TLS/SSL for secure WebSocket connections (`wss://`).
-- No files are ever stored on any server.
-- Sessions are transient and depend on the sender keeping their browser tab open.
-- **Vulnerabilities:** As of 2025-05-03, `npm audit` reports 8 vulnerabilities (2 moderate, 6 high) in the client dependencies, originating from `react-scripts`. These need investigation and resolution before production deployment. See `TASK.md` for details.
+*   **Desktop (Chrome, Edge):**
+    1.  Navigate to [https://infinityshare.netlify.app/](https://infinityshare.netlify.app/).
+    2.  Look for an "Install" icon in the address bar (usually a computer with a down arrow).
+    3.  Click it and follow the prompts to install.
+*   **Android (Chrome):**
+    1.  Navigate to [https://infinityshare.netlify.app/](https://infinityshare.netlify.app/) in Chrome.
+    2.  Tap the three-dot menu icon.
+    3.  Select "Install app" or "Add to Home screen."
+*   **iOS (Safari):**
+    1.  Navigate to [https://infinityshare.netlify.app/](https://infinityshare.netlify.app/) in Safari.
+    2.  Tap the "Share" icon (a square with an upward arrow).
+    3.  Scroll down and tap "Add to Home Screen."
+    4.  Confirm by tapping "Add."
 
-## Getting Started
+## Key Features
 
-1.  **Prerequisites:** Node.js and npm installed.
-2.  **Install Dependencies:**
-    ```sh
-    # Navigate to the project root directory
-    cd client && npm install
-    cd ../signaling-server && npm install
-    # cd ../server && npm install # Skip this, as /server has been removed
+- **Direct P2P Transfers:** Files are sent directly between browsers using WebRTC, ensuring privacy and speed.
+- **No Server-Side Storage:** Your files are never uploaded to or stored on any server.
+- **Drag & Drop Uploads:** Easily add files and entire folder structures.
+- **Drive Code & QR Sharing:** Simple sharing using a 4-character code or a scannable QR code.
+- **URL-Based Joining:** Receivers can join directly via a shared URL.
+- **Dynamic File Management:** Senders can add or delete files/folders, and the receiver's list updates in real-time.
+- **Single File Downloads:** Efficient streaming downloads for individual files via a Service Worker.
+- **"Download All" as ZIP:** Download all shared files or specific folders as a single ZIP archive, created in the browser.
+- **Progress Indicators:** View progress, speed, and ETA for "Download All" and folder downloads.
+- **Progressive Web App (PWA):** Installable on desktop and mobile for an app-like experience and offline access to the app shell.
+- **Screen Wake Lock:** Actively works to prevent your device's screen from sleeping during transfers.
+- **Secure:** Transfers are encrypted using DTLS (standard with WebRTC).
+
+## Local Development Setup
+
+Want to run InfinityShare locally or contribute? Here’s how:
+
+**Prerequisites:**
+*   Node.js (v16 or later recommended)
+*   npm (usually comes with Node.js) or yarn
+
+**Steps:**
+
+1.  **Clone the Repository:**
+    ```bash
+    git clone https://github.com/Shanmus4/infinityshare.git
+    cd infinityshare
     ```
-3.  **Start the Signaling Server:**
-    ```sh
-    cd signaling-server
-    node index.js
-    # Keep this terminal running
+
+2.  **Install Root Dependencies (Optional - if any for monorepo tools):**
+    ```bash
+    npm install 
     ```
-4.  **Start the Frontend:**
-    ```sh
-    cd ../client
-    npm start
-    # Keep this terminal running
+    *(Currently, the root `package.json` might only contain scripts for running client/server concurrently, actual dependencies are within sub-projects).*
+
+3.  **Install Client Dependencies:**
+    ```bash
+    cd client
+    npm install
     ```
-5.  Open your browser to the address provided by the frontend (usually `http://localhost:3001` or your configured port).
 
-## Configuration
+4.  **Install Signaling Server Dependencies:**
+    ```bash
+    cd ../signaling-server 
+    npm install
+    ```
 
-### ICE Servers (STUN/TURN)
+5.  **Environment Variables:**
+    *   **Signaling Server (`signaling-server/.env` - create this file):**
+        *   `PORT`: Port for the signaling server (defaults to 3000 if not set). E.g., `PORT=3000`
+        *   `ALLOWED_ORIGINS`: Comma-separated list of URLs allowed to connect (for CORS). For local development, this should include your client's URL. E.g., `ALLOWED_ORIGINS=http://localhost:3001`
+        *   `SSL_CERT_PATH` (Optional): Path to SSL certificate if running HTTPS locally.
+        *   `SSL_KEY_PATH` (Optional): Path to SSL private key if running HTTPS locally.
+    *   **Client (`client/.env` - create this file):**
+        *   `REACT_APP_SIGNALING_SERVER_URL`: The URL of your signaling server. For local development:
+            *   If signaling server is HTTP on port 3000: `REACT_APP_SIGNALING_SERVER_URL=ws://localhost:3000`
+            *   If signaling server is HTTPS on port 3000: `REACT_APP_SIGNALING_SERVER_URL=wss://localhost:3000`
 
-The application is configured in `client/src/utils/signaling.js` to use a list of public STUN servers (Google, Twilio) and public TURN servers (OpenRelay) as a fallback. This helps in establishing peer-to-peer connections across various network types. No external credentials are required for these public servers, but their availability and performance are not guaranteed.
+6.  **Running the Application:**
 
-### Signaling Server CORS Origins
+    *   **Start the Signaling Server:**
+        ```bash
+        cd signaling-server
+        npm start 
+        ```
+        (This typically runs `node index.js`. Keep this terminal running.)
 
-The signaling server (`/signaling-server/index.js`) restricts connections to specific origins for security. By default in development, it allows `http://localhost:3001` (assuming the React client runs on port 3001).
+    *   **Start the React Client (in a new terminal):**
+        ```bash
+        cd client
+        npm start
+        ```
+        This will usually open the app in your browser at `http://localhost:3001`.
 
-For production, set the `ALLOWED_ORIGINS` environment variable when running the signaling server. It should be a comma-separated list of allowed URLs:
+## Project Architecture
 
-```bash
-ALLOWED_ORIGINS=https://your-production-domain.com,https://www.your-production-domain.com node index.js
-```
-### Signaling Server HTTPS/SSL (Optional)
+InfinityShare consists of two main components:
 
-To run the signaling server over HTTPS (required for `wss://` connections, recommended for production), you need to provide paths to your SSL certificate and private key files via environment variables:
+1.  **React Frontend (`/client`):**
+    *   The user interface built with React.
+    *   Handles file selection, WebRTC connection setup, data channel management for file transfer, and all client-side logic (zipping, saving, PWA registration, NoSleep.js).
+    *   Communicates with the signaling server to exchange connection details with the peer.
+    *   Deployed on Netlify: [https://infinityshare.netlify.app/](https://infinityshare.netlify.app/)
 
--   `SSL_CERT_PATH`: Path to the SSL certificate file (e.g., `/etc/letsencrypt/live/yourdomain.com/fullchain.pem`).
--   `SSL_KEY_PATH`: Path to the SSL private key file (e.g., `/etc/letsencrypt/live/yourdomain.com/privkey.pem`).
+2.  **Signaling Server (`/signaling-server`):**
+    *   A lightweight Node.js server using `socket.io`.
+    *   Its sole purpose is to help peers discover each other and exchange WebRTC signaling messages (like offers, answers, and ICE candidates).
+    *   **It does not handle or store any file data.** All file transfers are direct P2P.
+    *   Deployed on Render: `wss://infinityshare-signalserver.onrender.com`
 
-Set these variables when starting the server:
+**How it Works (WebRTC):**
+*   When a sender uploads files, they connect to the signaling server and create a "room" identified by the Drive Code.
+*   When a receiver joins using the Drive Code, they also connect to the signaling server and join the same room.
+*   The signaling server then relays messages (SDP offers/answers, ICE candidates) between the sender and receiver. These messages allow their browsers to establish a direct WebRTC `PeerConnection`.
+*   Once the `PeerConnection` is established, files are transferred directly between the two browsers using `RTCDataChannel`s, which are encrypted by default (DTLS).
+*   If a direct P2P connection cannot be established (e.g., due to restrictive firewalls), WebRTC can attempt to use STUN/TURN servers as fallbacks. InfinityShare is configured with public STUN servers.
 
-```bash
-SSL_CERT_PATH=/path/to/cert.pem SSL_KEY_PATH=/path/to/key.pem node index.js
-```
+*(A visual diagram could be added here in the future to illustrate the signaling and P2P flow.)*
 
-If these variables are not set, the server will run using HTTP.
-### Client Signaling Server URL
+## File Structure Overview
 
-The React client determines the signaling server URL based on the environment:
--   **Production:** It uses the `REACT_APP_SIGNALING_SERVER_URL` environment variable (set during the build/deployment process, e.g., in Netlify).
--   **Development:** It defaults to `ws://localhost:3000` (or your signaling server's local address).
-
-This is configured in `client/src/utils/signaling.js`.
-## Testing
-
-- **Signaling Server Tests:** Pytest structure is set up in `/tests`, but tests need to be implemented.
+-   **`/` (Root)**
+    -   `package.json`: Scripts for managing the monorepo (e.g., concurrently running client and server).
+    -   `PLANNING.md`: Detailed project architecture, conventions, and planning notes.
+    -   `TASK.md`: Tracks active and completed development tasks.
+    -   `README.md`: This file.
+    -   `LICENSE`: MIT License.
+-   **`/client`**: The React frontend application.
+    -   `package.json`: Frontend dependencies and scripts.
+    -   `/public`: Static assets, `index.html`, `manifest.json` (PWA), `service-worker.js`.
+    -   `/src`: React application source code.
+        -   `App.js`: The main application component, managing state and core logic.
+        -   `/components`: Reusable UI components (e.g., `FileList.js`, `DropzoneArea.js`).
+        -   `/hooks`: Custom React hooks for encapsulated logic (e.g., `useWebRTC.js`, `useZipDownload.js`, `useNoSleep.js`, `useSocket.js`).
+        -   `/utils`: Utility functions and constants (e.g., `fileHelpers.js`, `signaling.js`).
+        -   `index.js`: Entry point for the React app, registers service worker.
+        -   `serviceWorkerRegistration.js`: Handles PWA service worker lifecycle.
+-   **`/signaling-server`**: The Node.js + Socket.io signaling server.
+    -   `package.json`: Server dependencies and start script.
+    -   `index.js`: Main server logic for handling socket connections and relaying WebRTC signals.
+-   **`/tests`**: Planned location for tests (currently empty).
 
 ## Contributing
 
-- Please see `PLANNING.md` and `TASK.md` for architecture details, contribution guidelines, and active development tasks.
-- Key areas for contribution include UI improvements, bug fixes (especially for "Download All"), implementing tests, and refactoring large components like `client/src/App.js`.
-- Follow the code style and modularity rules outlined in `PLANNING.md`.
+Contributions are welcome! Please refer to `PLANNING.md` for architectural guidelines and `TASK.md` for ongoing tasks. Key areas for improvement include:
+*   Implementing unit and end-to-end tests.
+*   Refactoring `client/src/App.js` into smaller, more manageable components/hooks.
+*   Enhancing UI/UX and responsiveness.
+*   Improving error handling and resilience.
 
-## Changelog
+## License
 
-- **2025-05-03:** Documentation updated, codebase analyzed, tasks updated. Identified unused `/server` directory. Added "Download All" feature using JSZip.
-- _(Previous)_ Fixed a race condition by ensuring the service worker is ready before starting downloads for newly added files.
-
----
-
-For questions or issues, please open an issue on the repository or refer to the project planning documents (`PLANNING.md`, `TASK.md`).
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

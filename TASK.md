@@ -2,12 +2,16 @@
 
 ## Active Tasks
 
-- [ ] **Improvement/Security:** Implement rate limiting on `signaling-server` events (e.g., `create-room`, `join-room`) to prevent abuse. (Discovered 2025-05-04)
 
 ## Completed Tasks (Verified 2025-05-10)
 
-- [x] **UI:** Update progress bar text to `(Downloaded Size / Total Size)` with downloaded size in primary green. (User Request 2025-05-10, Completed 2025-05-10)
-  - Modified `client/src/App.js` to update the `progress-bar-text` display.
+- [x] **UI:** Update progress bar text to display `(Downloaded Size / Total Size)` next to the main operation text (e.g., "Downloading and Zipping All Files..."), with "Downloaded Size" in primary green. (User Request 2025-05-10, Completed 2025-05-10)
+  - Modified `client/src/App.js` to update the `.progress-filename-text` display.
+- [x] **Feature: Screen Wake Lock (using NoSleep.js)** (User Request 2025-05-10, Completed 2025-05-10)
+  - Installed `nosleep.js` library in `/client`.
+  - Created `client/src/hooks/useNoSleep.js` to manage NoSleep.js instance.
+  - Integrated `useNoSleep` into `client/src/App.js` to enable screen wake lock when the app mounts.
+  - Corrected hook and function definition order in `App.js` to prevent initialization errors.
 
 ## Completed Tasks (Verified 2025-05-04)
 
