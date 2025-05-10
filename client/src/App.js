@@ -13,6 +13,7 @@ import { makeFileId } from "./utils/fileHelpers";
 import { useZipDownload } from "./hooks/useZipDownload"; // Handles all zip downloads now
 // import { useFolderDownload } from "./hooks/useFolderDownload"; // <-- REMOVE Import
 import { ICE_SERVERS } from "./utils/signaling"; // Import ICE_SERVERS
+import useScreenWakeLock from "./hooks/useScreenWakeLock"; // Import the new hook
 
 function App() {
   function getInitialStepAndDriveCode() {
@@ -52,6 +53,8 @@ function App() {
   window.pendingSignals = pendingSignals.current;
   const activeZipPcHeartbeats = useRef({}); // Tracks heartbeats for sender's main PCs for zip ops
   const prevDriveCodeRef = useRef(null); // To track driveCode changes for receiver cleanup
+
+  const { requestWakeLock, releaseWakeLock, isWakeLockActive, isWakeLockSupported } = useScreenWakeLock();
 
   // Cleanup toast timeout on unmount
   useEffect(() => {
@@ -938,6 +941,33 @@ function App() {
     prevStepRef.current = step;
   }, [step]);
 
+  // Effect to manage screen wake lock
+  useEffect(() => {
+    const shouldRequestLock =
+      (step === 'uploaded' && filesRef.current.length > 0) ||
+      (step === 'receiver' && (isZipping || downloadingFiles.size > 0));
+
+    if (shouldRequestLock) {
+      if (isWakeLockSupported && !isWakeLockActive) {
+        console.log('[App] Conditions met to request screen wake lock.');
+        requestWakeLock();
+      }
+    } else {
+      if (isWakeLockSupported && isWakeLockActive) {
+        console.log('[App] Conditions no longer met, releasing screen wake lock.');
+        releaseWakeLock();
+      }
+    }
+    // Ensure lock is released if component unmounts or conditions change drastically
+    return () => {
+      if (isWakeLockSupported && isWakeLockActive) { // Check isWakeLockActive from the hook's state
+        console.log('[App] Releasing screen wake lock on effect cleanup / unmount.');
+        releaseWakeLock();
+      }
+    };
+  }, [step, isZipping, downloadingFiles.size, requestWakeLock, releaseWakeLock, isWakeLockActive, isWakeLockSupported]);
+
+
   // --- RECEIVER: Listen for file list ---
   useEffect(() => {
     const handler = ({ filesMeta }) => {
@@ -1080,6 +1110,7 @@ function App() {
     zippingFolderPath, // Get the path of the folder being zipped
     connectionStatus: zipConnectionStatus, // Get connection status for zip downloads
     currentOperationTotalSize, // Get total size for the current zip operation
+    currentOperationDownloadedBytes, // Get downloaded bytes for current zip operation
   } = useZipDownload({
     receiverFilesMeta,
     driveCode,
@@ -1782,7 +1813,11 @@ function App() {
                       {zippingFolderPath
                         ? `Downloading and Zipping: ${zippingFolderPath.split("/").pop()}.zip`
                         : "Downloading and Zipping All Files..."}
-                      {isZipping && currentOperationTotalSize > 0 && ` (${formatBytes(currentOperationTotalSize)})`}
+                      {isZipping && currentOperationTotalSize > 0 && (
+                        <span className="progress-size-indicator">
+                          (<span style={{ color: '#24A094', fontWeight: 'bold' }}>{formatBytes(currentOperationDownloadedBytes)}</span> / {formatBytes(currentOperationTotalSize)})
+                        </span>
+                      )}
                     </div>
                     {/* Informational text about connection status, separate from filename */}
                     {zipConnectionStatus === "interrupted" && (
