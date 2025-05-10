@@ -722,17 +722,58 @@ function App() {
 
   // --- RECEIVER: Robustly join and request file list after socket connects ---
   useEffect(() => {
-    if (step !== "receiver" || !driveCode) return;
+    if (step !== "receiver" || !driveCode) {
+      // If not in receiver step or no drive code, ensure any lingering WebRTC state is cleared
+      // This can happen if navigating away from a receiver view that had an active connection.
+      // Object.keys(peerConns.current).forEach(id => cleanupWebRTCInstance(id)); // Potentially too aggressive here, could break sender if navigating back and forth
+      // pendingSignals.current = {};
+      return;
+    }
+
+    // --- Proactive Cleanup for Receiver Role ---
+    // When entering receiver mode for a specific driveCode, clean up ALL previous WebRTC states.
+    // This helps ensure the PWA starts fresh for this new receiver session.
+    console.log(`[App Receiver] Entering receiver mode for ${driveCode}. Performing full WebRTC state cleanup.`);
+    Object.keys(peerConns.current).forEach(id => {
+      // Check if the peer connection is not the one currently being established by useZipDownload for this drive.
+      // This is a bit tricky as useZipDownload manages its own PC.
+      // For simplicity and max cleanliness for PWA, we'll clear all.
+      // useZipDownload's resetZipState will be called when it starts a new operation anyway.
+      cleanupWebRTCInstance(id);
+    });
+    peerConns.current = {}; // Ensure the main ref is empty
+
+    Object.keys(dataChannels.current).forEach(id => {
+        const dc = dataChannels.current[id];
+        if (dc && dc.readyState !== "closed") {
+            try { dc.close(); } catch (e) { /* ignore */ }
+        }
+    });
+    dataChannels.current = {}; // Ensure the main ref is empty
+    pendingSignals.current = {};
+    console.log('[App Receiver] Full WebRTC state cleanup complete.');
+    // --- End Proactive Cleanup ---
+
     const joinAndRequest = () => {
+      console.log(`[App Receiver] Joining room: ${driveCode} and requesting file list.`);
       socket.emit("join-room", driveCode);
       socket.emit("get-file-list", { room: driveCode });
     };
+
     if (socket.connected) {
       joinAndRequest();
     }
-    socket.on("connect", joinAndRequest);
-    return () => socket.off("connect", joinAndRequest);
-  }, [step, driveCode, socket]);
+    socket.on("connect", joinAndRequest); // For re-establishing after socket disconnects
+
+    return () => {
+      console.log(`[App Receiver] Cleaning up effect for driveCode: ${driveCode}.`);
+      socket.off("connect", joinAndRequest);
+      // When navigating away from this specific receiver view (driveCode changes or step changes),
+      // ensure the specific zip PC that might have been initiated by useZipDownload for *this* driveCode is cleaned.
+      // useZipDownload's own reset will handle its currentZipOperation.pcId.
+      // The proactive cleanup at the start of this effect handles broader stale states.
+    };
+  }, [step, driveCode, socket, cleanupWebRTCInstance]); // Added cleanupWebRTCInstance
 
   // --- RECEIVER: Listen for file list ---
   useEffect(() => {
