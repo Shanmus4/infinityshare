@@ -3,65 +3,59 @@ import NoSleep from 'nosleep.js';
 
 export function useNoSleep() {
   const noSleepRef = useRef(null);
-  const [isNoSleepEnabledByApp, setIsNoSleepEnabledByApp] = useState(false); // Tracks if app has called enable
+  // Tracks if the app has successfully called .enable() on the instance
+  const [isNoSleepActiveByApp, setIsNoSleepActiveByApp] = useState(false);
 
-  // Initialize NoSleep instance
   useEffect(() => {
+    // Initialize NoSleep instance on mount
     noSleepRef.current = new NoSleep();
     // console.log('useNoSleep: NoSleep instance created.');
 
-    // Cleanup: ensure NoSleep is disabled when the component unmounts if it was enabled by the app
+    // Cleanup: ensure NoSleep is disabled when the component unmounts
+    // if it was active or the app intended it to be.
     return () => {
-      if (noSleepRef.current && isNoSleepEnabledByApp) {
-        // console.log('useNoSleep: Disabling NoSleep.js on hook unmount because app had enabled it.');
+      if (noSleepRef.current && noSleepRef.current.isEnabled) {
+        // console.log('useNoSleep: Disabling NoSleep.js on hook unmount.');
         noSleepRef.current.disable();
-        setIsNoSleepEnabledByApp(false); // Reset app's intent
-      } else if (noSleepRef.current) {
-        // console.log('useNoSleep: Hook unmounting, NoSleep was not actively enabled by app or already disabled.');
       }
+      noSleepRef.current = null; // Clean up the instance itself
+      setIsNoSleepActiveByApp(false);
     };
-  }, [isNoSleepEnabledByApp]); // Re-run cleanup if isNoSleepEnabledByApp changes (though primarily for unmount)
+  }, []); // Runs once on mount and cleanup on unmount
 
   const enableNoSleep = useCallback(() => {
     if (noSleepRef.current && !noSleepRef.current.isEnabled) {
-      // console.log('useNoSleep: enableNoSleep called. Attempting to enable.');
+      // console.log('useNoSleep: Attempting to enable NoSleep.js...');
       noSleepRef.current.enable()
         .then(() => {
-          setIsNoSleepEnabledByApp(true);
-          console.log('NoSleep.js enabled successfully by app.');
+          setIsNoSleepActiveByApp(true);
+          console.log('NoSleep.js enabled successfully.');
         })
         .catch(err => {
           console.error('Failed to enable NoSleep.js:', err);
-          setIsNoSleepEnabledByApp(false);
+          setIsNoSleepActiveByApp(false); // Ensure state reflects failure
         });
     } else if (noSleepRef.current && noSleepRef.current.isEnabled) {
-      // console.log('useNoSleep: enableNoSleep called, but NoSleep.js reports it is already enabled.');
-      setIsNoSleepEnabledByApp(true); // Sync app state if library says it's enabled
-    } else if (!noSleepRef.current) {
-      console.warn('useNoSleep: NoSleep instance not available to enable.');
+      // console.log('useNoSleep: NoSleep.js is already enabled.');
+      setIsNoSleepActiveByApp(true); // Sync state
     }
-  }, []); // No dependencies, this function is stable
+  }, []);
 
   const disableNoSleep = useCallback(() => {
-    // This function is less critical if we always enable on mount and disable on unmount,
-    // but good to have for explicit control if ever needed.
     if (noSleepRef.current && noSleepRef.current.isEnabled) {
-      // console.log('useNoSleep: disableNoSleep called. Disabling.');
+      // console.log('useNoSleep: Attempting to disable NoSleep.js...');
       noSleepRef.current.disable();
-      setIsNoSleepEnabledByApp(false);
-      console.log('NoSleep.js disabled by app.');
-    } else {
-      // console.log('useNoSleep: disableNoSleep called, but NoSleep.js not active or no instance.');
-      setIsNoSleepEnabledByApp(false); // Ensure app state reflects disabled
+      setIsNoSleepActiveByApp(false);
+      console.log('NoSleep.js disabled.');
     }
-  }, []); // No dependencies, this function is stable
+  }, []);
 
-  // Optional: Handle document visibility changes to re-enable if necessary
-  // This is more robust if the browser itself might pause the video element used by NoSleep.js
+  // Handle document visibility changes to re-enable if necessary
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isNoSleepEnabledByApp && noSleepRef.current && !noSleepRef.current.isEnabled) {
-        // console.log('useNoSleep: Document became visible, re-enabling NoSleep.js as app intended it to be active.');
+      if (document.visibilityState === 'visible' && isNoSleepActiveByApp && noSleepRef.current && !noSleepRef.current.isEnabled) {
+        // console.log('useNoSleep: Document became visible, re-enabling NoSleep.js.');
+        // NoSleep.js handles the user interaction requirement internally for re-enabling.
         noSleepRef.current.enable().catch(err => console.error('Failed to re-enable NoSleep.js on visibility change:', err));
       }
     };
@@ -70,9 +64,7 @@ export function useNoSleep() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isNoSleepEnabledByApp]); // Depends on whether the app wants it enabled
+  }, [isNoSleepActiveByApp]); // Re-evaluate if app's intent/state changes
 
-  // We don't return isNoSleepActive from the library directly, as it might be complex.
-  // The app cares more about whether it *tried* to enable it.
-  return { enableNoSleep, disableNoSleep };
+  return { enableNoSleep, disableNoSleep, isEnabled: isNoSleepActiveByApp };
 }
