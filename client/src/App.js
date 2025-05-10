@@ -641,7 +641,7 @@ function App() {
           dc.send(`META:${fileObj.name}:${fileObj.size}`);
 
           // File sending logic (adapted from startZipSenderConnection)
-          const chunkSize = 64 * 1024; // Increased chunk size to 64KB
+          const chunkSize = 256 * 1024; // Increased chunk size to 256KB
           let offset = 0;
           const MAX_BUFFERED_AMOUNT = 1024 * 1024; // Increased max buffered amount to 1MB
           dc.bufferedAmountLowThreshold = 512 * 1024; // Increased threshold to 512KB
@@ -886,11 +886,12 @@ function App() {
         event.data.type === "sw-ready" &&
         event.data.fileId === transferFileId
       ) {
-        // Post metadata to SW using the transferFileId
+        // Post metadata to SW using the transferFileId, INCLUDING fileSize
         postMessage({
           fileId: transferFileId,
           filename: fileMeta.name,
           mimetype: fileMeta.type,
+          fileSize: fileMeta.size // Add fileSize here
         });
         // console.log("[App Receiver] Emitting download-file");
         // Emit download request with original fileId and the transferFileId
@@ -1035,15 +1036,14 @@ function App() {
 
    if (filename && (!chunk || chunk === null)) {
      // This is a metadata-only message
-     // console.log("[App] Sending metadata to SW");
+     const sizeToSend = (typeof fileSize === 'number' && fileSize > 0) ? fileSize : undefined;
+     console.log(`[App sendSWMetaAndChunk] Meta for SW. fileId: ${fileId}, filename: ${filename}, received fileSize: ${fileSize}, sizeToSend: ${sizeToSend}`);
      navigator.serviceWorker.controller.postMessage({
-       type: "meta",
+       type: "meta", // Service worker might still use this type to identify meta messages
        fileId, // This is transferFileId
-        meta: {
-          name: filename,
-          type: mimeType || "application/octet-stream",
-          size: fileSize || undefined,
-        },
+       filename: filename,
+       mimetype: mimeType || "application/octet-stream",
+       fileSize: sizeToSend, // Send fileSize at the top level, ensure it's a positive number or undefined
       });
       return;
     }

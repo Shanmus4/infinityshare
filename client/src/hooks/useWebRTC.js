@@ -80,7 +80,7 @@ export function startWebRTC({
       console.log(`[WebRTC Single Sender] Data channel opened for ${fileId}`);
       console.log(`[WebRTC Single Sender] Sending META for ${fileId}: ${file.name}:${file.size}`);
       dc.send(`META:${file.name}:${file.size}`);
-      const chunkSize = 64 * 1024; // Increased chunk size to 64KB
+      const chunkSize = 256 * 1024; // Increased chunk size to 256KB
       let offset = 0;
       const MAX_BUFFERED_AMOUNT = 1024 * 1024; // Increased max buffered amount to 1MB
       dc.bufferedAmountLowThreshold = 512 * 1024; // Increased threshold to 512KB
@@ -155,15 +155,16 @@ export function startWebRTC({
       if (typeof e.data === 'string' && e.data.startsWith('META:')) {
         const parts = e.data.split(':');
         filename = parts.slice(1, -1).join(':');
-        expectedSize = parseInt(parts[parts.length - 1], 10);
-        console.log(`[WebRTC Single Receiver] META received for ${fileId}: ${filename}, Size: ${expectedSize}`);
+        const sizeString = parts[parts.length - 1];
+        expectedSize = parseInt(sizeString, 10);
+        console.log(`[WebRTC Single Receiver] META received for ${fileId}. Raw META: "${e.data}", Filename: ${filename}, SizeString: "${sizeString}", Parsed ExpectedSize: ${expectedSize}`);
 
         // Single download always uses SW
         if (fileId && navigator.serviceWorker.controller) {
             metaSent = true;
             // Assuming sendSWMetaAndChunk is only for single downloads now
             sendSWMetaAndChunk(fileId, null, filename, 'application/octet-stream', expectedSize);
-            console.log(`[WebRTC Single Receiver] META sent to SW for ${fileId}`);
+            console.log(`[WebRTC Single Receiver] META (with expectedSize: ${expectedSize}) sent to sendSWMetaAndChunk for SW for ${fileId}`);
         } else {
              console.warn('[WebRTC] Receiver: META received but no SW controller for single download', fileId);
         }

@@ -12,8 +12,10 @@ self.addEventListener('activate', (event) => {
 
 // Wait for meta before responding
 self.addEventListener('fetch', (event) => {
+  console.log('[SW] Received FETCH event for URL:', event.request.url); // New top-level log
   const url = new URL(event.request.url);
   if (url.pathname.startsWith('/sw-download/')) {
+    console.log('[SW] FETCH event is for /sw-download/, processing for fileId:', url.pathname.split('/').pop()); // Log processing start
     const fileId = url.pathname.split('/').pop();
     event.respondWith(new Promise((resolve) => {
       let controllerRef;
@@ -24,12 +26,12 @@ self.addEventListener('fetch', (event) => {
           controller: null,
           resolve,
           metaResolve,
-          meta: null,
+          meta: null, // Will store { filename, mimetype, fileSize }
           received: 0,
           closed: false
         };
         streams[fileId].metaResolve = (m) => {
-          meta = m;
+          meta = m; // meta now includes fileSize
           metaReceived = true;
           metaResolve();
         };
@@ -48,7 +50,8 @@ self.addEventListener('fetch', (event) => {
             //console.log('[SW] Flushing pending messages for', fileId, pendingChunks[fileId]);
             pendingChunks[fileId].forEach(msg => {
               if (msg.type === 'meta') {
-                streams[fileId].meta = { filename: msg.filename, mimetype: msg.mimetype };
+                // Ensure fileSize is included when flushing pending meta
+                streams[fileId].meta = { filename: msg.filename, mimetype: msg.mimetype, fileSize: msg.fileSize };
                 if (streams[fileId].metaResolve) streams[fileId].metaResolve(streams[fileId].meta);
               }
               if (msg.type === 'chunk') {
@@ -80,21 +83,36 @@ self.addEventListener('fetch', (event) => {
         }
       });
       metaPromise.then(() => {
-        const filename = meta && meta.filename ? meta.filename : 'download.bin';
-        const mime = meta && meta.mimetype ? meta.mimetype : 'application/octet-stream';
-        resolve(new Response(stream, {
-          headers: {
-            'Content-Type': mime,
-            'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`
-          }
-        }));
+        // Access meta from streams[fileId].meta as it's more reliably updated
+        const metaInfo = streams[fileId] && streams[fileId].meta ? streams[fileId].meta : {};
+        const filename = metaInfo.filename || 'download.bin';
+        const mime = metaInfo.mimetype || 'application/octet-stream';
+        const fileSize = metaInfo.fileSize ? metaInfo.fileSize.toString() : null;
+
+        console.log(`[SW fetch metaPromise.then] fileId: ${fileId}, metaInfo:`, JSON.stringify(metaInfo), `Resolved filename: ${filename}, Resolved mime: ${mime}, Resolved fileSize for header: ${fileSize}`);
+
+        const responseHeaders = new Headers({
+          'Content-Type': mime,
+          'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`
+        });
+
+        if (fileSize) {
+          responseHeaders.set('Content-Length', fileSize);
+          console.log(`[SW fetch metaPromise.then] Setting Content-Length to: ${fileSize}`);
+        } else {
+          console.warn(`[SW fetch metaPromise.then] fileSize is null or invalid, Content-Length NOT set. metaInfo.fileSize was: ${metaInfo.fileSize}`);
+        }
+
+        resolve(new Response(stream, { headers: responseHeaders }));
       });
     }));
   }
 });
 
 self.addEventListener('message', (event) => {
-  const { fileId, chunk, filename, mimetype, done, cancel } = event.data;
+  console.log('[SW] Received MESSAGE event. Data:', event.data); // New top-level log
+  // Destructure fileSize as well, assuming main thread sends it
+  const { fileId, chunk, filename, mimetype, fileSize, done, cancel } = event.data;
   // Cancel download if requested
   if (cancel && fileId) {
     if (streams[fileId] && streams[fileId].controller && !streams[fileId].closed) {
@@ -114,7 +132,8 @@ self.addEventListener('message', (event) => {
   if (!streams[fileId]) {
     if (!pendingChunks[fileId]) pendingChunks[fileId] = [];
     if (filename) {
-      pendingChunks[fileId].push({ type: 'meta', filename, mimetype });
+      // Ensure fileSize (from event.data) is queued with other meta info
+      pendingChunks[fileId].push({ type: 'meta', filename, mimetype, fileSize }); 
       //console.log('[SW] Queued meta for missing stream', fileId, event.data);
     }
     if (chunk) {
@@ -128,7 +147,8 @@ self.addEventListener('message', (event) => {
     return;
   }
   if (filename) {
-    streams[fileId].meta = { filename, mimetype };
+    // Ensure fileSize (from event.data) is stored with other meta info
+    streams[fileId].meta = { filename, mimetype, fileSize }; 
     if (streams[fileId].metaResolve) streams[fileId].metaResolve(streams[fileId].meta);
     //console.log('[SW] Meta received for', fileId, streams[fileId].meta);
   }
