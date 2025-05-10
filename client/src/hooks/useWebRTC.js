@@ -157,14 +157,14 @@ export function startWebRTC({
         filename = parts.slice(1, -1).join(':');
         const sizeString = parts[parts.length - 1];
         expectedSize = parseInt(sizeString, 10);
-        console.log(`[WebRTC Single Receiver] META received for ${fileId}. Raw META: "${e.data}", Filename: ${filename}, SizeString: "${sizeString}", Parsed ExpectedSize: ${expectedSize}`);
+        // console.log(`[WebRTC Single Receiver] META received for ${fileId}. Raw META: "${e.data}", Filename: ${filename}, SizeString: "${sizeString}", Parsed ExpectedSize: ${expectedSize}`); // Diagnostic log removed
 
         // Single download always uses SW
         if (fileId && navigator.serviceWorker.controller) {
             metaSent = true;
             // Assuming sendSWMetaAndChunk is only for single downloads now
             sendSWMetaAndChunk(fileId, null, filename, 'application/octet-stream', expectedSize);
-            console.log(`[WebRTC Single Receiver] META (with expectedSize: ${expectedSize}) sent to sendSWMetaAndChunk for SW for ${fileId}`);
+            // console.log(`[WebRTC Single Receiver] META (with expectedSize: ${expectedSize}) sent to sendSWMetaAndChunk for SW for ${fileId}`); // Diagnostic log removed
         } else {
              console.warn('[WebRTC] Receiver: META received but no SW controller for single download', fileId);
         }

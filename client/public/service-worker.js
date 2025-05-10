@@ -12,10 +12,10 @@ self.addEventListener('activate', (event) => {
 
 // Wait for meta before responding
 self.addEventListener('fetch', (event) => {
-  console.log('[SW] Received FETCH event for URL:', event.request.url); // New top-level log
+  // console.log('[SW] Received FETCH event for URL:', event.request.url); // Diagnostic log removed
   const url = new URL(event.request.url);
   if (url.pathname.startsWith('/sw-download/')) {
-    console.log('[SW] FETCH event is for /sw-download/, processing for fileId:', url.pathname.split('/').pop()); // Log processing start
+    // console.log('[SW] FETCH event is for /sw-download/, processing for fileId:', url.pathname.split('/').pop()); // Diagnostic log removed
     const fileId = url.pathname.split('/').pop();
     event.respondWith(new Promise((resolve) => {
       let controllerRef;
@@ -89,7 +89,7 @@ self.addEventListener('fetch', (event) => {
         const mime = metaInfo.mimetype || 'application/octet-stream';
         const fileSize = metaInfo.fileSize ? metaInfo.fileSize.toString() : null;
 
-        console.log(`[SW fetch metaPromise.then] fileId: ${fileId}, metaInfo:`, JSON.stringify(metaInfo), `Resolved filename: ${filename}, Resolved mime: ${mime}, Resolved fileSize for header: ${fileSize}`);
+        // console.log(`[SW fetch metaPromise.then] fileId: ${fileId}, metaInfo:`, JSON.stringify(metaInfo), `Resolved filename: ${filename}, Resolved mime: ${mime}, Resolved fileSize for header: ${fileSize}`); // Diagnostic log removed
 
         const responseHeaders = new Headers({
           'Content-Type': mime,
@@ -98,9 +98,9 @@ self.addEventListener('fetch', (event) => {
 
         if (fileSize) {
           responseHeaders.set('Content-Length', fileSize);
-          console.log(`[SW fetch metaPromise.then] Setting Content-Length to: ${fileSize}`);
+          // console.log(`[SW fetch metaPromise.then] Setting Content-Length to: ${fileSize}`); // Diagnostic log removed
         } else {
-          console.warn(`[SW fetch metaPromise.then] fileSize is null or invalid, Content-Length NOT set. metaInfo.fileSize was: ${metaInfo.fileSize}`);
+          // console.warn(`[SW fetch metaPromise.then] fileSize is null or invalid, Content-Length NOT set. metaInfo.fileSize was: ${metaInfo.fileSize}`); // Diagnostic log removed
         }
 
         resolve(new Response(stream, { headers: responseHeaders }));
@@ -110,7 +110,7 @@ self.addEventListener('fetch', (event) => {
 });
 
 self.addEventListener('message', (event) => {
-  console.log('[SW] Received MESSAGE event. Data:', event.data); // New top-level log
+  // console.log('[SW] Received MESSAGE event. Data:', event.data); // Diagnostic log removed
   // Destructure fileSize as well, assuming main thread sends it
   const { fileId, chunk, filename, mimetype, fileSize, done, cancel } = event.data;
   // Cancel download if requested

@@ -1037,7 +1037,7 @@ function App() {
    if (filename && (!chunk || chunk === null)) {
      // This is a metadata-only message
      const sizeToSend = (typeof fileSize === 'number' && fileSize > 0) ? fileSize : undefined;
-     console.log(`[App sendSWMetaAndChunk] Meta for SW. fileId: ${fileId}, filename: ${filename}, received fileSize: ${fileSize}, sizeToSend: ${sizeToSend}`);
+     // console.log(`[App sendSWMetaAndChunk] Meta for SW. fileId: ${fileId}, filename: ${filename}, received fileSize: ${fileSize}, sizeToSend: ${sizeToSend}`); // Diagnostic log removed
      navigator.serviceWorker.controller.postMessage({
        type: "meta", // Service worker might still use this type to identify meta messages
        fileId, // This is transferFileId
