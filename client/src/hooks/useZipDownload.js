@@ -251,13 +251,34 @@ export function useZipDownload({
             }
         };
         dc.onerror = (err) => {
-            console.error(`[useZipDownload] DataChannel error for transferId: ${transferFileId}`, err);
-            setError(`Error receiving file: ${fileMeta?.name || transferFileId}`);
-            resetZipState();
+            const fileMeta = currentZipOperation.current?.filesToDownload?.get(transferFileId);
+            const fileName = fileMeta?.name || transferFileId;
+            console.error(`[useZipDownload] DataChannel error for transferId: ${transferFileId}, file: ${fileName}. Error:`, err);
+            setError(`Error during transfer of file: ${fileName}. The "Download All" operation may be incomplete.`);
+            // Not calling resetZipState() here to allow the main connection to persist if possible.
+            // The download progress for the zip will stall, and this error will be visible.
+            // The user can then decide to retry or the main PC state change ('closed') will eventually reset.
         };
         dc.onclose = () => {
-            console.log(`[useZipDownload] DataChannel closed for transferId: ${transferFileId}`);
+            const fileMeta = currentZipOperation.current?.filesToDownload?.get(transferFileId);
+            const fileName = fileMeta?.name || transferFileId;
+            console.log(`[useZipDownload] DataChannel closed for transferId: ${transferFileId}, file: ${fileName}`);
             delete dataChannels.current[transferFileId];
+
+            // If the overall connection hasn't failed espectadores, and an error for this specific file isn't already prominent,
+            // set an error to indicate this specific file transfer was interrupted.
+            // This helps explain why the zip download might be incomplete.
+            if (connectionStatus !== 'failed' && !error.includes(fileName) && currentZipOperation.current) {
+                 setError(prevError => {
+                    const newErrorMsg = `Transfer of file: ${fileName} was interrupted (channel closed). "Download All" may be incomplete.`;
+                    // Avoid duplicate messages if prevError already contains a similar message for this file.
+                    if (prevError && prevError.includes(fileName)) return prevError;
+                    return prevError ? `${prevError}\n${newErrorMsg}` : newErrorMsg;
+                 });
+            }
+            // Note: We are not calling resetZipState() here. The overall operation continues,
+            // but this file will be missing from the final zip if it doesn't complete.
+            // The main PeerConnection state changes (e.g., 'closed' or 'failed') will handle full resets.
         };
     };
 

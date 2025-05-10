@@ -276,32 +276,20 @@ function App() {
     const handler = () => {
       console.log('[App Sender] Socket connect/reconnect event triggered.');
 
-      // Aggressively clean up all existing WebRTC states
-      console.log('[App Sender] Cleaning up ALL existing PeerConnections and DataChannels on (re)connect.');
-      Object.keys(peerConns.current).forEach(pcId => {
-        cleanupWebRTCInstance(pcId); // This will also handle associated data channels if pc._associatedTransferIds exists
-      });
-      // Ensure dataChannels that might not have been associated with a PC (e.g. if PC creation failed mid-way) are also cleared
-      Object.keys(dataChannels.current).forEach(dcId => {
-         const dc = dataChannels.current[dcId];
-         if (dc) {
-           try {
-             if (dc.readyState !== "closed") dc.close();
-           } catch (e) { /* ignore */ }
-           delete dataChannels.current[dcId];
-         }
-      });
-      pendingSignals.current = {}; // Clear all pending signals
-      console.log('[App Sender] All WebRTC states and pending signals cleared.');
-
-      if (!driveCode) { // If driveCode itself is lost, we can't do much.
-        console.log('[App Sender] Socket connected, but no active driveCode found in state. Cannot re-establish previous drive.');
+      if (!driveCode) { // If no drive is active, no special handling needed beyond normal connect.
+        console.log('[App Sender] Socket connected, but no active driveCode found in state. No existing drive to re-assert.');
+        // No aggressive cleanup if no drive was active.
         return;
       }
 
-      // If driveCode exists, proceed. filesRef.current might be empty if files state was lost,
-      // in which case an empty file list will be correctly emitted.
-      console.log('[App Sender] Socket (re)connected. Re-asserting room and re-emitting file-list for room:', driveCode, 'Files available:', filesRef.current.length);
+      // If a driveCode IS active:
+      console.log('[App Sender] Socket (re)connected with active driveCode:', driveCode);
+      console.log('[App Sender] Re-asserting room and re-emitting file-list for room:', driveCode, 'Files available:', filesRef.current.length);
+
+      // 1. Re-assert room presence.
+      socket.emit("create-room", driveCode);
+
+      // 2. Re-emit the current file list.
       const filesMeta = filesRef.current.map(({ name, size, type, fileId, path }) => ({
         name,
         size,
@@ -309,8 +297,11 @@ function App() {
         fileId,
         path,
       }));
-      socket.emit("create-room", driveCode); // Re-assert room presence
       socket.emit("file-list", { room: driveCode, filesMeta });
+
+      // DO NOT clean up existing peerConns, dataChannels, or pendingSignals here.
+      // Let ongoing WebRTC operations attempt to continue or be managed by their own lifecycles (e.g., heartbeats for zip PCs).
+      console.log('[App Sender] Socket (re)connect: Skipped aggressive cleanup of WebRTC states to preserve ongoing operations.');
     };
 
     socket.on("connect", handler);
@@ -318,15 +309,14 @@ function App() {
     // Initial emit if already connected and hosting when component mounts
     if (socket.connected && driveCode && filesRef.current.length > 0) {
         console.log('[App Sender] Component mounted with active socket and drive. Emitting file-list for room:', driveCode);
-        // Call handler directly, but ensure it doesn't cause issues if called too early
-        // The cleanup inside handler should be safe.
+        // Call handler directly.
         handler();
     }
 
     return () => {
       socket.off("connect", handler);
     };
-  }, [driveCode, socket, cleanupWebRTCInstance]); // Added cleanupWebRTCInstance to dependencies
+  }, [driveCode, socket]); // Removed cleanupWebRTCInstance from dependencies as it's not called here.
 
   // --- SENDER: Handle heartbeats from receivers for zip operations ---
   useEffect(() => {
@@ -1599,12 +1589,16 @@ function App() {
                   {/* Global Progress Display for "Download All" or specific folder */}
                   <div className="progress-display-container">
                      <div className="progress-filename-text">
-                      {zipConnectionStatus === 'interrupted' 
-                        ? (zipError || "Connection interrupted, waiting for sender...")
-                        : zippingFolderPath
-                          ? `Downloading and Zipping: ${zippingFolderPath.split('/').pop()}.zip`
-                          : "Downloading and Zipping All Files..."}
+                      {zippingFolderPath
+                        ? `Downloading and Zipping: ${zippingFolderPath.split('/').pop()}.zip`
+                        : "Downloading and Zipping All Files..."}
                     </div>
+                    {/* Informational text about connection status, separate from filename */}
+                    {zipConnectionStatus === 'interrupted' && (
+                      <div className="progress-info-text connection-status-info">
+                        {zipError || "Connection interrupted, waiting for sender..."}
+                      </div>
+                    )}
                     {zipConnectionStatus !== 'failed' && ( // Hide progress bar if connection totally failed and reset
                       <>
                         <div className="progress-bar-wrapper">
@@ -1628,14 +1622,19 @@ function App() {
                           </span>
                         </div>
                         <div className="progress-info-text">
+                          {/* Display specific message for interruption, otherwise the standard zipping message */}
                           {zipConnectionStatus === 'interrupted'
-                            ? "Download will resume if sender reconnects."
+                            ? "Download will attempt to resume if sender reconnects."
                             : "Please wait, the download will start automatically when zipping is complete."}
                         </div>
                       </>
                     )}
+                    {/* This general error display for 'failed' connectionStatus was already here, 
+                        but it might be redundant if the main error display below FileList catches it.
+                        Let's keep it for now as it's specific to the progress container when zipping fails.
+                    */}
                     {zipConnectionStatus === 'failed' && zipError && (
-                        <div className="progress-info-text error-text">{zipError}</div> // This specifically shows zipError if connection failed
+                        <div className="progress-info-text error-text">{zipError}</div> 
                     )}
                   </div>
                 </div>
