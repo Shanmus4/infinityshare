@@ -254,11 +254,15 @@ export function useZipDownload({
                  // -------------------------------------------------------
             }
         };
-        dc.onerror = (err) => {
+        dc.onerror = (event) => { // event is RTCErrorEvent
             const fileMeta = currentZipOperation.current?.filesToDownload?.get(transferFileId);
             const fileName = fileMeta?.name || transferFileId;
-            console.error(`[useZipDownload] DataChannel error for transferId: ${transferFileId}, file: ${fileName}. Error:`, err);
-            setError(`Error during transfer of file: ${fileName}. The "Download All" operation may be incomplete.`);
+            let errorDetails = 'Unknown DataChannel error';
+            if (event.error) {
+                errorDetails = `RTCError: ${event.error.message || 'No message'}. Detail: ${event.error.errorDetail || 'N/A'}. SCTP Cause: ${event.error.sctpCauseCode || 'N/A'}. HTTP Status: ${event.error.httpRequestStatusCode || 'N/A'}. SDP Line: ${event.error.sdpLineNumber || 'N/A'}. Received Alert: ${event.error.receivedAlert || 'N/A'}. Sent Alert: ${event.error.sentAlert || 'N/A'}.`;
+            }
+            console.error(`[useZipDownload] DataChannel error for transferId: ${transferFileId}, file: ${fileName}. Event:`, event, 'Parsed Details:', errorDetails);
+            setError(`Error during transfer of file: ${fileName}. Details: ${event.error?.errorDetail || 'Connection issue'}. The "Download All" operation may be incomplete.`);
             // Not calling resetZipState() here to allow the main connection to persist if possible.
             // The download progress for the zip will stall, and this error will be visible.
             // The user can then decide to retry or the main PC state change ('closed') will eventually reset.

@@ -445,8 +445,16 @@ function App() {
           }
           sendChunk();
         };
-        dc.onerror = () => { delete dataChannels.current[useTransferFileId]; };
-        dc.onclose = () => { delete dataChannels.current[useTransferFileId]; };
+        dc.onerror = (event) => { // event is RTCErrorEvent
+          const errorDetail = event.error ? `RTCError: ${event.error.message || 'No message'}. Detail: ${event.error.errorDetail || 'N/A'}. SCTP Cause: ${event.error.sctpCauseCode || 'N/A'}. HTTP Status: ${event.error.httpRequestStatusCode || 'N/A'}. SDP Line: ${event.error.sdpLineNumber || 'N/A'}. Received Alert: ${event.error.receivedAlert || 'N/A'}. Sent Alert: ${event.error.sentAlert || 'N/A'}.` : 'Unknown DataChannel error';
+          console.error(`[App Sender Zip/Folder] DataChannel error for transferId: ${useTransferFileId}, file: ${fileObj.name}. Event:`, event, 'Parsed Details:', errorDetail);
+          setError(`Sender: DataChannel error for ${fileObj.name}. Details: ${event.error?.errorDetail || 'Connection issue'}`);
+          delete dataChannels.current[useTransferFileId]; 
+        };
+        dc.onclose = () => { 
+          console.log(`[App Sender Zip/Folder] DataChannel closed for transferId: ${useTransferFileId}, file: ${fileObj.name}`);
+          delete dataChannels.current[useTransferFileId]; 
+        };
         if (isNewPc) {
           pc.createOffer()
             .then((offer) => pc.setLocalDescription(offer))

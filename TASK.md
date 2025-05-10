@@ -2,6 +2,10 @@
 
 ## Active Tasks
 
+- [ ] **BUGFIX & Stability:** Investigate and fix WebRTC connection drops during "Download All" / folder downloads. (Reported 2025-05-10)
+  - Symptoms: `RTCErrorEvent` on DataChannels, followed by PeerConnection `disconnected` then `failed` state.
+  - Action: Add detailed logging for `RTCErrorEvent` in `useZipDownload.js` (receiver) and `App.js` (sender) to diagnose.
+  - Action: Analyze connection management, heartbeat, and error handling in `useZipDownload.js`.
 
 ## Completed Tasks (Verified 2025-05-10)
 
