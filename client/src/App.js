@@ -641,10 +641,10 @@ function App() {
           dc.send(`META:${fileObj.name}:${fileObj.size}`);
 
           // File sending logic (adapted from startZipSenderConnection)
-          const chunkSize = 256 * 1024; // Increased chunk size to 256KB
+          const chunkSize = 256 * 1024; // Chunk size is 256KB
           let offset = 0;
-          const MAX_BUFFERED_AMOUNT = 1024 * 1024; // Increased max buffered amount to 1MB
-          dc.bufferedAmountLowThreshold = 512 * 1024; // Increased threshold to 512KB
+          const MAX_BUFFERED_AMOUNT = 4 * 1024 * 1024; // Try 4MB buffer
+          dc.bufferedAmountLowThreshold = 2 * 1024 * 1024; // Set threshold to 2MB
 
           function sendChunk() {
             if (offset < fileObj.size) {
