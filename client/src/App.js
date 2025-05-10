@@ -906,7 +906,7 @@ function App() {
   }, []);
 
   // --- Minimal WebRTC logic helpers ---
-  function cleanupWebRTCInstance(id) { // Renamed parameter for clarity
+  const cleanupWebRTCInstance = React.useCallback((id) => { // Renamed parameter for clarity
     const pc = peerConns.current[id];
 
     // If this ID corresponds to a main PeerConnection that had associated DataChannels (e.g., for a zip operation)
@@ -963,7 +963,7 @@ function App() {
       console.log(`[App cleanup] Deleting pending signals for ${id}`);
       delete pendingSignals.current[id];
     }
-  }
+  }, [peerConns, dataChannels, pendingSignals, activeZipPcHeartbeats]); // Refs are stable, so this callback is stable
 
   // Integrate the unified useZipDownload hook
   const {
