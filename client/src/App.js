@@ -20,8 +20,8 @@ function App() {
     const asReceiver =
       new URLSearchParams(window.location.search).get("as") === "receiver";
     if (
-      pathDriveCode.length === 6 &&
-      /^[A-Z0-9]+$/.test(pathDriveCode) &&
+      pathDriveCode.length === 4 && // Changed to 4
+      /^[A-Z]+$/.test(pathDriveCode) && // Changed to only alphabets
       asReceiver
     ) {
       return { step: "receiver", driveCode: pathDriveCode };
@@ -93,15 +93,15 @@ function App() {
             .then(() => {
               // Ensure localDescription is set before emitting
               if (pc.localDescription) {
-                 socket.emit("signal", {
-                   room: driveCode,
-                   fileId,
-                   data: { sdp: pc.localDescription },
-                 });
+                socket.emit("signal", {
+                  room: driveCode,
+                  fileId,
+                  data: { sdp: pc.localDescription },
+                });
               } else {
-                 console.error(
-                   `[App] Local description not set before emitting answer for ${fileId}`
-                 );
+                console.error(
+                  `[App] Local description not set before emitting answer for ${fileId}`
+                );
               }
             })
             .catch((e) =>
@@ -122,12 +122,12 @@ function App() {
         const candidate = new RTCIceCandidate(data.candidate);
         pc.addIceCandidate(candidate).catch((e) => {
           // Ignore benign errors like candidate already added or connection closed
-           if (
-             !e.message.includes("OperationError") &&
-             !e.message.includes("InvalidStateError")
-           ) {
-             console.error(`[App] Error adding ICE candidate for ${fileId}:`, e);
-           }
+          if (
+            !e.message.includes("OperationError") &&
+            !e.message.includes("InvalidStateError")
+          ) {
+            console.error(`[App] Error adding ICE candidate for ${fileId}:`, e);
+          }
         });
       }
     },
@@ -145,74 +145,91 @@ function App() {
   }, [socket, handleSignal]); // Use handleSignal from useCallback
 
   // --- Minimal WebRTC logic helpers ---
-  const cleanupWebRTCInstance = React.useCallback((id) => { // Renamed parameter for clarity
-    const pc = peerConns.current[id];
+  const cleanupWebRTCInstance = React.useCallback(
+    (id) => {
+      // Renamed parameter for clarity
+      const pc = peerConns.current[id];
 
-    // If this ID corresponds to a main PeerConnection that had associated DataChannels (e.g., for a zip operation)
-    if (pc && pc._associatedTransferIds) {
-      console.log(`[App cleanup] Cleaning up main PC ${id} (zip/folder type) and its ${pc._associatedTransferIds.size} associated DataChannels.`);
-      pc._associatedTransferIds.forEach(transferId => {
-        const associatedDc = dataChannels.current[transferId];
-        if (associatedDc) {
+      // If this ID corresponds to a main PeerConnection that had associated DataChannels (e.g., for a zip operation)
+      if (pc && pc._associatedTransferIds) {
+        console.log(
+          `[App cleanup] Cleaning up main PC ${id} (zip/folder type) and its ${pc._associatedTransferIds.size} associated DataChannels.`
+        );
+        pc._associatedTransferIds.forEach((transferId) => {
+          const associatedDc = dataChannels.current[transferId];
+          if (associatedDc) {
+            try {
+              if (associatedDc.readyState !== "closed") {
+                associatedDc.close();
+                console.log(
+                  `[App cleanup] Closed associated DataChannel ${transferId} for main PC ${id}`
+                );
+              }
+            } catch (e) {
+              console.warn(
+                `[App cleanup] Error closing associated DataChannel ${transferId}:`,
+                e
+              );
+            }
+            delete dataChannels.current[transferId]; // Remove from global tracking
+          }
+        });
+        delete pc._associatedTransferIds; // Clean up the tracking set itself
+        if (activeZipPcHeartbeats.current.hasOwnProperty(id)) {
+          delete activeZipPcHeartbeats.current[id]; // Stop tracking heartbeat for this PC
+          console.log(
+            `[App cleanup] Stopped and REMOVED heartbeat tracking for zip PC: ${id}`
+          );
+        } else {
+          console.warn(
+            `[App cleanup] Heartbeat tracking for zip PC ${id} was expected but not found for deletion.`
+          );
+        }
+      } else {
+        // This might be a cleanup for a single file's DataChannel directly (ID is transferId),
+        // or a PC that wasn't a main zip PC (e.g. single file PC, ID is transferId).
+        // It should not be a main zip PC ID if it doesn't have _associatedTransferIds.
+        if (activeZipPcHeartbeats.current.hasOwnProperty(id)) {
+          console.warn(
+            `[App cleanup] PC ${id} was in activeZipPcHeartbeats but NOT identified as a main zip PC (no _associatedTransferIds). Removing from heartbeats.`
+          );
+          delete activeZipPcHeartbeats.current[id];
+        }
+        const dc = dataChannels.current[id];
+        if (dc) {
           try {
-            if (associatedDc.readyState !== "closed") {
-              associatedDc.close();
-              console.log(`[App cleanup] Closed associated DataChannel ${transferId} for main PC ${id}`);
+            if (dc.readyState !== "closed") {
+              dc.close();
+              console.log(`[App cleanup] Closed DataChannel ${id}`);
             }
           } catch (e) {
-            console.warn(`[App cleanup] Error closing associated DataChannel ${transferId}:`, e);
+            console.warn(`[App cleanup] Error closing DataChannel ${id}:`, e);
           }
-          delete dataChannels.current[transferId]; // Remove from global tracking
+          delete dataChannels.current[id];
         }
-      });
-      delete pc._associatedTransferIds; // Clean up the tracking set itself
-      if (activeZipPcHeartbeats.current.hasOwnProperty(id)) {
-        delete activeZipPcHeartbeats.current[id]; // Stop tracking heartbeat for this PC
-        console.log(`[App cleanup] Stopped and REMOVED heartbeat tracking for zip PC: ${id}`);
-      } else {
-        console.warn(`[App cleanup] Heartbeat tracking for zip PC ${id} was expected but not found for deletion.`);
       }
-    } else {
-      // This might be a cleanup for a single file's DataChannel directly (ID is transferId),
-      // or a PC that wasn't a main zip PC (e.g. single file PC, ID is transferId).
-      // It should not be a main zip PC ID if it doesn't have _associatedTransferIds.
-      if (activeZipPcHeartbeats.current.hasOwnProperty(id)) {
-        console.warn(`[App cleanup] PC ${id} was in activeZipPcHeartbeats but NOT identified as a main zip PC (no _associatedTransferIds). Removing from heartbeats.`);
-        delete activeZipPcHeartbeats.current[id];
-      }
-      const dc = dataChannels.current[id];
-      if (dc) {
+
+      // Clean up the PeerConnection itself
+      if (pc) {
         try {
-          if (dc.readyState !== "closed") {
-            dc.close();
-            console.log(`[App cleanup] Closed DataChannel ${id}`);
+          if (pc.signalingState !== "closed") {
+            pc.close();
+            console.log(`[App cleanup] Closed PeerConnection ${id}`);
           }
         } catch (e) {
-          console.warn(`[App cleanup] Error closing DataChannel ${id}:`, e);
+          console.warn(`[App cleanup] Error closing PeerConnection ${id}:`, e);
         }
-        delete dataChannels.current[id];
+        delete peerConns.current[id];
       }
-    }
 
-    // Clean up the PeerConnection itself
-    if (pc) {
-      try {
-        if (pc.signalingState !== "closed") {
-          pc.close();
-          console.log(`[App cleanup] Closed PeerConnection ${id}`);
-        }
-      } catch (e) {
-        console.warn(`[App cleanup] Error closing PeerConnection ${id}:`, e);
+      // Also delete any pending signals for this id
+      if (pendingSignals.current && pendingSignals.current[id]) {
+        console.log(`[App cleanup] Deleting pending signals for ${id}`);
+        delete pendingSignals.current[id];
       }
-      delete peerConns.current[id];
-    }
-
-    // Also delete any pending signals for this id
-    if (pendingSignals.current && pendingSignals.current[id]) {
-      console.log(`[App cleanup] Deleting pending signals for ${id}`);
-      delete pendingSignals.current[id];
-    }
-  }, [peerConns, dataChannels, pendingSignals, activeZipPcHeartbeats]); // Refs are stable, so this callback is stable
+    },
+    [peerConns, dataChannels, pendingSignals, activeZipPcHeartbeats]
+  ); // Refs are stable, so this callback is stable
 
   // --- SENDER: Upload files and create drive, or add more files (flat version) ---
   const handleDrop = (acceptedFiles) => {
@@ -272,7 +289,11 @@ function App() {
 
     if (!driveCode) {
       // First time uploading, create room and send full list
-      const code = Math.random().toString(16).slice(2, 8).toUpperCase();
+      let code = "";
+      const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      for (let i = 0; i < 4; i++) { // Generate 4 characters
+        code += characters.charAt(Math.floor(Math.random() * characters.length));
+      }
       setDriveCode(code);
       // Generate the receiver URL for QR code
       const driveUrl = `${window.location.origin}/${code}`;
@@ -345,43 +366,61 @@ function App() {
   // --- SENDER: On socket reconnect, re-emit file list ---
   useEffect(() => {
     const handler = () => {
-      console.log('[App Sender] Socket connect/reconnect event triggered.');
+      console.log("[App Sender] Socket connect/reconnect event triggered.");
 
-      if (!driveCode) { // If no drive is active, no special handling needed beyond normal connect.
-        console.log('[App Sender] Socket connected, but no active driveCode found in state. No existing drive to re-assert.');
+      if (!driveCode) {
+        // If no drive is active, no special handling needed beyond normal connect.
+        console.log(
+          "[App Sender] Socket connected, but no active driveCode found in state. No existing drive to re-assert."
+        );
         // No aggressive cleanup if no drive was active.
         return;
       }
 
       // If a driveCode IS active:
-      console.log('[App Sender] Socket (re)connected with active driveCode:', driveCode);
-      console.log('[App Sender] Re-asserting room and re-emitting file-list for room:', driveCode, 'Files available:', filesRef.current.length);
+      console.log(
+        "[App Sender] Socket (re)connected with active driveCode:",
+        driveCode
+      );
+      console.log(
+        "[App Sender] Re-asserting room and re-emitting file-list for room:",
+        driveCode,
+        "Files available:",
+        filesRef.current.length
+      );
 
       // 1. Re-assert room presence.
       socket.emit("create-room", driveCode);
 
       // 2. Re-emit the current file list.
-      const filesMeta = filesRef.current.map(({ name, size, type, fileId, path }) => ({
-        name,
-        size,
-        type,
-        fileId,
-        path,
-      }));
+      const filesMeta = filesRef.current.map(
+        ({ name, size, type, fileId, path }) => ({
+          name,
+          size,
+          type,
+          fileId,
+          path,
+        })
+      );
       socket.emit("file-list", { room: driveCode, filesMeta });
 
       // DO NOT clean up existing peerConns, dataChannels, or pendingSignals here.
       // Let ongoing WebRTC operations attempt to continue or be managed by their own lifecycles (e.g., heartbeats for zip PCs).
-      console.log('[App Sender] Socket (re)connect: Skipped aggressive cleanup of WebRTC states to preserve ongoing operations.');
+      console.log(
+        "[App Sender] Socket (re)connect: Skipped aggressive cleanup of WebRTC states to preserve ongoing operations."
+      );
     };
 
     socket.on("connect", handler);
 
     // Initial emit if already connected and hosting when component mounts
     if (socket.connected && driveCode && filesRef.current.length > 0) {
-        console.log('[App Sender] Component mounted with active socket and drive. Emitting file-list for room:', driveCode);
-        // Call handler directly.
-        handler();
+      console.log(
+        "[App Sender] Component mounted with active socket and drive. Emitting file-list for room:",
+        driveCode
+      );
+      // Call handler directly.
+      handler();
     }
 
     return () => {
@@ -392,15 +431,24 @@ function App() {
   // --- SENDER: Handle heartbeats from receivers for zip operations ---
   useEffect(() => {
     const heartbeatHandler = (data) => {
-      if (data && data.pcId && activeZipPcHeartbeats.current.hasOwnProperty(data.pcId)) {
-        console.log(`[App Sender] Received heartbeat for active zip PC: ${data.pcId}`);
+      if (
+        data &&
+        data.pcId &&
+        activeZipPcHeartbeats.current.hasOwnProperty(data.pcId)
+      ) {
+        console.log(
+          `[App Sender] Received heartbeat for active zip PC: ${data.pcId}`
+        );
         activeZipPcHeartbeats.current[data.pcId] = Date.now();
       } else {
-        console.warn(`[App Sender] Received heartbeat for unknown or inactive zip PC:`, data);
+        console.warn(
+          `[App Sender] Received heartbeat for unknown or inactive zip PC:`,
+          data
+        );
       }
     };
-    socket.on('heartbeat-zip', heartbeatHandler);
-    return () => socket.off('heartbeat-zip', heartbeatHandler);
+    socket.on("heartbeat-zip", heartbeatHandler);
+    return () => socket.off("heartbeat-zip", heartbeatHandler);
   }, [socket]);
 
   // --- SENDER: Periodically check for stale zip PeerConnections via heartbeats ---
@@ -410,10 +458,12 @@ function App() {
 
     const intervalId = setInterval(() => {
       const now = Date.now();
-      console.log('[App Sender] Checking for stale zip PeerConnections...');
-      Object.keys(activeZipPcHeartbeats.current).forEach(pcId => {
+      console.log("[App Sender] Checking for stale zip PeerConnections...");
+      Object.keys(activeZipPcHeartbeats.current).forEach((pcId) => {
         if (now - activeZipPcHeartbeats.current[pcId] > HEARTBEAT_TIMEOUT_MS) {
-          console.warn(`[App Sender] Zip PC ${pcId} timed out due to no heartbeat. Cleaning up.`);
+          console.warn(
+            `[App Sender] Zip PC ${pcId} timed out due to no heartbeat. Cleaning up.`
+          );
           cleanupWebRTCInstance(pcId); // This will also remove it from peerConns
           delete activeZipPcHeartbeats.current[pcId]; // Remove from heartbeat tracking
         }
@@ -443,8 +493,12 @@ function App() {
       );
 
       if (!socket.connected) {
-        console.error('[App Sender DEBUG] downloadHandler: Socket not connected. Aborting.');
-        setError("Sender not connected to signaling server. Please check connection.");
+        console.error(
+          "[App Sender DEBUG] downloadHandler: Socket not connected. Aborting."
+        );
+        setError(
+          "Sender not connected to signaling server. Please check connection."
+        );
         return;
       }
 
@@ -458,7 +512,9 @@ function App() {
           `[App] Sender: File not found for requestedFileId: ${requestedFileId}. filesRef.current:`,
           filesRef.current
         ); // Keep error
-        console.error("File not found for download. Please re-upload or refresh.");
+        console.error(
+          "File not found for download. Please re-upload or refresh."
+        );
         // setError("File not found for download. Please re-upload or refresh."); // Changed to console.error
         return;
       }
@@ -526,22 +582,33 @@ function App() {
           // cleanupWebRTCInstance(pcIdToUse); // Cleanup previous instance if any (optional)
           try {
             pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS });
-            console.log(`[App Sender DEBUG] Successfully created new RTCPeerConnection for ${pcIdToUse}`, pc);
+            console.log(
+              `[App Sender DEBUG] Successfully created new RTCPeerConnection for ${pcIdToUse}`,
+              pc
+            );
           } catch (e) {
-            console.error(`[App Sender DEBUG] FAILED to create new RTCPeerConnection for ${pcIdToUse}:`, e);
-            setError(`Sender: Failed to initialize WebRTC connection: ${e.message}`);
+            console.error(
+              `[App Sender DEBUG] FAILED to create new RTCPeerConnection for ${pcIdToUse}:`,
+              e
+            );
+            setError(
+              `Sender: Failed to initialize WebRTC connection: ${e.message}`
+            );
             return; // Critical failure
           }
           pc._associatedTransferIds = new Set(); // Initialize set to track associated data channels
           peerConns.current[pcIdToUse] = pc;
           activeZipPcHeartbeats.current[pcIdToUse] = Date.now(); // Start tracking heartbeat
-          console.log(`[App Sender] Started heartbeat tracking for new zip PC: ${pcIdToUse}`);
+          console.log(
+            `[App Sender] Started heartbeat tracking for new zip PC: ${pcIdToUse}`
+          );
 
           // Setup handlers for the NEW main PC
           pc.onicecandidate = (event) => {
             if (event.candidate) {
               console.log(
-                `[App Sender] Gathered ICE candidate for main PC ${pcIdToUse}: Type: ${event.candidate.type}, Address: ${event.candidate.address}, Port: ${event.candidate.port}, Protocol: ${event.candidate.protocol}`, event.candidate
+                `[App Sender] Gathered ICE candidate for main PC ${pcIdToUse}: Type: ${event.candidate.type}, Address: ${event.candidate.address}, Port: ${event.candidate.port}, Protocol: ${event.candidate.protocol}`,
+                event.candidate
               );
               socket.emit("signal", {
                 room: driveCode,
@@ -625,8 +692,13 @@ function App() {
         const dc = pc.createDataChannel(useTransferFileId); // Label channel with unique transfer ID
         dc.binaryType = "arraybuffer";
         dataChannels.current[useTransferFileId] = dc; // Store channel by transfer ID
-        if (peerConns.current[pcIdToUse] && peerConns.current[pcIdToUse]._associatedTransferIds) {
-          peerConns.current[pcIdToUse]._associatedTransferIds.add(useTransferFileId);
+        if (
+          peerConns.current[pcIdToUse] &&
+          peerConns.current[pcIdToUse]._associatedTransferIds
+        ) {
+          peerConns.current[pcIdToUse]._associatedTransferIds.add(
+            useTransferFileId
+          );
         }
 
         // --- Setup Data Channel Handlers (File Sending Logic) ---
@@ -673,7 +745,9 @@ function App() {
                     //   setError(
                     //     `Sender: DataChannel closed unexpectedly for ${fileObj.name}`
                     //   );
-                    console.error(`Sender: DataChannel closed unexpectedly for ${fileObj.name}`);
+                    console.error(
+                      `Sender: DataChannel closed unexpectedly for ${fileObj.name}`
+                    );
                     // Don't cleanup main PC here, just this channel? Or let connection state handle it.
                     delete dataChannels.current[useTransferFileId];
                   }
@@ -689,7 +763,7 @@ function App() {
                   delete dataChannels.current[useTransferFileId];
                 }
               };
-                reader.onerror = (e) => {
+              reader.onerror = (e) => {
                 console.error(
                   `[App Sender] FileReader error for ${useTransferFileId}:`,
                   e
@@ -711,8 +785,11 @@ function App() {
           sendChunk(); // Start sending
         };
 
-        dc.onerror = (event) => { // event is RTCErrorEvent
-          const errorDetail = event.error ? `${event.error.name}: ${event.error.message}` : 'Unknown DataChannel error';
+        dc.onerror = (event) => {
+          // event is RTCErrorEvent
+          const errorDetail = event.error
+            ? `${event.error.name}: ${event.error.message}`
+            : "Unknown DataChannel error";
           console.error(
             `[App Sender] DataChannel error for transferId: ${useTransferFileId}. Error: ${errorDetail}`,
             event
@@ -735,12 +812,17 @@ function App() {
           );
           pc.createOffer()
             .then((offer) => {
-              console.log(`[App Sender DEBUG] Offer created for ${pcIdToUse}:`, offer);
+              console.log(
+                `[App Sender DEBUG] Offer created for ${pcIdToUse}:`,
+                offer
+              );
               return pc.setLocalDescription(offer);
             })
             .then(() => {
               if (pc.localDescription) {
-                console.log(`[App Sender DEBUG] Local description set for ${pcIdToUse}. Emitting signal.`);
+                console.log(
+                  `[App Sender DEBUG] Local description set for ${pcIdToUse}. Emitting signal.`
+                );
                 socket.emit("signal", {
                   room: driveCode,
                   fileId: pcIdToUse,
@@ -795,26 +877,37 @@ function App() {
   useEffect(() => {
     if (step === "receiver" && driveCode) {
       // Check if it's a new drive or a transition to receiver mode for the current driveCode
-      if (driveCode !== prevDriveCodeRef.current || prevStepRef.current !== "receiver") {
-        console.log(`[App Receiver] Initializing for drive ${driveCode}. Performing cleanup of existing WebRTC instances.`);
+      if (
+        driveCode !== prevDriveCodeRef.current ||
+        prevStepRef.current !== "receiver"
+      ) {
+        console.log(
+          `[App Receiver] Initializing for drive ${driveCode}. Performing cleanup of existing WebRTC instances.`
+        );
         // Iterate and cleanup existing peer connections. cleanupWebRTCInstance handles removing from refs.
-        Object.keys(peerConns.current).forEach(id => {
+        Object.keys(peerConns.current).forEach((id) => {
           console.log(`[App Receiver] Proactively cleaning up peerConn: ${id}`);
           cleanupWebRTCInstance(id);
         });
         // Iterate and cleanup existing data channels that might not be associated with a PC cleared above.
         // cleanupWebRTCInstance also handles data channels if called with their ID.
-        Object.keys(dataChannels.current).forEach(id => {
-           console.log(`[App Receiver] Proactively cleaning up dataChannel: ${id}`);
-           cleanupWebRTCInstance(id); // It's safe to call this; if it's a DC ID, it will be handled.
+        Object.keys(dataChannels.current).forEach((id) => {
+          console.log(
+            `[App Receiver] Proactively cleaning up dataChannel: ${id}`
+          );
+          cleanupWebRTCInstance(id); // It's safe to call this; if it's a DC ID, it will be handled.
         });
         pendingSignals.current = {}; // Clear all pending signals
-        console.log('[App Receiver] Proactive WebRTC state cleanup complete for new drive/receiver entry.');
+        console.log(
+          "[App Receiver] Proactive WebRTC state cleanup complete for new drive/receiver entry."
+        );
       }
       prevDriveCodeRef.current = driveCode; // Update prevDriveCodeRef after the check
 
       const joinAndRequest = () => {
-        console.log(`[App Receiver] Joining room: ${driveCode} and requesting file list.`);
+        console.log(
+          `[App Receiver] Joining room: ${driveCode} and requesting file list.`
+        );
         socket.emit("join-room", driveCode);
         socket.emit("get-file-list", { room: driveCode });
       };
@@ -825,7 +918,9 @@ function App() {
       socket.on("connect", joinAndRequest);
 
       return () => {
-        console.log(`[App Receiver] Cleaning up effect for driveCode: ${driveCode}.`);
+        console.log(
+          `[App Receiver] Cleaning up effect for driveCode: ${driveCode}.`
+        );
         socket.off("connect", joinAndRequest);
       };
     } else {
@@ -891,7 +986,7 @@ function App() {
           fileId: transferFileId,
           filename: fileMeta.name,
           mimetype: fileMeta.type,
-          fileSize: fileMeta.size // Add fileSize here
+          fileSize: fileMeta.size, // Add fileSize here
         });
         // console.log("[App Receiver] Emitting download-file");
         // Emit download request with original fileId and the transferFileId
@@ -971,7 +1066,6 @@ function App() {
       navigator.serviceWorker.removeEventListener("message", handler);
   }, []);
 
-
   // Integrate the unified useZipDownload hook
   const {
     startZipProcess, // <-- Renamed function
@@ -1004,11 +1098,13 @@ function App() {
       let confirmationMessage = "";
       let needsConfirmation = false;
 
-      if (step === 'uploaded' && files.length > 0) {
-        confirmationMessage = 'Leaving or reloading will stop the file transfer. Keep this page open to continue sharing.';
+      if (step === "uploaded" && files.length > 0) {
+        confirmationMessage =
+          "Leaving or reloading will stop the file transfer. Keep this page open to continue sharing.";
         needsConfirmation = true;
-      } else if (step === 'receiver' && isZipping) {
-        confirmationMessage = 'Files are currently being downloaded and zipped. Leaving or reloading now may interrupt the process. Are you sure you want to leave?';
+      } else if (step === "receiver" && isZipping) {
+        confirmationMessage =
+          "Files are currently being downloaded and zipped. Leaving or reloading now may interrupt the process. Are you sure you want to leave?";
         needsConfirmation = true;
       }
 
@@ -1019,31 +1115,31 @@ function App() {
       }
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [step, files, isZipping]); // Dependencies for the consolidated handler
 
-
   // This function is ONLY for single file downloads now
   function sendSWMetaAndChunk(fileId, chunk, filename, mimeType, fileSize) {
-   if (!navigator.serviceWorker.controller) {
-     console.error("[App] SW Ctrl not available for sendSWMetaAndChunk"); // Keep error
-     return;
-   }
+    if (!navigator.serviceWorker.controller) {
+      console.error("[App] SW Ctrl not available for sendSWMetaAndChunk"); // Keep error
+      return;
+    }
 
-   if (filename && (!chunk || chunk === null)) {
-     // This is a metadata-only message
-     const sizeToSend = (typeof fileSize === 'number' && fileSize > 0) ? fileSize : undefined;
-     // console.log(`[App sendSWMetaAndChunk] Meta for SW. fileId: ${fileId}, filename: ${filename}, received fileSize: ${fileSize}, sizeToSend: ${sizeToSend}`); // Diagnostic log removed
-     navigator.serviceWorker.controller.postMessage({
-       type: "meta", // Service worker might still use this type to identify meta messages
-       fileId, // This is transferFileId
-       filename: filename,
-       mimetype: mimeType || "application/octet-stream",
-       fileSize: sizeToSend, // Send fileSize at the top level, ensure it's a positive number or undefined
+    if (filename && (!chunk || chunk === null)) {
+      // This is a metadata-only message
+      const sizeToSend =
+        typeof fileSize === "number" && fileSize > 0 ? fileSize : undefined;
+      // console.log(`[App sendSWMetaAndChunk] Meta for SW. fileId: ${fileId}, filename: ${filename}, received fileSize: ${fileSize}, sizeToSend: ${sizeToSend}`); // Diagnostic log removed
+      navigator.serviceWorker.controller.postMessage({
+        type: "meta", // Service worker might still use this type to identify meta messages
+        fileId, // This is transferFileId
+        filename: filename,
+        mimetype: mimeType || "application/octet-stream",
+        fileSize: sizeToSend, // Send fileSize at the top level, ensure it's a positive number or undefined
       });
       return;
     }
@@ -1132,9 +1228,10 @@ function App() {
   const handleJoinDrive = (codeToJoin) => {
     setError(""); // Clear previous errors
     setIsJoiningDrive(true); // Start loading
-    const upperCode = codeToJoin.toUpperCase();
+    const upperCode = codeToJoin.toUpperCase().replace(/[^A-Z]/g, ''); // Ensure only uppercase letters
+
     // Basic validation
-    if (upperCode && upperCode.length === 6 && /^[A-Z0-9]+$/.test(upperCode)) {
+    if (upperCode && upperCode.length === 4 && /^[A-Z]+$/.test(upperCode)) { // Check for 4 uppercase letters
       // Navigate to the receiver URL for this code
       // This leverages the existing URL parsing logic on page load
       // Simulate a delay for loading state visibility if navigation is too fast
@@ -1143,7 +1240,7 @@ function App() {
         // setIsJoiningDrive(false); // Will be false on new page load anyway
       }, 500); // Small delay
     } else {
-      setError("Invalid drive code. Must be 6 alphanumeric characters.");
+      setError("Invalid drive code. Must be 4 uppercase letters."); // Updated error message
       setJoinDriveCodeInput(""); // Clear invalid input
       setIsJoiningDrive(false); // Stop loading on error
     }
@@ -1183,15 +1280,20 @@ function App() {
   }
 
   function formatEtr(seconds) {
-    if (seconds === null || seconds === Infinity || seconds < 0 || isNaN(seconds)) {
+    if (
+      seconds === null ||
+      seconds === Infinity ||
+      seconds < 0 ||
+      isNaN(seconds)
+    ) {
       return "--:--";
     }
-  
+
     const totalSeconds = Math.floor(seconds);
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const secs = totalSeconds % 60;
-  
+
     if (hours > 0) {
       return `${hours}h ${minutes.toString().padStart(2, "0")}m`;
     } else if (minutes > 0) {
@@ -1235,16 +1337,16 @@ function App() {
           onClick={() => (window.location.href = "/")}
           title="Home"
         >
-          <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            height="48px" 
-            viewBox="0 0 24 24" 
-            width="48px" 
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            height="48px"
+            viewBox="0 0 24 24"
+            width="48px"
             fill="#000000" // Standard black fill for Material Icons
             className="home-icon header-icon-svg" // Added common class
           >
-            <path d="M0 0h24v24H0V0z" fill="none"/>
-            <path d="M10 19v-5h4v5c0 .55.45 1 1 1h3c.55 0 1-.45 1-1v-7h1.7c.46 0 .68-.57.33-.87L12.67 3.6c-.38-.34-.96-.34-1.34 0l-8.36 7.53c-.34.3-.13.87.33.87H5v7c0 .55.45 1 1 1h3c.55 0 1-.45 1-1z"/>
+            <path d="M0 0h24v24H0V0z" fill="none" />
+            <path d="M10 19v-5h4v5c0 .55.45 1 1 1h3c.55 0 1-.45 1-1v-7h1.7c.46 0 .68-.57.33-.87L12.67 3.6c-.38-.34-.96-.34-1.34 0l-8.36 7.53c-.34.3-.13.87.33.87H5v7c0 .55.45 1 1 1h3c.55 0 1-.45 1-1z" />
           </svg>
         </div>
         <a
@@ -1262,7 +1364,7 @@ function App() {
             className="github-icon header-icon-svg" // Added common class
           >
             {/* GitHub path data is more complex, assuming it's correct and just ensuring size/class consistency */}
-            <path d="M12 1.27a11 11 0 00-3.48 21.46c.55.1.73-.24.73-.53v-1.84c-3.03.65-3.67-1.46-3.67-1.46a2.89 2.89 0 00-1.21-1.58c-.99-.68.08-.66.08-.66a2.29 2.29 0 011.66 1.12 2.33 2.33 0 003.19.91 2.32 2.32 0 01.68-1.45c-2.43-.28-4.98-1.22-4.98-5.42a4.25 4.25 0 011.11-2.91 3.93 3.93 0 01.11-2.88s.92-.3 3 1.12a10.3 10.3 0 015.44 0c2.08-1.42 3-1.12 3-1.12a3.93 3.93 0 01.11 2.88 4.25 4.25 0 011.11 2.91c0 4.21-2.55 5.14-4.99 5.42a2.58 2.58 0 01.73 2v2.92c0 .29.18.63.73.53A11 11 0 0012 1.27z"/>
+            <path d="M12 1.27a11 11 0 00-3.48 21.46c.55.1.73-.24.73-.53v-1.84c-3.03.65-3.67-1.46-3.67-1.46a2.89 2.89 0 00-1.21-1.58c-.99-.68.08-.66.08-.66a2.29 2.29 0 011.66 1.12 2.33 2.33 0 003.19.91 2.32 2.32 0 01.68-1.45c-2.43-.28-4.98-1.22-4.98-5.42a4.25 4.25 0 011.11-2.91 3.93 3.93 0 01.11-2.88s.92-.3 3 1.12a10.3 10.3 0 015.44 0c2.08-1.42 3-1.12 3-1.12a3.93 3.93 0 01.11 2.88 4.25 4.25 0 011.11 2.91c0 4.21-2.55 5.14-4.99 5.42a2.58 2.58 0 01.73 2v2.92c0 .29.18.63.73.53A11 11 0 0012 1.27z" />
           </svg>
         </a>
       </div>
@@ -1368,12 +1470,12 @@ function App() {
                 <input
                   type="text"
                   className="drive-code-input"
-                  placeholder="Enter 6 character drive code"
+                  placeholder="Enter 4 character drive code"
                   value={joinDriveCodeInput}
                   onChange={(e) =>
-                    setJoinDriveCodeInput(e.target.value.toUpperCase())
+                    setJoinDriveCodeInput(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))
                   }
-                  maxLength={6}
+                  maxLength={4}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleJoinDrive(joinDriveCodeInput);
                   }}
@@ -1602,10 +1704,23 @@ function App() {
 
               {/* General error display (not specific to zipping process) */}
               {(error || zipError) && ( // Show 'error' or 'zipError'
-                <div className="error-subcontainer receiver-error-subcontainer" style={{ marginBottom: '16px' }}> {/* Added margin-bottom */}
+                <div
+                  className="error-subcontainer receiver-error-subcontainer"
+                  style={{ marginBottom: "16px" }}
+                >
+                  {" "}
+                  {/* Added margin-bottom */}
                   <div className="error-field">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" className="error-icon">
-                      <path d="M12 17C12.2833 17 12.521 16.904 12.713 16.712C12.905 16.52 13.0007 16.2827 13 16C12.9993 15.7173 12.9033 15.48 12.712 15.288C12.5207 15.096 12.2833 15 12 15C11.7167 15 11.4793 15.096 11.288 15.288C11.0967 15.48 11.0007 15.7173 11 16C10.9993 16.2827 11.0953 16.5203 11.288 16.713C11.4807 16.9057 11.718 17.0013 12 17ZM11 13H13V7H11V13ZM12 22C10.6167 22 9.31667 21.7373 8.1 21.212C6.88334 20.6867 5.825 19.9743 4.925 19.075C4.025 18.1757 3.31267 17.1173 2.788 15.9C2.26333 14.6827 2.00067 13.3827 2 12C1.99933 10.6173 2.262 9.31733 2.788 8.1C3.314 6.88267 4.02633 5.82433 4.925 4.925C5.82367 4.02567 6.882 3.31333 8.1 2.788C9.318 2.26267 10.618 2 12 2C13.382 2 14.682 2.26267 15.9 2.788C17.118 3.31333 18.1763 4.02567 19.075 4.925C19.9737 5.82433 20.6863 6.88267 21.213 8.1C21.7397 9.31733 22.002 10.6173 22 12C21.998 13.3827 21.7353 14.6827 21.212 15.9C20.6887 17.1173 19.9763 18.1757 19.075 19.075C18.1737 19.9743 17.1153 20.687 15.9 21.213C14.6847 21.739 13.3847 22.0013 12 22ZM12 20C14.2333 20 16.125 19.225 17.675 17.675C19.225 16.125 20 14.2333 20 12C20 9.76667 19.225 7.875 17.675 6.325C16.125 4.775 14.2333 4 12 4C9.76667 4 7.875 4.775 6.325 6.325C4.775 7.875 4 9.76667 4 12C4 14.2333 4.775 16.125 6.325 17.675C7.875 19.225 9.76667 20 12 20Z"
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      className="error-icon"
+                    >
+                      <path
+                        d="M12 17C12.2833 17 12.521 16.904 12.713 16.712C12.905 16.52 13.0007 16.2827 13 16C12.9993 15.7173 12.9033 15.48 12.712 15.288C12.5207 15.096 12.2833 15 12 15C11.7167 15 11.4793 15.096 11.288 15.288C11.0967 15.48 11.0007 15.7173 11 16C10.9993 16.2827 11.0953 16.5203 11.288 16.713C11.4807 16.9057 11.718 17.0013 12 17ZM11 13H13V7H11V13ZM12 22C10.6167 22 9.31667 21.7373 8.1 21.212C6.88334 20.6867 5.825 19.9743 4.925 19.075C4.025 18.1757 3.31267 17.1173 2.788 15.9C2.26333 14.6827 2.00067 13.3827 2 12C1.99933 10.6173 2.262 9.31733 2.788 8.1C3.314 6.88267 4.02633 5.82433 4.925 4.925C5.82367 4.02567 6.882 3.31333 8.1 2.788C9.318 2.26267 10.618 2 12 2C13.382 2 14.682 2.26267 15.9 2.788C17.118 3.31333 18.1763 4.02567 19.075 4.925C19.9737 5.82433 20.6863 6.88267 21.213 8.1C21.7397 9.31733 22.002 10.6173 22 12C21.998 13.3827 21.7353 14.6827 21.212 15.9C20.6887 17.1173 19.9763 18.1757 19.075 19.075C18.1737 19.9743 17.1153 20.687 15.9 21.213C14.6847 21.739 13.3847 22.0013 12 22ZM12 20C14.2333 20 16.125 19.225 17.675 17.675C19.225 16.125 20 14.2333 20 12C20 9.76667 19.225 7.875 17.675 6.325C16.125 4.775 14.2333 4 12 4C9.76667 4 7.875 4.775 6.325 6.325C4.775 7.875 4 9.76667 4 12C4 14.2333 4.775 16.125 6.325 17.675C7.875 19.225 9.76667 20 12 20Z"
                         fill="#98282A"
                       />
                     </svg>
@@ -1615,7 +1730,14 @@ function App() {
               )}
 
               {isZipping && (
-                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "16px",
+                  }}
+                >
                   {/* Info for user during zipping */}
                   <div className="info-for-user receiver-info-zipping">
                     <svg
@@ -1632,26 +1754,29 @@ function App() {
                       />
                     </svg>
                     <span className="info-text">
-                      The files you requested are downloading and getting zipped.
-                      Please do not close or refresh the page while this process
-                      is active.
+                      The files you requested are downloading and getting
+                      zipped. Please do not close or refresh the page while this
+                      process is active.
                     </span>
                   </div>
-                  
+
                   {/* Global Progress Display for "Download All" or specific folder */}
                   <div className="progress-display-container">
-                     <div className="progress-filename-text">
+                    <div className="progress-filename-text">
                       {zippingFolderPath
-                        ? `Downloading and Zipping: ${zippingFolderPath.split('/').pop()}.zip`
+                        ? `Downloading and Zipping: ${zippingFolderPath
+                            .split("/")
+                            .pop()}.zip`
                         : "Downloading and Zipping All Files..."}
                     </div>
                     {/* Informational text about connection status, separate from filename */}
-                    {zipConnectionStatus === 'interrupted' && (
+                    {zipConnectionStatus === "interrupted" && (
                       <div className="progress-info-text connection-status-info">
-                        {zipError || "Connection interrupted, waiting for sender..."}
+                        {zipError ||
+                          "Connection interrupted, waiting for sender..."}
                       </div>
                     )}
-                    {zipConnectionStatus !== 'failed' && ( // Hide progress bar if connection totally failed and reset
+                    {zipConnectionStatus !== "failed" && ( // Hide progress bar if connection totally failed and reset
                       <>
                         <div className="progress-bar-wrapper">
                           <div
@@ -1666,16 +1791,23 @@ function App() {
                           <span>
                             Speed:{" "}
                             <span className="stat-value">
-                              {zipConnectionStatus === 'interrupted' ? "--" : formatSpeed(downloadSpeed)}
+                              {zipConnectionStatus === "interrupted"
+                                ? "--"
+                                : formatSpeed(downloadSpeed)}
                             </span>
                           </span>
                           <span>
-                            ETA: <span className="stat-value">{zipConnectionStatus === 'interrupted' ? "--" : formatEtr(etr)}</span>
+                            ETA:{" "}
+                            <span className="stat-value">
+                              {zipConnectionStatus === "interrupted"
+                                ? "--"
+                                : formatEtr(etr)}
+                            </span>
                           </span>
                         </div>
                         <div className="progress-info-text">
                           {/* Display specific message for interruption, otherwise the standard zipping message */}
-                          {zipConnectionStatus === 'interrupted'
+                          {zipConnectionStatus === "interrupted"
                             ? "Download will attempt to resume if sender reconnects."
                             : "Please wait, the download will start automatically when zipping is complete."}
                         </div>
@@ -1685,8 +1817,10 @@ function App() {
                         but it might be redundant if the main error display below FileList catches it.
                         Let's keep it for now as it's specific to the progress container when zipping fails.
                     */}
-                    {zipConnectionStatus === 'failed' && zipError && (
-                        <div className="progress-info-text error-text">{zipError}</div> 
+                    {zipConnectionStatus === "failed" && zipError && (
+                      <div className="progress-info-text error-text">
+                        {zipError}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1720,11 +1854,13 @@ function App() {
       let confirmationMessage = "";
       let needsConfirmation = false;
 
-      if (step === 'uploaded' && files.length > 0) {
-        confirmationMessage = 'Leaving or reloading will stop the file transfer. Keep this page open to continue sharing.';
+      if (step === "uploaded" && files.length > 0) {
+        confirmationMessage =
+          "Leaving or reloading will stop the file transfer. Keep this page open to continue sharing.";
         needsConfirmation = true;
-      } else if (step === 'receiver' && isZipping) {
-        confirmationMessage = 'Files are currently being downloaded and zipped. Leaving or reloading now may interrupt the process. Are you sure you want to leave?';
+      } else if (step === "receiver" && isZipping) {
+        confirmationMessage =
+          "Files are currently being downloaded and zipped. Leaving or reloading now may interrupt the process. Are you sure you want to leave?";
         needsConfirmation = true;
       }
 
@@ -1735,13 +1871,12 @@ function App() {
       }
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [step, files, isZipping]); // Dependencies for the consolidated handler
-
 
   useEffect(() => {
     if (step === "receiver" && driveCode) {
@@ -1755,8 +1890,8 @@ function App() {
       new URLSearchParams(window.location.search).get("as") === "receiver";
     if (
       step === "init" &&
-      pathDriveCode.length === 6 &&
-      /^[A-Z0-9]+$/.test(pathDriveCode) &&
+      pathDriveCode.length === 4 && // Changed to 4
+      /^[A-Z]+$/.test(pathDriveCode) && // Changed to only alphabets
       !asReceiver
     ) {
       setDriveCode(pathDriveCode);
