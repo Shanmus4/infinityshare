@@ -148,7 +148,7 @@ InfinityShare consists of two main components:
     - A lightweight Node.js server using `socket.io`.
     - Its sole purpose is to help peers discover each other and exchange WebRTC signaling messages (like offers, answers, and ICE candidates).
     - **It does not handle or store any file data.** All file transfers are direct P2P.
-    - Deployed on Render: `wss://infinityshare-signalserver.onrender.com`
+    - Deployed on Render: `wss://infinityshare.onrender.com`
 
 **How it Works (WebRTC):**
 
