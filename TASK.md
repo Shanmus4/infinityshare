@@ -2,16 +2,26 @@
 
 ## Active Tasks
 
-- [ ] **BUGFIX & Stability:** Investigate and fix WebRTC connection drops. (Reported 2025-05-10, Diagnostics & Timeouts Improved 2025-05-11)
-  - Symptoms:
-    - Scenario 1 (Original Network/Hotspot): Sender's zip PC timed out on heartbeats mid-transfer. (Addressed by heartbeat timing adjustments).
-    - Scenario 2 (New/Current Network): Connection fails to establish, even when both devices are on the same local network. Sender logs show STUN 701 errors, and PeerConnection transitions `connecting` -> `failed`. Download does not start.
-  - Actions (2025-05-11):
-    - Implemented a 30s ICE connection timeout (sender & receiver).
-    - Sender's zip PC cleans up on `failed` or `closed`.
-    - Adjusted heartbeat intervals & logging.
-  - **Diagnostic Re-Test (2025-05-11):** Set `ICE_SERVERS = []` in `client/src/utils/signaling.js` to force host candidates only for same-network testing. This is to isolate if STUN errors interfere with local connections or if local P2P itself is failing.
-  - Status: Awaiting user to test local transfer with empty `ICE_SERVERS` and provide PC console logs.
+- [x] **Feature: Implement Twilio TURN Server Integration** (User Request 2025-05-11, Completed 2025-05-11)
+  - `signaling-server/index.js` updated with Express.js to serve temporary STUN/TURN credentials from Twilio via an `/api/ice-servers` endpoint. Requires `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` as environment variables.
+  - `client/src/utils/signaling.js` updated to fetch ICE server configuration from this endpoint, with fallback to public STUNs.
+  - `App.js`, `useZipDownload.js`, `useWebRTC.js` updated to use the dynamically fetched ICE server configuration.
+- [ ] **BUGFIX & Stability:** Investigate and resolve mid-transfer connection drops. (Ongoing)
+  - Symptoms: 
+    - WebRTC PeerConnection establishes successfully (often using TURN).
+    - File transfer begins and progresses.
+    - Sender's WebSocket connection to the signaling server disconnects (`transport close`) and then reconnects.
+    - Due to this disruption, heartbeats from the receiver are likely missed by the sender.
+    - Sender's zip PC eventually times out (e.g., after 90s) due to not receiving/processing heartbeats.
+    - Sender cleans up the timed-out PC, causing "User-Initiated Abort" on the receiver.
+  - Current Status (2025-05-11):
+    - TURN server integration is functional; connections can establish.
+    - Heartbeat mechanism is in place but is susceptible to signaling channel disruptions.
+  - Root Cause Hypothesis: Instability of the WebSocket connection to the signaling server (`wss://infinityshare.onrender.com`) is the primary trigger.
+  - Next Steps:
+    - User to investigate signaling server stability on Render.com (check service tier, logs, metrics for restarts/errors/idling).
+    - Consider client-side logic improvements for handling socket reconnections more gracefully (e.g., re-sending critical state or heartbeats immediately upon reconnect), though this is secondary to ensuring a stable signaling channel.
+    - Monitor client-side socket `connect`, `disconnect`, `connect_error` logs.
 
 ## Completed Tasks (Verified 2025-05-10)
 
