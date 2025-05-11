@@ -140,49 +140,78 @@ function App() {
   );
 
   const cleanupWebRTCInstance = React.useCallback(
-    (id) => {
+    (id) => { // 'id' is the PeerConnection ID
+      console.log(`[App Cleanup] Attempting to clean up for PC ID: ${id}`);
       const pc = peerConns.current[id];
 
-      if (pc && pc._iceTimeoutId) { // Clear ICE connection timeout if it exists
-        clearTimeout(pc._iceTimeoutId);
-        delete pc._iceTimeoutId; 
+      if (pc) {
+        // Clear ICE connection timeout if it exists
+        if (pc._iceTimeoutId) {
+          clearTimeout(pc._iceTimeoutId);
+          delete pc._iceTimeoutId;
+          console.log(`[App Cleanup] Cleared ICE timeout for PC ID: ${id}`);
+        }
+
+        // If it's a zip PC, clean up its associated DataChannels
+        if (pc._associatedTransferIds) {
+          console.log(`[App Cleanup] PC ID: ${id} is a zip PC. Cleaning associated DCs:`, Array.from(pc._associatedTransferIds));
+          pc._associatedTransferIds.forEach((transferId) => {
+            const associatedDc = dataChannels.current[transferId];
+            if (associatedDc) {
+              try {
+                if (associatedDc.readyState !== "closed") associatedDc.close();
+                console.log(`[App Cleanup] Closed associated DC: ${transferId} for PC ID: ${id}`);
+              } catch (e) { console.warn(`[App Cleanup] Error closing associated DC ${transferId}:`, e); }
+              delete dataChannels.current[transferId];
+            }
+          });
+          delete pc._associatedTransferIds; // Clean up the Set itself
+        } else {
+          // If not a zip PC (or _associatedTransferIds was already cleaned),
+          // 'id' might also be the ID for a single DataChannel (for single file transfers where pcId === dcId)
+          const singleDc = dataChannels.current[id];
+          if (singleDc) {
+            console.log(`[App Cleanup] PC ID: ${id} might be for a single DC. Cleaning DC: ${id}`);
+            try {
+              if (singleDc.readyState !== "closed") singleDc.close();
+              console.log(`[App Cleanup] Closed single DC: ${id}`);
+            } catch (e) { console.warn(`[App Cleanup] Error closing single DC ${id}:`, e); }
+            delete dataChannels.current[id];
+          }
+        }
+
+        // Close the PeerConnection itself
+        try {
+          if (pc.signalingState !== "closed") {
+            pc.close();
+            console.log(`[App Cleanup] Closed PC ID: ${id}`);
+          }
+        } catch (e) { console.warn(`[App Cleanup] Error closing PC ID ${id}:`, e); }
+        delete peerConns.current[id];
+      } else {
+        console.warn(`[App Cleanup] No PeerConnection found for ID: ${id} during cleanup attempt.`);
+        // Still try to clean up other refs by this ID in case they are orphaned
+        if (dataChannels.current[id]) { // If an orphaned DC with this ID exists
+             console.log(`[App Cleanup] Found orphaned DC with ID: ${id}. Cleaning it.`);
+             try {
+                if (dataChannels.current[id].readyState !== "closed") dataChannels.current[id].close();
+             } catch(e) { /*ignore*/ }
+             delete dataChannels.current[id];
+        }
       }
 
-      if (pc && pc._associatedTransferIds) {
-        pc._associatedTransferIds.forEach((transferId) => {
-          const associatedDc = dataChannels.current[transferId];
-          if (associatedDc) {
-            try {
-              if (associatedDc.readyState !== "closed") associatedDc.close();
-            } catch (e) { /* ignore */ }
-            delete dataChannels.current[transferId];
-          }
-        });
-        delete pc._associatedTransferIds;
-        if (activeZipPcHeartbeats.current.hasOwnProperty(id)) {
-          delete activeZipPcHeartbeats.current[id];
-        }
-      } else {
-        if (activeZipPcHeartbeats.current.hasOwnProperty(id)) {
-          delete activeZipPcHeartbeats.current[id];
-        }
-        const dc = dataChannels.current[id];
-        if (dc) {
-          try {
-            if (dc.readyState !== "closed") dc.close();
-          } catch (e) { /* ignore */ }
-          delete dataChannels.current[id];
-        }
+      // Clean up from heartbeat tracking if it was a zip PC
+      if (activeZipPcHeartbeats.current.hasOwnProperty(id)) {
+        delete activeZipPcHeartbeats.current[id];
+        console.log(`[App Cleanup] Removed PC ID: ${id} from heartbeat tracking.`);
       }
-      if (pc) {
-        try {
-          if (pc.signalingState !== "closed") pc.close();
-        } catch (e) { /* ignore */ }
-        delete peerConns.current[id];
-      }
+
+      // Clean up pending signals for this PC ID
       if (pendingSignals.current && pendingSignals.current[id]) {
         delete pendingSignals.current[id];
+        console.log(`[App Cleanup] Cleared pending signals for PC ID: ${id}`);
       }
+      console.log(`[App Cleanup] Finished cleanup for ID: ${id}`);
     },
     [peerConns, dataChannels, pendingSignals, activeZipPcHeartbeats]
   );
@@ -291,6 +320,15 @@ function App() {
     setFiles(combinedFiles);
     const combinedFilesMeta = combinedFiles.map(({ name, size, type, fileId, path }) => ({ name, size, type, fileId, path, }));
     if (!driveCode) {
+      // This is a new drive creation
+      console.log("[App Sender] Creating a new drive. Cleaning up any existing WebRTC state.");
+      Object.keys(peerConns.current).forEach(cleanupWebRTCInstance);
+      // dataChannels, pendingSignals, activeZipPcHeartbeats are cleaned within cleanupWebRTCInstance
+      // or should be reset if they are global to the drive.
+      // For safety, explicitly clear pendingSignals for a new drive.
+      pendingSignals.current = {}; 
+      activeZipPcHeartbeats.current = {}; // Reset heartbeat tracking for a new drive
+
       let code = "";
       const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
       for (let i = 0; i < 4; i++) {
