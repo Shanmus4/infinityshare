@@ -5,14 +5,13 @@
 - [ ] **BUGFIX & Stability:** Investigate and fix WebRTC connection drops. (Reported 2025-05-10, Diagnostics & Timeouts Improved 2025-05-11)
   - Symptoms:
     - Scenario 1 (Original Network/Hotspot): Sender's zip PC timed out on heartbeats mid-transfer. (Addressed by heartbeat timing adjustments).
-    - Scenario 2 (New Network): Connection fails to establish entirely. Sender logs show all STUN servers failing (error 701), and PeerConnection transitions `connecting` -> `failed`. Download does not start.
+    - Scenario 2 (New/Current Network): Connection fails to establish, even when both devices are on the same local network. Sender logs show STUN 701 errors, and PeerConnection transitions `connecting` -> `failed`. Download does not start.
   - Actions (2025-05-11):
-    - Implemented a 30-second ICE connection timeout for both sender (`App.js`) and receiver (`useZipDownload.js`) zip PeerConnections.
-    - Ensured `cleanupWebRTCInstance` and `resetZipState` clear these ICE timeouts.
-    - Sender's zip PC `onconnectionstatechange` now cleans up on both `failed` and `closed` states.
-    - Adjusted heartbeat intervals (Sender: 90s timeout, 15s check; Receiver: sends every 10s) and improved sender's heartbeat logging.
-  - Conclusion for Scenario 2: The inability to connect on the "new network" is due to ICE failure, primarily because all STUN servers are unreachable (701 errors) and no other viable candidate paths (host/srflx) are successfully established. This points to a network environment issue (firewall, restrictive NAT).
-  - Status: The application now handles ICE failures more gracefully with timeouts and cleanup. For connections to work on challenging networks, environmental network troubleshooting or a TURN server would be necessary. The heartbeat adjustments aim to improve stability for connections that *do* establish.
+    - Implemented a 30s ICE connection timeout (sender & receiver).
+    - Sender's zip PC cleans up on `failed` or `closed`.
+    - Adjusted heartbeat intervals & logging.
+  - **Diagnostic Re-Test (2025-05-11):** Set `ICE_SERVERS = []` in `client/src/utils/signaling.js` to force host candidates only for same-network testing. This is to isolate if STUN errors interfere with local connections or if local P2P itself is failing.
+  - Status: Awaiting user to test local transfer with empty `ICE_SERVERS` and provide PC console logs.
 
 ## Completed Tasks (Verified 2025-05-10)
 
