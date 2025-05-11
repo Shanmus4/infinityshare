@@ -334,6 +334,9 @@ function App() {
     const heartbeatHandler = (data) => {
       if (data && data.pcId && activeZipPcHeartbeats.current.hasOwnProperty(data.pcId)) {
         activeZipPcHeartbeats.current[data.pcId] = Date.now();
+        console.log(`[App Sender] Received and processed heartbeat for active zip PC: ${data.pcId}`);
+      } else {
+        console.warn(`[App Sender] Received heartbeat for unknown or inactive zip PC:`, data);
       }
     };
     socket.on("heartbeat-zip", heartbeatHandler);
@@ -341,14 +344,15 @@ function App() {
   }, [socket]);
 
   useEffect(() => {
-    const HEARTBEAT_TIMEOUT_MS = 60000;
-    const CHECK_INTERVAL_MS = 30000;
+    const HEARTBEAT_TIMEOUT_MS = 60000; // 60 seconds
+    const CHECK_INTERVAL_MS = 30000; // Check every 30 seconds
+
     const intervalId = setInterval(() => {
       const now = Date.now();
       Object.keys(activeZipPcHeartbeats.current).forEach((pcId) => {
         if (now - activeZipPcHeartbeats.current[pcId] > HEARTBEAT_TIMEOUT_MS) {
-          cleanupWebRTCInstance(pcId);
-          delete activeZipPcHeartbeats.current[pcId];
+          console.warn(`[App Sender] Zip PC ${pcId} heartbeat timeout after ${HEARTBEAT_TIMEOUT_MS / 1000}s. Cleaning up.`);
+          cleanupWebRTCInstance(pcId); // cleanupWebRTCInstance already deletes from activeZipPcHeartbeats
         }
       });
     }, CHECK_INTERVAL_MS);
@@ -395,25 +399,29 @@ function App() {
           pc.onicecandidate = (event) => {
             if (event.candidate) socket.emit("signal", { room: driveCode, fileId: pcIdToUse, data: { candidate: event.candidate }, });
           };
-          // --- Temporarily simplified error and state logging for sender's zip PC ---
-          // pc.onicecandidateerror = (event) => {
-          //   console.error(`[App Sender Zip/Folder] ICE candidate error for PC ${pcIdToUse}:`, event);
-          //   if (event.errorCode) {
-          //     const errorText = event.errorText || 'No error text';
-          //     console.error(`  Error Code: ${event.errorCode}, Host Candidate: ${event.hostCandidate}, Server URL: ${event.url}, Text: ${errorText}`);
-          //   }
-          // };
-          pc.onconnectionstatechange = () => {
-            console.log(`[App Sender Zip/Folder] DIAGNOSTIC - PC ${pcIdToUse} connection state: ${pc.connectionState}`);
-            if (["failed", "closed"].includes(pc.connectionState)) {
-              console.warn(`[App Sender Zip/Folder] DIAGNOSTIC - PC ${pcIdToUse} connection failed or closed. Cleaning up.`);
-              cleanupWebRTCInstance(pcIdToUse);
+          pc.onicecandidateerror = (event) => {
+            console.error(`[App Sender Zip/Folder] ICE candidate error for PC ${pcIdToUse}:`, event);
+            if (event.errorCode) {
+              const errorText = event.errorText || 'No error text';
+              console.error(`  Error Code: ${event.errorCode}, Host Candidate: ${event.hostCandidate}, Server URL: ${event.url}, Text: ${errorText}`);
+              // setError(`Sender ICE Error: ${event.errorCode} - ${errorText}`); // Avoid overwriting receiver's more specific STUN error
+            } else {
+              // setError('Sender ICE Error: Unknown'); // Avoid overwriting
             }
           };
-          // pc.onsignalingstatechange = () => { 
-          //   console.log(`[App Sender Zip/Folder] PC ${pcIdToUse} signaling state: ${pc.signalingState}. ICE: ${pc.iceConnectionState}, Connection: ${pc.connectionState}`);
-          // };
-          // --- End temporary simplification ---
+          pc.onconnectionstatechange = () => {
+            console.log(`[App Sender Zip/Folder] PC ${pcIdToUse} connection state: ${pc.connectionState}. ICE: ${pc.iceConnectionState}, Signaling: ${pc.signalingState}`);
+            if (pc.connectionState === "closed") {
+              console.warn(`[App Sender Zip/Folder] PC ${pcIdToUse} connection closed. Cleaning up.`);
+              cleanupWebRTCInstance(pcIdToUse);
+            } else if (pc.connectionState === "failed") {
+              console.error(`[App Sender Zip/Folder] PC ${pcIdToUse} connection failed. State: ${pc.connectionState}, ICE: ${pc.iceConnectionState}. Not cleaning up immediately, relying on heartbeat or eventual close.`);
+              // setError(`Sender: Zip connection failed (${pcIdToUse}). Transfers may not complete.`); // Optionally set an error
+            }
+          };
+          pc.onsignalingstatechange = () => { 
+            console.log(`[App Sender Zip/Folder] PC ${pcIdToUse} signaling state: ${pc.signalingState}. ICE: ${pc.iceConnectionState}, Connection: ${pc.connectionState}`);
+          };
           if (pendingSignals.current[pcIdToUse]) {
             pendingSignals.current[pcIdToUse].forEach((signalData) => handleSignal({ fileId: pcIdToUse, ...signalData }));
             delete pendingSignals.current[pcIdToUse];
