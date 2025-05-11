@@ -3,11 +3,11 @@
 ## Active Tasks
 
 - [ ] **BUGFIX & Stability:** Investigate and fix WebRTC connection drops during "Download All" / folder downloads. (Reported 2025-05-10, Diagnostics Improved 2025-05-11)
-  - Symptoms: PeerConnection fails to establish reliably. Logs on both sender and receiver show all STUN servers failing with error 701 (STUN host lookup received error). This leads to the sender's PeerConnection failing, which then closes DataChannels, causing the receiver to see "User-Initiated Abort" (SCTP Cause 12).
+  - Symptoms: PeerConnection fails to establish reliably. Logs on both sender and receiver show all STUN servers failing with error 701. This leads to the sender's PeerConnection failing, which then closes DataChannels, causing the receiver to see "User-Initiated Abort" (SCTP Cause 12).
   - Action: Implemented detailed ICE candidate error logging and PeerConnection state logging on both sender (`App.js`) and receiver (`useZipDownload.js`).
-  - Action: Enhanced UI error message on receiver to specifically mention STUN server failures and suggest checking network, firewall (UDP traffic), and DNS.
-  - Conclusion: The primary issue appears to be the user's network environment preventing successful STUN server communication on both ends. The application now correctly diagnoses and reports this.
-  - Status: Awaiting user to troubleshoot their network environment (firewall, DNS, proxy/VPN) based on the error messages and logs. Recommend using tools like https://test.webrtc.org/ for further network diagnosis.
+  - Action: Enhanced UI error message on receiver to specifically mention STUN server failures.
+  - **Diagnostic Step (2025-05-11):** Temporarily set `ICE_SERVERS` to an empty array in `client/src/utils/signaling.js` to force reliance on host candidates only. This is to test if STUN failures are impacting local network transfers or if there's a more fundamental local P2P issue.
+  - Status: Awaiting user to test local transfer with empty `ICE_SERVERS` and provide logs from both sender and receiver.
 
 ## Completed Tasks (Verified 2025-05-10)
 
