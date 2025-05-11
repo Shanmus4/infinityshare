@@ -336,7 +336,7 @@ function App() {
         activeZipPcHeartbeats.current[data.pcId] = Date.now();
         console.log(`[App Sender] Received and processed heartbeat for active zip PC: ${data.pcId}`);
       } else {
-        console.warn(`[App Sender] Received heartbeat for unknown or inactive zip PC:`, data);
+        console.warn(`[App Sender] Received heartbeat for unknown or inactive zip PC:`, data, 'Current active keys:', Object.keys(activeZipPcHeartbeats.current));
       }
     };
     socket.on("heartbeat-zip", heartbeatHandler);
@@ -344,15 +344,23 @@ function App() {
   }, [socket]);
 
   useEffect(() => {
-    const HEARTBEAT_TIMEOUT_MS = 60000; // 60 seconds
-    const CHECK_INTERVAL_MS = 30000; // Check every 30 seconds
+    const HEARTBEAT_TIMEOUT_MS = 90000; // Increased to 90 seconds
+    const CHECK_INTERVAL_MS = 15000; // Check every 15 seconds
 
     const intervalId = setInterval(() => {
       const now = Date.now();
       Object.keys(activeZipPcHeartbeats.current).forEach((pcId) => {
-        if (now - activeZipPcHeartbeats.current[pcId] > HEARTBEAT_TIMEOUT_MS) {
-          console.warn(`[App Sender] Zip PC ${pcId} heartbeat timeout after ${HEARTBEAT_TIMEOUT_MS / 1000}s. Cleaning up.`);
-          cleanupWebRTCInstance(pcId); // cleanupWebRTCInstance already deletes from activeZipPcHeartbeats
+        const lastHeartbeatTime = activeZipPcHeartbeats.current[pcId];
+        if (typeof lastHeartbeatTime === 'number') { // Ensure the timestamp exists and is a number
+          if (now - lastHeartbeatTime > HEARTBEAT_TIMEOUT_MS) {
+            console.warn(`[App Sender] Zip PC ${pcId} heartbeat timeout. Last heartbeat was ${Math.round((now - lastHeartbeatTime)/1000)}s ago (threshold: ${HEARTBEAT_TIMEOUT_MS / 1000}s). Cleaning up.`);
+            cleanupWebRTCInstance(pcId);
+          }
+        } else {
+          // This case should ideally not happen if pcId is still in Object.keys and was properly initialized.
+          // Could indicate a race condition if deleted between Object.keys and access.
+          console.warn(`[App Sender] Heartbeat check: pcId ${pcId} found in keys, but its timestamp was not a number:`, lastHeartbeatTime, ". Potentially already cleaned up or race condition.");
+          // cleanupWebRTCInstance(pcId); // Optionally cleanup here too if this state is considered invalid
         }
       });
     }, CHECK_INTERVAL_MS);

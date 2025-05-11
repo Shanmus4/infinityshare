@@ -3,12 +3,12 @@
 ## Active Tasks
 
 - [ ] **BUGFIX & Stability:** Investigate and fix WebRTC connection drops during "Download All" / folder downloads. (Reported 2025-05-10, Diagnostics Improved 2025-05-11)
-  - Symptoms: PeerConnection fails to establish reliably, even on the local network when STUN servers are bypassed. Logs on both sender and receiver show PeerConnection state transitioning to `failed` after attempting to connect using only `host` candidates. This indicates a fundamental issue with local P2P connectivity.
-  - Action: Implemented detailed ICE candidate error logging and PeerConnection state logging on both sender (`App.js`) and receiver (`useZipDownload.js`).
-  - Action: Enhanced UI error message on receiver to specifically mention STUN server failures (though this is secondary to the current local connection failure).
-  - Diagnostic Test (2025-05-11): Setting `ICE_SERVERS` to an empty array (forcing host candidates only) still resulted in connection failures on the local network.
-  - Conclusion: The primary issue is likely related to the user's local network configuration (e.g., firewall blocking local UDP P2P traffic, mDNS resolution issues for `.local` hostnames) or a more fundamental problem in the WebRTC ICE handling logic for host candidates. STUN server accessibility is a separate, compounding issue for non-local connections.
-  - Status: User needs to investigate local network/firewall settings. Code review of ICE handling for host candidates might be a secondary step if network troubleshooting doesn't resolve local failures. `ICE_SERVERS` configuration reverted to original.
+  - Symptoms: Sender's zip PeerConnection times out due to missed heartbeats, even after initially connecting. This causes the sender to clean up, leading to "User-Initiated Abort" on the receiver. Issue occurs even on local/hotspot networks.
+  - Action: Restored full ICE/PC state logging on sender. Added detailed logging to sender's heartbeat processing and timeout logic in `App.js` to trace `pcId` mismatches or premature cleanup.
+  - Action (Previous): Temporarily disabled immediate cleanup on "failed" PC state for sender's zip PC to observe behavior.
+  - Action (Previous): Reverted `ICE_SERVERS` to original STUN configuration.
+  - Hypothesis: The sender's `heartbeatHandler` is not correctly identifying or updating the timestamp for the active zip PC's `pcId`, leading to a timeout. This could be due to the `pcId` not being found in `activeZipPcHeartbeats.current` when a heartbeat arrives.
+  - Status: Awaiting new logs (especially sender-side, if possible, or detailed receiver-side logs if sender logs are unavailable) with the latest logging to confirm heartbeat processing flow.
 
 ## Completed Tasks (Verified 2025-05-10)
 

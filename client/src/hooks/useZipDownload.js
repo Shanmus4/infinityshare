@@ -449,7 +449,7 @@ export function useZipDownload({
           console.log(`[useZipDownload] Sending heartbeat for pcId: ${pcId}`);
           socket.emit("heartbeat-zip", { room: driveCode, pcId });
         }
-      }, 15000); // Send heartbeat every 15 seconds
+      }, 10000); // Send heartbeat every 10 seconds
 
       // REMOVED Speed/ETR Calculation Interval - Moved into onmessage handler
     },
