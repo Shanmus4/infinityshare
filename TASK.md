@@ -6,16 +6,20 @@
   - `signaling-server/index.js` updated with Express.js to serve temporary STUN/TURN credentials from Twilio via an `/api/ice-servers` endpoint. Requires `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` as environment variables.
   - `client/src/utils/signaling.js` updated to fetch ICE server configuration from this endpoint, with fallback to public STUNs.
   - `App.js`, `useZipDownload.js`, `useWebRTC.js` updated to use the dynamically fetched ICE server configuration.
-- [ ] **BUGFIX & Stability:** Investigate and resolve mid-transfer connection drops / local network speed issues. (Ongoing)
+- [ ] **BUGFIX & Stability:** Monitor WebRTC connection stability and performance with TURN server integration. (Ongoing)
   - Symptoms:
-    - Scenario 1 (Original Network/Hotspot with TURN): Sender's zip PC timed out on heartbeats mid-transfer, likely due to WebSocket disconnects. (Addressed by heartbeat timing adjustments & investigation of signaling server stability).
-    - Scenario 2 (New/Current Network with TURN): Connection fails to establish entirely. Sender logs show all STUN servers failing (error 701), and PeerConnection transitions `connecting` -> `failed`.
-    - Scenario 3 (Local Network with TURN): User reports slow transfer speeds, suspecting TURN is used unnecessarily.
+    - Previously: Mid-transfer drops (heartbeat timeouts, possibly due to WebSocket instability), connection failures on restrictive networks (STUN 701 errors), and slow local transfers when TURN was enabled (suggesting TURN was chosen over local P2P).
   - Current Status (2025-05-11):
-    - TURN server integration is functional.
-    - Heartbeat mechanism adjusted. ICE connection timeouts implemented. State cleanup improved.
-  - **Diagnostic Configuration (2025-05-11):** `client/src/utils/signaling.js` modified so `getIceServers()` returns **only public STUN servers** (TURN fetching temporarily disabled). This is to test if local network transfers become fast again and to isolate issues related to local P2P (host candidate) connections.
-  - Next Steps: User to test local network transfers with this STUN-only configuration and provide PC console logs to observe connection behavior and speed.
+    - **Full STUN+TURN functionality re-enabled.** `getIceServers()` in `client/src/utils/signaling.js` now calls `fetchIceServers_ORIGINAL()` to get config from backend.
+    - Diagnostic test showed local transfers were faster with STUN-only, indicating local P2P paths might not be optimally chosen by ICE when TURN candidates are present on some networks.
+    - Heartbeat mechanism adjusted (Sender: 90s timeout, 15s check; Receiver: sends every 10s).
+    - ICE connection timeouts (30s) implemented.
+    - WebRTC state cleanup logic improved.
+  - Next Steps: User to test transfers on various networks (local and remote).
+    - Monitor for connection success rates.
+    - Observe transfer speeds, especially on local networks (is P2P being prioritized over TURN?).
+    - Check for WebSocket stability (`[Socket]...` logs).
+    - If local transfers are consistently slow with TURN enabled, further investigation into local network configuration (firewalls, AP isolation, mDNS) or advanced ICE candidate filtering might be needed.
 
 ## Completed Tasks (Verified 2025-05-10)
 

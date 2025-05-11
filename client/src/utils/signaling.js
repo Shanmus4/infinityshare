@@ -62,10 +62,10 @@ export async function fetchIceServers_ORIGINAL() {
 // To avoid fetching multiple times, we can cache the promise
 export function getIceServers() {
   if (!iceServerConfigPromise) {
-    // FOR DIAGNOSTIC TEST (STUN ONLY):
-    iceServerConfigPromise = fetchIceServers_TURN_DISABLED_FOR_TEST();
-    // TO RE-ENABLE TURN:
-    // iceServerConfigPromise = fetchIceServers_ORIGINAL();
+    // RE-ENABLE TURN by calling the original function that fetches from backend
+    iceServerConfigPromise = fetchIceServers_ORIGINAL();
+    // FOR DIAGNOSTIC TEST (STUN ONLY) - Comment out the line above and uncomment below:
+    // iceServerConfigPromise = fetchIceServers_TURN_DISABLED_FOR_TEST();
   }
   return iceServerConfigPromise;
 }
@@ -75,5 +75,5 @@ export let ICE_SERVERS = []; // Deprecated, use getIceServers()
 getIceServers().then(servers => {
   ICE_SERVERS = servers; 
   // Log will indicate if it's STUN_ONLY or includes TURN based on which fetch function is active in getIceServers()
-  console.log("ICE Servers have been asynchronously set:", ICE_SERVERS);
+  console.log("ICE Servers (should now include TURN if backend is working) have been asynchronously set:", ICE_SERVERS);
 });
