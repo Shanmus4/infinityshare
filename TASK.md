@@ -3,11 +3,12 @@
 ## Active Tasks
 
 - [ ] **BUGFIX & Stability:** Investigate and fix WebRTC connection drops during "Download All" / folder downloads. (Reported 2025-05-10, Diagnostics Improved 2025-05-11)
-  - Symptoms: PeerConnection fails to establish reliably. Logs on both sender and receiver show all STUN servers failing with error 701. This leads to the sender's PeerConnection failing, which then closes DataChannels, causing the receiver to see "User-Initiated Abort" (SCTP Cause 12).
+  - Symptoms: PeerConnection fails to establish reliably, even on the local network when STUN servers are bypassed. Logs on both sender and receiver show PeerConnection state transitioning to `failed` after attempting to connect using only `host` candidates. This indicates a fundamental issue with local P2P connectivity.
   - Action: Implemented detailed ICE candidate error logging and PeerConnection state logging on both sender (`App.js`) and receiver (`useZipDownload.js`).
-  - Action: Enhanced UI error message on receiver to specifically mention STUN server failures.
-  - **Diagnostic Step (2025-05-11):** Temporarily set `ICE_SERVERS` to an empty array in `client/src/utils/signaling.js` to force reliance on host candidates only. This is to test if STUN failures are impacting local network transfers or if there's a more fundamental local P2P issue.
-  - Status: Awaiting user to test local transfer with empty `ICE_SERVERS` and provide logs from both sender and receiver.
+  - Action: Enhanced UI error message on receiver to specifically mention STUN server failures (though this is secondary to the current local connection failure).
+  - Diagnostic Test (2025-05-11): Setting `ICE_SERVERS` to an empty array (forcing host candidates only) still resulted in connection failures on the local network.
+  - Conclusion: The primary issue is likely related to the user's local network configuration (e.g., firewall blocking local UDP P2P traffic, mDNS resolution issues for `.local` hostnames) or a more fundamental problem in the WebRTC ICE handling logic for host candidates. STUN server accessibility is a separate, compounding issue for non-local connections.
+  - Status: User needs to investigate local network/firewall settings. Code review of ICE handling for host candidates might be a secondary step if network troubleshooting doesn't resolve local failures. `ICE_SERVERS` configuration reverted to original.
 
 ## Completed Tasks (Verified 2025-05-10)
 

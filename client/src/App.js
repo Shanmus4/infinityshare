@@ -395,24 +395,25 @@ function App() {
           pc.onicecandidate = (event) => {
             if (event.candidate) socket.emit("signal", { room: driveCode, fileId: pcIdToUse, data: { candidate: event.candidate }, });
           };
-          pc.onicecandidateerror = (event) => {
-            console.error(`[App Sender Zip/Folder] ICE candidate error for PC ${pcIdToUse}:`, event);
-            if (event.errorCode) {
-              const errorText = event.errorText || 'No error text';
-              console.error(`  Error Code: ${event.errorCode}, Host Candidate: ${event.hostCandidate}, Server URL: ${event.url}, Text: ${errorText}`);
-              // setError(`Sender ICE Error: ${event.errorCode} - ${errorText}`); // Avoid overwriting receiver's more specific STUN error
-            } else {
-              // setError('Sender ICE Error: Unknown'); // Avoid overwriting
-            }
-          };
+          // --- Temporarily simplified error and state logging for sender's zip PC ---
+          // pc.onicecandidateerror = (event) => {
+          //   console.error(`[App Sender Zip/Folder] ICE candidate error for PC ${pcIdToUse}:`, event);
+          //   if (event.errorCode) {
+          //     const errorText = event.errorText || 'No error text';
+          //     console.error(`  Error Code: ${event.errorCode}, Host Candidate: ${event.hostCandidate}, Server URL: ${event.url}, Text: ${errorText}`);
+          //   }
+          // };
           pc.onconnectionstatechange = () => {
-            console.log(`[App Sender Zip/Folder] PC ${pcIdToUse} connection state: ${pc.connectionState}. ICE: ${pc.iceConnectionState}, Signaling: ${pc.signalingState}`);
+            console.log(`[App Sender Zip/Folder] DIAGNOSTIC - PC ${pcIdToUse} connection state: ${pc.connectionState}`);
             if (["failed", "closed"].includes(pc.connectionState)) {
-              console.warn(`[App Sender Zip/Folder] PC ${pcIdToUse} connection failed or closed. Cleaning up.`);
+              console.warn(`[App Sender Zip/Folder] DIAGNOSTIC - PC ${pcIdToUse} connection failed or closed. Cleaning up.`);
               cleanupWebRTCInstance(pcIdToUse);
             }
           };
-          pc.onsignalingstatechange = () => { /* logging */ };
+          // pc.onsignalingstatechange = () => { 
+          //   console.log(`[App Sender Zip/Folder] PC ${pcIdToUse} signaling state: ${pc.signalingState}. ICE: ${pc.iceConnectionState}, Connection: ${pc.connectionState}`);
+          // };
+          // --- End temporary simplification ---
           if (pendingSignals.current[pcIdToUse]) {
             pendingSignals.current[pcIdToUse].forEach((signalData) => handleSignal({ fileId: pcIdToUse, ...signalData }));
             delete pendingSignals.current[pcIdToUse];
