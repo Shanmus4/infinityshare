@@ -2,10 +2,11 @@
 
 ## Active Tasks
 
-- [ ] **BUGFIX & Stability:** Investigate and fix WebRTC connection drops during "Download All" / folder downloads. (Reported 2025-05-10)
-  - Symptoms: `RTCErrorEvent` on DataChannels, followed by PeerConnection `disconnected` then `failed` state.
-  - Action: Add detailed logging for `RTCErrorEvent` in `useZipDownload.js` (receiver) and `App.js` (sender) to diagnose.
-  - Action: Analyze connection management, heartbeat, and error handling in `useZipDownload.js`.
+- [ ] **BUGFIX & Stability:** Investigate and fix WebRTC connection drops during "Download All" / folder downloads. (Reported 2025-05-10, Diagnostic Logging Added 2025-05-11)
+  - Symptoms: `RTCErrorEvent` on DataChannels, followed by PeerConnection `disconnected` then `failed` state. All STUN servers report error 701 on receiver.
+  - Action: Added detailed logging for `RTCErrorEvent` in `useZipDownload.js` (receiver) and `App.js` (sender).
+  - Action: Implemented specific error message in UI if all STUN servers fail, guiding user to check network/firewall/DNS.
+  - Status: Awaiting user feedback after checking their network configuration based on the new error messages.
 
 ## Completed Tasks (Verified 2025-05-10)
 

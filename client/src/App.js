@@ -395,9 +395,22 @@ function App() {
           pc.onicecandidate = (event) => {
             if (event.candidate) socket.emit("signal", { room: driveCode, fileId: pcIdToUse, data: { candidate: event.candidate }, });
           };
-          pc.onicecandidateerror = (event) => { /* logging */ };
+          pc.onicecandidateerror = (event) => {
+            console.error(`[App Sender Zip/Folder] ICE candidate error for PC ${pcIdToUse}:`, event);
+            if (event.errorCode) {
+              const errorText = event.errorText || 'No error text';
+              console.error(`  Error Code: ${event.errorCode}, Host Candidate: ${event.hostCandidate}, Server URL: ${event.url}, Text: ${errorText}`);
+              // setError(`Sender ICE Error: ${event.errorCode} - ${errorText}`); // Avoid overwriting receiver's more specific STUN error
+            } else {
+              // setError('Sender ICE Error: Unknown'); // Avoid overwriting
+            }
+          };
           pc.onconnectionstatechange = () => {
-            if (["failed", "closed"].includes(pc.connectionState)) cleanupWebRTCInstance(pcIdToUse);
+            console.log(`[App Sender Zip/Folder] PC ${pcIdToUse} connection state: ${pc.connectionState}. ICE: ${pc.iceConnectionState}, Signaling: ${pc.signalingState}`);
+            if (["failed", "closed"].includes(pc.connectionState)) {
+              console.warn(`[App Sender Zip/Folder] PC ${pcIdToUse} connection failed or closed. Cleaning up.`);
+              cleanupWebRTCInstance(pcIdToUse);
+            }
           };
           pc.onsignalingstatechange = () => { /* logging */ };
           if (pendingSignals.current[pcIdToUse]) {
