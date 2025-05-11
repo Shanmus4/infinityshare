@@ -6,22 +6,16 @@
   - `signaling-server/index.js` updated with Express.js to serve temporary STUN/TURN credentials from Twilio via an `/api/ice-servers` endpoint. Requires `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` as environment variables.
   - `client/src/utils/signaling.js` updated to fetch ICE server configuration from this endpoint, with fallback to public STUNs.
   - `App.js`, `useZipDownload.js`, `useWebRTC.js` updated to use the dynamically fetched ICE server configuration.
-- [ ] **BUGFIX & Stability:** Investigate and resolve mid-transfer connection drops. (Ongoing)
-  - Symptoms: 
-    - WebRTC PeerConnection establishes successfully (often using TURN).
-    - File transfer begins and progresses.
-    - Sender's WebSocket connection to the signaling server disconnects (`transport close`) and then reconnects.
-    - Due to this disruption, heartbeats from the receiver are likely missed by the sender.
-    - Sender's zip PC eventually times out (e.g., after 90s) due to not receiving/processing heartbeats.
-    - Sender cleans up the timed-out PC, causing "User-Initiated Abort" on the receiver.
+- [ ] **BUGFIX & Stability:** Investigate and resolve mid-transfer connection drops / local network speed issues. (Ongoing)
+  - Symptoms:
+    - Scenario 1 (Original Network/Hotspot with TURN): Sender's zip PC timed out on heartbeats mid-transfer, likely due to WebSocket disconnects. (Addressed by heartbeat timing adjustments & investigation of signaling server stability).
+    - Scenario 2 (New/Current Network with TURN): Connection fails to establish entirely. Sender logs show all STUN servers failing (error 701), and PeerConnection transitions `connecting` -> `failed`.
+    - Scenario 3 (Local Network with TURN): User reports slow transfer speeds, suspecting TURN is used unnecessarily.
   - Current Status (2025-05-11):
-    - TURN server integration is functional; connections can establish.
-    - Heartbeat mechanism is in place but is susceptible to signaling channel disruptions.
-  - Root Cause Hypothesis: Instability of the WebSocket connection to the signaling server (`wss://infinityshare.onrender.com`) is the primary trigger.
-  - Next Steps:
-    - User to investigate signaling server stability on Render.com (check service tier, logs, metrics for restarts/errors/idling).
-    - Consider client-side logic improvements for handling socket reconnections more gracefully (e.g., re-sending critical state or heartbeats immediately upon reconnect), though this is secondary to ensuring a stable signaling channel.
-    - Monitor client-side socket `connect`, `disconnect`, `connect_error` logs.
+    - TURN server integration is functional.
+    - Heartbeat mechanism adjusted. ICE connection timeouts implemented. State cleanup improved.
+  - **Diagnostic Configuration (2025-05-11):** `client/src/utils/signaling.js` modified so `getIceServers()` returns **only public STUN servers** (TURN fetching temporarily disabled). This is to test if local network transfers become fast again and to isolate issues related to local P2P (host candidate) connections.
+  - Next Steps: User to test local network transfers with this STUN-only configuration and provide PC console logs to observe connection behavior and speed.
 
 ## Completed Tasks (Verified 2025-05-10)
 

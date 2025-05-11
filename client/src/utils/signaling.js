@@ -4,16 +4,14 @@ export const SIGNALING_SERVER_URL =
   process.env.NODE_ENV === 'production'
     ? process.env.REACT_APP_SIGNALING_SERVER_URL // This will be set in Netlify/Vercel
     : "ws://localhost:3000";
+
 // Base URL for the signaling server's API (where /api/ice-servers is hosted)
 // This needs to be the HTTP/HTTPS URL, not the WebSocket URL.
-// Assuming your signaling server (now with Express) runs on the same host/port as the WebSocket,
-// but uses http/https protocol.
-
 let apiBaseUrl = SIGNALING_SERVER_URL.replace(/^ws/, 'http'); 
 // If SIGNALING_SERVER_URL is like 'wss://your-domain.com', apiBaseUrl becomes 'https://your-domain.com'
 // If SIGNALING_SERVER_URL is like 'ws://localhost:3000', apiBaseUrl becomes 'http://localhost:3000'
 
-// Fallback public STUN servers if fetching from backend fails
+// Single, correct declaration of FALLBACK_ICE_SERVERS
 const FALLBACK_ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
@@ -23,20 +21,23 @@ const FALLBACK_ICE_SERVERS = [
 
 let iceServerConfigPromise = null;
 
-export async function fetchIceServers() {
+// This is the diagnostic version that ONLY returns public STUN servers
+export async function fetchIceServers_TURN_DISABLED_FOR_TEST() {
+  console.warn("[ICE Fetch DIAGNOSTIC] TURN fetching is disabled. Using public STUN servers only.");
+  return Promise.resolve(FALLBACK_ICE_SERVERS);
+}
+
+// This is the original function that fetches from the backend (includes TURN)
+export async function fetchIceServers_ORIGINAL() {
   if (!apiBaseUrl) {
     console.error("Cannot determine API base URL for fetching ICE servers from SIGNALING_SERVER_URL:", SIGNALING_SERVER_URL);
     return FALLBACK_ICE_SERVERS;
   }
   
-  // Ensure SIGNALING_SERVER_URL is defined, otherwise default to localhost for API calls too
-  // This is important if REACT_APP_SIGNALING_SERVER_URL is not set in production for the client
   if (process.env.NODE_ENV === 'production' && !process.env.REACT_APP_SIGNALING_SERVER_URL) {
     console.warn("REACT_APP_SIGNALING_SERVER_URL is not set in production. Defaulting API for ICE servers to current origin if possible, or expecting relative path.");
-    // Attempt to use relative path if on same domain, or adjust as needed for your deployment
-    apiBaseUrl = ''; // This will make it a relative path e.g. /api/ice-servers
+    apiBaseUrl = ''; 
   }
-
 
   console.log(`[ICE Fetch] Attempting to fetch ICE servers from: ${apiBaseUrl}/api/ice-servers`);
   try {
@@ -61,16 +62,18 @@ export async function fetchIceServers() {
 // To avoid fetching multiple times, we can cache the promise
 export function getIceServers() {
   if (!iceServerConfigPromise) {
-    iceServerConfigPromise = fetchIceServers();
+    // FOR DIAGNOSTIC TEST (STUN ONLY):
+    iceServerConfigPromise = fetchIceServers_TURN_DISABLED_FOR_TEST();
+    // TO RE-ENABLE TURN:
+    // iceServerConfigPromise = fetchIceServers_ORIGINAL();
   }
   return iceServerConfigPromise;
 }
 
 // For places that might still expect a static array (though they should be updated)
-// This will be initially empty and then populated.
-// However, it's better to call getIceServers() and await its result.
 export let ICE_SERVERS = []; // Deprecated, use getIceServers()
 getIceServers().then(servers => {
-  ICE_SERVERS = servers; // Populate for any old code, but new code should await
-  console.log("ICE Servers (potentially with TURN) have been fetched and set:", ICE_SERVERS);
+  ICE_SERVERS = servers; 
+  // Log will indicate if it's STUN_ONLY or includes TURN based on which fetch function is active in getIceServers()
+  console.log("ICE Servers have been asynchronously set:", ICE_SERVERS);
 });
