@@ -142,6 +142,12 @@ function App() {
   const cleanupWebRTCInstance = React.useCallback(
     (id) => {
       const pc = peerConns.current[id];
+
+      if (pc && pc._iceTimeoutId) { // Clear ICE connection timeout if it exists
+        clearTimeout(pc._iceTimeoutId);
+        delete pc._iceTimeoutId; 
+      }
+
       if (pc && pc._associatedTransferIds) {
         pc._associatedTransferIds.forEach((transferId) => {
           const associatedDc = dataChannels.current[transferId];
@@ -404,6 +410,21 @@ function App() {
           pc._associatedTransferIds = new Set();
           peerConns.current[pcIdToUse] = pc;
           activeZipPcHeartbeats.current[pcIdToUse] = Date.now();
+
+          // ---- ADD ICE Connection Timeout for Sender Zip PC ----
+          const iceConnectionTimeoutMs = 30000; // 30 seconds
+          const iceTimeoutId = setTimeout(() => {
+            // Check pc reference again as it might have been cleaned up by another process
+            const currentPC = peerConns.current[pcIdToUse];
+            if (currentPC && currentPC.connectionState !== "connected" && currentPC.connectionState !== "completed") {
+              console.warn(`[App Sender Zip/Folder] PC ${pcIdToUse} ICE connection timed out after ${iceConnectionTimeoutMs / 1000}s. State: ${currentPC.connectionState}. Cleaning up.`);
+              setError(`Connection attempt timed out. Please check network and try again.`);
+              cleanupWebRTCInstance(pcIdToUse);
+            }
+          }, iceConnectionTimeoutMs);
+          pc._iceTimeoutId = iceTimeoutId; 
+          // ---- END ICE Connection Timeout ----
+
           pc.onicecandidate = (event) => {
             if (event.candidate) socket.emit("signal", { room: driveCode, fileId: pcIdToUse, data: { candidate: event.candidate }, });
           };
@@ -412,20 +433,26 @@ function App() {
             if (event.errorCode) {
               const errorText = event.errorText || 'No error text';
               console.error(`  Error Code: ${event.errorCode}, Host Candidate: ${event.hostCandidate}, Server URL: ${event.url}, Text: ${errorText}`);
-              // setError(`Sender ICE Error: ${event.errorCode} - ${errorText}`); // Avoid overwriting receiver's more specific STUN error
-            } else {
-              // setError('Sender ICE Error: Unknown'); // Avoid overwriting
             }
           };
           pc.onconnectionstatechange = () => {
-            console.log(`[App Sender Zip/Folder] PC ${pcIdToUse} connection state: ${pc.connectionState}. ICE: ${pc.iceConnectionState}, Signaling: ${pc.signalingState}`);
-            if (["failed", "closed"].includes(pc.connectionState)) {
-              console.warn(`[App Sender Zip/Folder] PC ${pcIdToUse} connection ${pc.connectionState}. Cleaning up.`);
+            const currentPC = peerConns.current[pcIdToUse]; // Get fresh reference
+            if (!currentPC) return; // PC might have been cleaned up
+
+            console.log(`[App Sender Zip/Folder] PC ${pcIdToUse} connection state: ${currentPC.connectionState}. ICE: ${currentPC.iceConnectionState}, Signaling: ${currentPC.signalingState}`);
+            if (currentPC.connectionState === "connected" || currentPC.connectionState === "completed") {
+              if (currentPC._iceTimeoutId) clearTimeout(currentPC._iceTimeoutId);
+            }
+            if (["failed", "closed"].includes(currentPC.connectionState)) {
+              if (currentPC._iceTimeoutId) clearTimeout(currentPC._iceTimeoutId);
+              console.warn(`[App Sender Zip/Folder] PC ${pcIdToUse} connection ${currentPC.connectionState}. Cleaning up.`);
               cleanupWebRTCInstance(pcIdToUse);
             }
           };
           pc.onsignalingstatechange = () => { 
-            console.log(`[App Sender Zip/Folder] PC ${pcIdToUse} signaling state: ${pc.signalingState}. ICE: ${pc.iceConnectionState}, Connection: ${pc.connectionState}`);
+            const currentPC = peerConns.current[pcIdToUse]; // Get fresh reference
+            if (!currentPC) return;
+            console.log(`[App Sender Zip/Folder] PC ${pcIdToUse} signaling state: ${currentPC.signalingState}. ICE: ${currentPC.iceConnectionState}, Connection: ${currentPC.connectionState}`);
           };
           if (pendingSignals.current[pcIdToUse]) {
             pendingSignals.current[pcIdToUse].forEach((signalData) => handleSignal({ fileId: pcIdToUse, ...signalData }));

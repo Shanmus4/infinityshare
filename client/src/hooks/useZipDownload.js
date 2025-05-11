@@ -32,6 +32,14 @@ export function useZipDownload({
   const heartbeatIntervalRef = useRef(null); // For receiver-side heartbeat
 
   const resetZipState = () => {
+    // Clear ICE timeout if it exists on the current PC
+    if (currentZipOperation.current && currentZipOperation.current.pcId) {
+      const pc = peerConns.current[currentZipOperation.current.pcId];
+      if (pc && pc._iceTimeoutId) {
+        clearTimeout(pc._iceTimeoutId);
+        delete pc._iceTimeoutId;
+      }
+    }
     setIsZipping(false);
     setZipProgress(0);
     setError("");
@@ -139,25 +147,38 @@ export function useZipDownload({
       // --- Setup PeerConnection ---
       // The resetZipState() called earlier should have cleaned up the previous currentZipOperation's pcId.
       // A new pcId is generated for this new operation.
-      const pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS });
-      peerConns.current[pcId] = pc;
+    const pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS });
+    peerConns.current[pcId] = pc;
 
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          console.log(
-            `[useZipDownload] Gathered ICE candidate for ${pcId}: Type: ${event.candidate.type}, Address: ${event.candidate.address}, Port: ${event.candidate.port}, Protocol: ${event.candidate.protocol}`,
-            event.candidate
-          );
-          socket.emit("signal", {
-            room: driveCode,
-            fileId: pcId,
-            data: { candidate: event.candidate },
-          });
-        } else {
-          console.log(`[useZipDownload] End of ICE candidates for ${pcId}.`);
-        }
-      };
-      pc.onicecandidateerror = (event) => {
+    // ---- ADD ICE Connection Timeout for Receiver Zip PC ----
+    const iceConnectionTimeoutMs = 30000; // 30 seconds
+    const iceTimeoutId = setTimeout(() => {
+      const currentPC = peerConns.current[pcId]; // Get fresh reference
+      if (currentPC && currentPC.connectionState !== "connected" && currentPC.connectionState !== "completed") {
+        console.warn(`[useZipDownload] Receiver PC ${pcId} ICE connection timed out after ${iceConnectionTimeoutMs / 1000}s. State: ${currentPC.connectionState}. Resetting zip state.`);
+        setError('Connection attempt timed out. Please check network and try again.');
+        resetZipState(); // This calls cleanupWebRTCInstance which should also clear pc._iceTimeoutId
+      }
+    }, iceConnectionTimeoutMs);
+    pc._iceTimeoutId = iceTimeoutId;
+    // ---- END ICE Connection Timeout ----
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        console.log(
+          `[useZipDownload] Gathered ICE candidate for ${pcId}: Type: ${event.candidate.type}, Address: ${event.candidate.address}, Port: ${event.candidate.port}, Protocol: ${event.candidate.protocol}`,
+          event.candidate
+        );
+        socket.emit("signal", {
+          room: driveCode,
+          fileId: pcId,
+          data: { candidate: event.candidate },
+        });
+      } else {
+        console.log(`[useZipDownload] End of ICE candidates for ${pcId}.`);
+      }
+    };
+    pc.onicecandidateerror = (event) => {
         console.error(
           `[useZipDownload] ICE candidate error for ${pcId}:`,
           event
@@ -189,59 +210,57 @@ export function useZipDownload({
         }
       };
       pc.onconnectionstatechange = () => {
-        const newState = pc.connectionState;
-        console.log(
-          `[useZipDownload] PC connection state change for ${pcId}: ${newState}. ICE State: ${pc.iceConnectionState}, Signaling State: ${pc.signalingState}`
-        );
+      const newState = pc.connectionState;
+      const currentPC = peerConns.current[pcId]; // Get fresh reference
+      if (!currentPC) return; // PC might have been cleaned up
 
-        switch (newState) {
-          case "connected":
-            setConnectionStatus("stable");
-            setError(""); // Clear any previous interruption errors
-            console.log(`[useZipDownload] PC ${pcId} connected.`);
-            break;
-          case "disconnected":
-            setConnectionStatus("interrupted");
-            setError((prevError) =>
-              prevError && prevError.includes("STUN servers")
-                ? prevError
-                : "Connection interrupted. Attempting to reconnect..."
-            );
-            console.warn(
-              `[useZipDownload] PC ${pcId} disconnected. Waiting for potential auto-reconnect.`
-            );
-            break;
-          case "failed":
-            setConnectionStatus("failed");
-            setError((prevError) => {
-              if (prevError && prevError.includes("STUN servers"))
-                return prevError;
-              return "Connection lost. Please reload the page and ensure the sender tab remains open to try again.";
-            });
-            console.error(
-              `[useZipDownload] Main PC ${pcId} failed. ICE: ${pc.iceConnectionState}, Signaling: ${pc.signalingState}. Resetting zip state.`
-            );
-            resetZipState();
-            break;
-          case "closed":
-            setConnectionStatus("failed");
-            setError((prevError) => {
-              if (prevError && prevError.includes("STUN servers"))
-                return prevError;
-              if (prevError && prevError.includes("Connection lost"))
-                return prevError; // Avoid overwriting 'failed' state message
-              return "Zip download connection closed. Please try again.";
-            });
-            console.error(
-              `[useZipDownload] Main PC ${pcId} closed. This is likely final.`
-            );
-            resetZipState();
-            break;
-          default:
-            break;
-        }
-      };
-      pc.onsignalingstatechange = () =>
+      console.log(
+        `[useZipDownload] PC connection state change for ${pcId}: ${newState}. ICE State: ${currentPC.iceConnectionState}, Signaling State: ${currentPC.signalingState}`
+      );
+
+      if (newState === "connected" || newState === "completed") {
+        if (currentPC._iceTimeoutId) clearTimeout(currentPC._iceTimeoutId);
+        setConnectionStatus("stable");
+        setError(""); 
+        console.log(`[useZipDownload] PC ${pcId} connected.`);
+      } else if (newState === "disconnected") {
+        setConnectionStatus("interrupted");
+        setError((prevError) =>
+          prevError && prevError.includes("STUN servers")
+            ? prevError
+            : "Connection interrupted. Attempting to reconnect..."
+        );
+        console.warn(
+          `[useZipDownload] PC ${pcId} disconnected. Waiting for potential auto-reconnect.`
+        );
+      } else if (newState === "failed") {
+        if (currentPC._iceTimeoutId) clearTimeout(currentPC._iceTimeoutId);
+        setConnectionStatus("failed");
+        setError((prevError) => {
+          if (prevError && prevError.includes("STUN servers")) return prevError;
+          if (prevError && prevError.includes("Connection attempt timed out")) return prevError;
+          return "Connection lost. Please reload the page and ensure the sender tab remains open to try again.";
+        });
+        console.error(
+          `[useZipDownload] Main PC ${pcId} failed. ICE: ${currentPC.iceConnectionState}, Signaling: ${currentPC.signalingState}. Resetting zip state.`
+        );
+        resetZipState();
+      } else if (newState === "closed") {
+        if (currentPC._iceTimeoutId) clearTimeout(currentPC._iceTimeoutId);
+        setConnectionStatus("failed");
+        setError((prevError) => {
+          if (prevError && prevError.includes("STUN servers")) return prevError;
+          if (prevError && prevError.includes("Connection attempt timed out")) return prevError;
+          if (prevError && prevError.includes("Connection lost")) return prevError;
+          return "Zip download connection closed. Please try again.";
+        });
+        console.error(
+          `[useZipDownload] Main PC ${pcId} closed. This is likely final.`
+        );
+        resetZipState();
+      }
+    };
+    pc.onsignalingstatechange = () =>
         console.log(
           `[useZipDownload] PC signaling state change for ${pcId}: ${pc.signalingState}. ICE State: ${pc.iceConnectionState}, Connection State: ${pc.connectionState}`
         );

@@ -2,13 +2,17 @@
 
 ## Active Tasks
 
-- [ ] **BUGFIX & Stability:** Investigate and fix WebRTC connection drops during "Download All" / folder downloads. (Reported 2025-05-10, Diagnostics Improved 2025-05-11)
-  - Symptoms: Sender's zip PeerConnection times out due to missed heartbeats, even after initially connecting. This causes the sender to clean up, leading to "User-Initiated Abort" on the receiver. Issue occurs even on local/hotspot networks.
-  - Action: Restored full ICE/PC state logging on sender. Added detailed logging to sender's heartbeat processing and timeout logic in `App.js` to trace `pcId` mismatches or premature cleanup.
-  - Action (Previous): Temporarily disabled immediate cleanup on "failed" PC state for sender's zip PC to observe behavior.
-  - Action (Previous): Reverted `ICE_SERVERS` to original STUN configuration.
-  - Hypothesis: The sender's `heartbeatHandler` is not correctly identifying or updating the timestamp for the active zip PC's `pcId`, leading to a timeout. This could be due to the `pcId` not being found in `activeZipPcHeartbeats.current` when a heartbeat arrives.
-  - Status: Awaiting new logs (especially sender-side, if possible, or detailed receiver-side logs if sender logs are unavailable) with the latest logging to confirm heartbeat processing flow.
+- [ ] **BUGFIX & Stability:** Investigate and fix WebRTC connection drops. (Reported 2025-05-10, Diagnostics & Timeouts Improved 2025-05-11)
+  - Symptoms:
+    - Initial Issue: Sender's zip PC timed out on heartbeats mid-transfer.
+    - After Network Change: Connection fails to establish, sender PC gets stuck in ICE checking, STUN 701 errors logged.
+  - Actions (2025-05-11):
+    - Implemented a 30-second ICE connection timeout for both sender (`App.js`) and receiver (`useZipDownload.js`) zip PeerConnections. This will trigger cleanup if connection isn't established promptly.
+    - Ensured `cleanupWebRTCInstance` and `resetZipState` clear these new ICE timeouts.
+    - Reverted sender's zip PC `onconnectionstatechange` to cleanup on both `failed` and `closed` states.
+    - Adjusted heartbeat intervals (Sender: 90s timeout, 15s check; Receiver: sends every 10s) and improved sender's heartbeat logging.
+  - Hypothesis: Network changes or difficult NAT traversal can cause ICE to stall. The new ICE timeout should make the app more responsive to these situations. Heartbeat adjustments aim to improve stability for established connections.
+  - Status: Awaiting user testing with the new ICE timeout and adjusted heartbeat parameters.
 
 ## Completed Tasks (Verified 2025-05-10)
 
