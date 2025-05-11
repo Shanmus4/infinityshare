@@ -46,6 +46,29 @@ function App() {
   const { postMessage } = useServiceWorker();
   const pendingSignals = useRef({});
   window.pendingSignals = pendingSignals.current; // For debugging
+
+  useEffect(() => {
+    const handleConnect = () => console.log('[Socket] Connected to signaling server. ID:', socket.id);
+    const handleDisconnect = (reason) => console.warn('[Socket] Disconnected from signaling server. Reason:', reason);
+    const handleConnectError = (error) => console.error('[Socket] Connection error with signaling server:', error);
+
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('connect_error', handleConnectError);
+
+    // Initial check
+    if (socket.connected) {
+      handleConnect();
+    } else {
+      console.log('[Socket] Initially not connected. Attempting to connect...');
+    }
+
+    return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('connect_error', handleConnectError);
+    };
+  }, [socket]);
   const activeZipPcHeartbeats = useRef({});
   const prevDriveCodeRef = useRef(null);
   const prevStepRef = useRef();
