@@ -419,12 +419,9 @@ function App() {
           };
           pc.onconnectionstatechange = () => {
             console.log(`[App Sender Zip/Folder] PC ${pcIdToUse} connection state: ${pc.connectionState}. ICE: ${pc.iceConnectionState}, Signaling: ${pc.signalingState}`);
-            if (pc.connectionState === "closed") {
-              console.warn(`[App Sender Zip/Folder] PC ${pcIdToUse} connection closed. Cleaning up.`);
+            if (["failed", "closed"].includes(pc.connectionState)) {
+              console.warn(`[App Sender Zip/Folder] PC ${pcIdToUse} connection ${pc.connectionState}. Cleaning up.`);
               cleanupWebRTCInstance(pcIdToUse);
-            } else if (pc.connectionState === "failed") {
-              console.error(`[App Sender Zip/Folder] PC ${pcIdToUse} connection failed. State: ${pc.connectionState}, ICE: ${pc.iceConnectionState}. Not cleaning up immediately, relying on heartbeat or eventual close.`);
-              // setError(`Sender: Zip connection failed (${pcIdToUse}). Transfers may not complete.`); // Optionally set an error
             }
           };
           pc.onsignalingstatechange = () => { 
