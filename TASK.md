@@ -4,15 +4,15 @@
 
 - [ ] **BUGFIX & Stability:** Investigate and fix WebRTC connection drops. (Reported 2025-05-10, Diagnostics & Timeouts Improved 2025-05-11)
   - Symptoms:
-    - Initial Issue: Sender's zip PC timed out on heartbeats mid-transfer.
-    - After Network Change: Connection fails to establish, sender PC gets stuck in ICE checking, STUN 701 errors logged.
+    - Scenario 1 (Original Network/Hotspot): Sender's zip PC timed out on heartbeats mid-transfer. (Addressed by heartbeat timing adjustments).
+    - Scenario 2 (New Network): Connection fails to establish entirely. Sender logs show all STUN servers failing (error 701), and PeerConnection transitions `connecting` -> `failed`. Download does not start.
   - Actions (2025-05-11):
-    - Implemented a 30-second ICE connection timeout for both sender (`App.js`) and receiver (`useZipDownload.js`) zip PeerConnections. This will trigger cleanup if connection isn't established promptly.
-    - Ensured `cleanupWebRTCInstance` and `resetZipState` clear these new ICE timeouts.
-    - Reverted sender's zip PC `onconnectionstatechange` to cleanup on both `failed` and `closed` states.
+    - Implemented a 30-second ICE connection timeout for both sender (`App.js`) and receiver (`useZipDownload.js`) zip PeerConnections.
+    - Ensured `cleanupWebRTCInstance` and `resetZipState` clear these ICE timeouts.
+    - Sender's zip PC `onconnectionstatechange` now cleans up on both `failed` and `closed` states.
     - Adjusted heartbeat intervals (Sender: 90s timeout, 15s check; Receiver: sends every 10s) and improved sender's heartbeat logging.
-  - Hypothesis: Network changes or difficult NAT traversal can cause ICE to stall. The new ICE timeout should make the app more responsive to these situations. Heartbeat adjustments aim to improve stability for established connections.
-  - Status: Awaiting user testing with the new ICE timeout and adjusted heartbeat parameters.
+  - Conclusion for Scenario 2: The inability to connect on the "new network" is due to ICE failure, primarily because all STUN servers are unreachable (701 errors) and no other viable candidate paths (host/srflx) are successfully established. This points to a network environment issue (firewall, restrictive NAT).
+  - Status: The application now handles ICE failures more gracefully with timeouts and cleanup. For connections to work on challenging networks, environmental network troubleshooting or a TURN server would be necessary. The heartbeat adjustments aim to improve stability for connections that *do* establish.
 
 ## Completed Tasks (Verified 2025-05-10)
 
