@@ -2,11 +2,12 @@
 
 ## Active Tasks
 
-- [ ] **BUGFIX & Stability:** Investigate and fix WebRTC connection drops during "Download All" / folder downloads. (Reported 2025-05-10, Diagnostic Logging Added 2025-05-11)
-  - Symptoms: `RTCErrorEvent` on DataChannels, followed by PeerConnection `disconnected` then `failed` state. All STUN servers report error 701 on receiver.
-  - Action: Added detailed logging for `RTCErrorEvent` in `useZipDownload.js` (receiver) and `App.js` (sender).
-  - Action: Implemented specific error message in UI if all STUN servers fail, guiding user to check network/firewall/DNS.
-  - Status: Awaiting user feedback after checking their network configuration based on the new error messages.
+- [ ] **BUGFIX & Stability:** Investigate and fix WebRTC connection drops during "Download All" / folder downloads. (Reported 2025-05-10, Diagnostics Improved 2025-05-11)
+  - Symptoms: PeerConnection fails to establish reliably. Logs on both sender and receiver show all STUN servers failing with error 701 (STUN host lookup received error). This leads to the sender's PeerConnection failing, which then closes DataChannels, causing the receiver to see "User-Initiated Abort" (SCTP Cause 12).
+  - Action: Implemented detailed ICE candidate error logging and PeerConnection state logging on both sender (`App.js`) and receiver (`useZipDownload.js`).
+  - Action: Enhanced UI error message on receiver to specifically mention STUN server failures and suggest checking network, firewall (UDP traffic), and DNS.
+  - Conclusion: The primary issue appears to be the user's network environment preventing successful STUN server communication on both ends. The application now correctly diagnoses and reports this.
+  - Status: Awaiting user to troubleshoot their network environment (firewall, DNS, proxy/VPN) based on the error messages and logs. Recommend using tools like https://test.webrtc.org/ for further network diagnosis.
 
 ## Completed Tasks (Verified 2025-05-10)
 
