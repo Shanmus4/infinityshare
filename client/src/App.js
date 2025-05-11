@@ -1313,7 +1313,7 @@ function App() {
               title="How to Use InfinityShare"
             >
               <div className="modal-list">
-                <h4>Quick Steps:</h4>
+                
                 <ul>
                   <ul>
                     <li>
