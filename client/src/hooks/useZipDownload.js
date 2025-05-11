@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
-import { ICE_SERVERS } from "../utils/signaling";
+import { getIceServers } from "../utils/signaling"; // Changed import
 
 export function useZipDownload({
   receiverFilesMeta, // Full list
@@ -147,7 +147,8 @@ export function useZipDownload({
       // --- Setup PeerConnection ---
       // The resetZipState() called earlier should have cleaned up the previous currentZipOperation's pcId.
       // A new pcId is generated for this new operation.
-    const pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS });
+    const iceServersConfig = await getIceServers(); // Fetch dynamic config
+    const pc = new window.RTCPeerConnection({ iceServers: iceServersConfig });
     peerConns.current[pcId] = pc;
 
     // ---- ADD ICE Connection Timeout for Receiver Zip PC ----

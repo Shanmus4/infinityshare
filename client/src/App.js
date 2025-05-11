@@ -7,7 +7,7 @@ import { useServiceWorker } from "./hooks/useServiceWorker";
 import { startWebRTC } from "./hooks/useWebRTC";
 import { makeFileId } from "./utils/fileHelpers";
 import { useZipDownload } from "./hooks/useZipDownload";
-import { ICE_SERVERS } from "./utils/signaling";
+import { getIceServers } from "./utils/signaling"; // Changed import
 import NoSleep from 'nosleep.js'; // Import NoSleep
 
 function App() {
@@ -291,7 +291,16 @@ function App() {
         socket.emit("download-file", { room: driveCode, fileId: fileMeta.fileId, transferFileId, name: fileMeta.name, size: fileMeta.size, type: fileMeta.type, });
         const fileIndex = receiverFilesMeta.findIndex((f) => f.fileId === fileMeta.fileId);
         cleanupWebRTCInstance(transferFileId); // Cleanup before starting new WebRTC for this transfer
-        startWebRTC({ isSender: false, code: driveCode, fileIndex, filesRef: { current: receiverFilesMeta }, peerConns, dataChannels, setError, driveCode, socket, sendSWMetaAndChunk, cleanupWebRTCInstance, makeFileId, fileId: transferFileId, });
+        // Call startWebRTC and await it since it's now async
+        try {
+          await startWebRTC({ isSender: false, code: driveCode, fileIndex, filesRef: { current: receiverFilesMeta }, peerConns, dataChannels, setError, driveCode, socket, sendSWMetaAndChunk, cleanupWebRTCInstance, makeFileId, fileId: transferFileId, });
+        } catch (e) {
+          console.error(`[App Receiver] Error calling startWebRTC for single file ${transferFileId}:`, e);
+          setError(`Failed to start WebRTC for file ${fileMeta.name}.`);
+          // Ensure cleanup if startWebRTC itself throws before full setup
+          cleanupWebRTCInstance(transferFileId);
+          setDownloadingFiles((prev) => { const s = new Set(prev); s.delete(fileMeta.fileId); return s; });
+        }
         navigator.serviceWorker.removeEventListener("message", swHandler);
       }
     };
@@ -459,11 +468,13 @@ function App() {
           return;
         }
         let pc = peerConns.current[pcIdToUse];
+        // downloadHandler is already async, so await getIceServers() is fine here
         let isNewPc = false;
         if (!pc) {
           isNewPc = true;
           try {
-            pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS });
+            const iceServersConfig = await getIceServers(); // Fetch dynamic config
+            pc = new window.RTCPeerConnection({ iceServers: iceServersConfig });
           } catch (e) {
             setError(`Sender: Failed to initialize WebRTC: ${e.message}`);
             return;
@@ -580,7 +591,14 @@ function App() {
             .catch((e) => { setError(`Sender: Failed to create offer: ${e.message}`); cleanupWebRTCInstance(pcIdToUse); });
         }
       } else {
-        startWebRTC({ isSender: true, code: driveCode, fileIndex, filesRef, peerConns, dataChannels, setError, driveCode, socket, sendSWMetaAndChunk, cleanupWebRTCInstance, makeFileId, fileId: useTransferFileId, });
+        // This is for sender side of single file transfer
+        try {
+          await startWebRTC({ isSender: true, code: driveCode, fileIndex, filesRef, peerConns, dataChannels, setError, driveCode, socket, sendSWMetaAndChunk, cleanupWebRTCInstance, makeFileId, fileId: useTransferFileId, });
+        } catch (e) {
+          console.error(`[App Sender] Error calling startWebRTC for single file ${useTransferFileId}:`, e);
+          setError(`Failed to start WebRTC for file ${fileObj.name}.`);
+          cleanupWebRTCInstance(useTransferFileId);
+        }
       }
     };
     socket.on("download-file", downloadHandler);

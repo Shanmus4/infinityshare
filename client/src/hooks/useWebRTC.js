@@ -1,6 +1,6 @@
-import { ICE_SERVERS } from '../utils/signaling';
+import { getIceServers } from '../utils/signaling'; // Changed import
 
-export function startWebRTC({
+export async function startWebRTC({ // Made async
   isSender,
   code,
   fileIndex,
@@ -25,7 +25,8 @@ export function startWebRTC({
   }
   // Cleanup any existing connection for this ID *before* creating a new one
   cleanupWebRTCInstance(fileId);
-  const pc = new window.RTCPeerConnection({ iceServers: ICE_SERVERS });
+  const iceServersConfig = await getIceServers(); // Fetch dynamic config
+  const pc = new window.RTCPeerConnection({ iceServers: iceServersConfig });
   peerConns.current[fileId] = pc;
 
   // --- Detailed Logging ADDED ---
