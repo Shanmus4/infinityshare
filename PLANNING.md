@@ -5,8 +5,8 @@ Develop a web-based application for direct peer-to-peer (P2P) file transfers bet
 
 ## Architecture Overview
 - **Frontend:** React.js (dynamic UI), react-dropzone (file upload), qrcode.react (QR code generation), socket.io-client (signaling), jszip (zipping), file-saver (saving files), nosleep.js (screen wake lock).
-- **Signaling Server:** Standalone Node.js + socket.io server for room management and WebRTC signaling relay. This is the active backend component.
-- **WebRTC:** Used for direct P2P file transfer via `RTCDataChannel`.
+- **Signaling Server:** Node.js server using Socket.IO (for signaling relay) and Express.js (to provide an API endpoint). Dynamically fetches temporary STUN/TURN credentials from Twilio (requires Twilio Account SID & Auth Token as environment variables).
+- **WebRTC:** Uses STUN for NAT traversal and TURN (via Twilio) as a fallback to relay media if direct P2P connection fails. Aims for direct P2P file transfer via `RTCDataChannel`.
 - **Service Worker:** (`client/public/service-worker.js`) Intercepts download requests for single file streaming and enables PWA app shell caching. Registered via `client/src/serviceWorkerRegistration.js`.
 - **PWA Support:** Includes `client/public/manifest.json` for installability ("Add to Home Screen") and app-like experience.
 - **Security:** WebRTC encryption (DTLS). TLS/SSL for signaling server (requires setup for production).
@@ -36,7 +36,8 @@ Develop a web-based application for direct peer-to-peer (P2P) file transfers bet
 - Enhanced progress indication for "Download All" and folder downloads (overall progress, speed, ETA, downloaded/total size).
 - Client-side session handling (state management, URL parsing).
 - Warning before closing/reloading sender/receiver tab during active operations.
-- Standalone signaling server for relaying messages.
+- Standalone signaling server for relaying messages and serving STUN/TURN configurations.
+- **TURN Server Integration:** Dynamically fetches and uses STUN/TURN credentials from Twilio for robust NAT traversal, improving connection success rates across diverse networks.
 - **Progressive Web App (PWA):** Installable to home screen with basic offline app shell caching.
 - **Screen Wake Lock:** Uses NoSleep.js to attempt to keep the screen awake during active use, preventing interruptions on mobile devices.
 
@@ -86,3 +87,5 @@ Develop a web-based application for direct peer-to-peer (P2P) file transfers bet
 * **Download All Memory:** Zipping large files entirely in the browser (`JSZip`) can consume significant memory and may fail for very large transfers. Consider alternative approaches (e.g., streaming zip generation) if this becomes an issue.
 * **App.js Size:** `client/src/App.js` is very large and handles too many responsibilities. Refactor into smaller hooks and components.
 * **NoSleep.js Activation:** `NoSleep.js` relies on user interaction (like a click or touch) to initially enable its video-based wake lock. This is handled by the library, but ensure the first user interaction happens for it to take effect.
+* **TURN Server Costs & Performance:** While TURN servers (like Twilio's) significantly improve connection reliability, data relayed through them incurs costs (per GB). Also, relayed connections are inherently slower than direct P2P. Optimal local network configurations (firewalls allowing UDP, no AP isolation, working mDNS) are still important for achieving the fastest speeds on the same network.
+* **Signaling Server Stability:** The reliability of the signaling server (e.g., on Render.com) is crucial. WebSocket disconnects can disrupt heartbeats and lead to premature WebRTC session termination. Ensure the hosting tier and server health are adequate.

@@ -100,16 +100,18 @@ Want to run InfinityShare locally or contribute? Here’s how:
 
     ```bash
     cd ../signaling-server
-    npm install
+    npm install # express, twilio, dotenv will be installed
     ```
 
 5.  **Environment Variables:**
 
     - **Signaling Server (`signaling-server/.env` - create this file):**
-      - `PORT`: Port for the signaling server (defaults to 3000 if not set). E.g., `PORT=3000`
-      - `ALLOWED_ORIGINS`: Comma-separated list of URLs allowed to connect (for CORS). For local development, this should include your client's URL. E.g., `ALLOWED_ORIGINS=http://localhost:3001`
-      - `SSL_CERT_PATH` (Optional): Path to SSL certificate if running HTTPS locally.
-      - `SSL_KEY_PATH` (Optional): Path to SSL private key if running HTTPS locally.
+      - `PORT`: Port for the signaling server (e.g., `3000`).
+      - `ALLOWED_ORIGINS`: Comma-separated list of client URLs allowed for CORS (e.g., `http://localhost:3001,https://your-app.netlify.app`).
+      - `TWILIO_ACCOUNT_SID`: Your Twilio Account SID (for TURN service).
+      - `TWILIO_AUTH_TOKEN`: Your Twilio Auth Token (for TURN service).
+      - `SSL_CERT_PATH` (Optional for local HTTPS): Path to SSL certificate.
+      - `SSL_KEY_PATH` (Optional for local HTTPS): Path to SSL private key.
     - **Client (`client/.env` - create this file):**
       - `REACT_APP_SIGNALING_SERVER_URL`: The URL of your signaling server. For local development:
         - If signaling server is HTTP on port 3000: `REACT_APP_SIGNALING_SERVER_URL=ws://localhost:3000`
@@ -145,18 +147,22 @@ InfinityShare consists of two main components:
     - Deployed on Netlify: [https://infinityshare.netlify.app/](https://infinityshare.netlify.app/)
 
 2.  **Signaling Server (`/signaling-server`):**
-    - A lightweight Node.js server using `socket.io`.
-    - Its sole purpose is to help peers discover each other and exchange WebRTC signaling messages (like offers, answers, and ICE candidates).
-    - **It does not handle or store any file data.** All file transfers are direct P2P.
-    - Deployed on Render: `wss://infinityshare.onrender.com`
+    - A Node.js server using `socket.io` (for signaling) and `Express.js` (for API).
+    - Relays WebRTC signaling messages (offers, answers, ICE candidates).
+    - Provides an API endpoint (`/api/ice-servers`) that dynamically fetches temporary STUN/TURN credentials from Twilio using your secure Account SID and Auth Token.
+    - **It does not handle or store any file data.** All file transfers are direct P2P if possible, or relayed via Twilio's TURN servers if necessary.
+    - Deployed on Render: `wss://infinityshare.onrender.com` (signaling) and `https://infinityshare.onrender.com` (API for ICE servers).
 
 **How it Works (WebRTC):**
 
-- When a sender uploads files, they connect to the signaling server and create a "room" identified by the Drive Code.
-- When a receiver joins using the Drive Code, they also connect to the signaling server and join the same room.
-- The signaling server then relays messages (SDP offers/answers, ICE candidates) between the sender and receiver. These messages allow their browsers to establish a direct WebRTC `PeerConnection`.
-- Once the `PeerConnection` is established, files are transferred directly between the two browsers using `RTCDataChannel`s, which are encrypted by default (DTLS).
-- If a direct P2P connection cannot be established (e.g., due to restrictive firewalls), WebRTC can attempt to use STUN/TURN servers as fallbacks. InfinityShare is configured with public STUN servers.
+- Peers connect to the signaling server.
+- The client application fetches STUN and TURN server configurations (including temporary credentials for TURN) from an API endpoint on the signaling server.
+- The signaling server relays SDP offers/answers and ICE candidates between peers.
+- WebRTC's ICE process uses this information to attempt to establish the best possible connection:
+    1. **Direct P2P (Host Candidates):** Tries to connect using local network IPs if peers are on the same network.
+    2. **Direct P2P via NAT (Server Reflexive Candidates):** Uses STUN servers to discover public IPs and attempts a direct connection.
+    3. **Relayed (TURN Candidates):** If direct P2P fails (due to restrictive firewalls/NATs), it falls back to using a TURN server to relay encrypted data between peers. This is provided by Twilio's Network Traversal Service.
+- Once connected, files are transferred via encrypted `RTCDataChannel`s.
 
 ![Image](https://github.com/user-attachments/assets/f75cd166-bc4d-484c-babf-caa3919b5c37)
 
