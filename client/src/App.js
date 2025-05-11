@@ -2,13 +2,14 @@ import React, { useState, useRef, useEffect } from "react";
 import FileList from "./components/FileList";
 import DropzoneArea from "./components/DropzoneArea";
 import QRCodeBlock from "./components/QRCodeBlock";
+import Modal from "./components/Modal"; // Import Modal component
 import { useSocket } from "./hooks/useSocket";
 import { useServiceWorker } from "./hooks/useServiceWorker";
 import { startWebRTC } from "./hooks/useWebRTC";
 import { makeFileId } from "./utils/fileHelpers";
 import { useZipDownload } from "./hooks/useZipDownload";
-import { getIceServers } from "./utils/signaling"; // Changed import
-import NoSleep from 'nosleep.js'; // Import NoSleep
+import { getIceServers } from "./utils/signaling"; 
+import NoSleep from 'nosleep.js'; 
 
 function App() {
   function getInitialStepAndDriveCode() {
@@ -37,6 +38,8 @@ function App() {
   const [downloadingFiles, setDownloadingFiles] = useState(new Set());
   const [showToast, setShowToast] = useState(false);
   const toastTimeoutRef = useRef(null);
+  const [showInstructionsModal, setShowInstructionsModal] = useState(false);
+  const [showWhyModal, setShowWhyModal] = useState(false);
 
   const fileBlobs = useRef({});
   const peerConns = useRef({});
@@ -45,7 +48,7 @@ function App() {
   const socket = useSocket();
   const { postMessage } = useServiceWorker();
   const pendingSignals = useRef({});
-  window.pendingSignals = pendingSignals.current; // For debugging
+  window.pendingSignals = pendingSignals.current; 
 
   useEffect(() => {
     const handleConnect = () => console.log('[Socket] Connected to signaling server. ID:', socket.id);
@@ -56,7 +59,6 @@ function App() {
     socket.on('disconnect', handleDisconnect);
     socket.on('connect_error', handleConnectError);
 
-    // Initial check
     if (socket.connected) {
       handleConnect();
     } else {
@@ -72,12 +74,10 @@ function App() {
   const activeZipPcHeartbeats = useRef({});
   const prevDriveCodeRef = useRef(null);
   const prevStepRef = useRef();
-  const noSleepRef = useRef(null); // Ref to store NoSleep instance
+  const noSleepRef = useRef(null); 
 
   useEffect(() => {
-    // Initialize NoSleep and set up to enable on first user click
-    // This effect runs only once on mount
-    if (!noSleepRef.current) { // Initialize only if not already done
+    if (!noSleepRef.current) { 
       noSleepRef.current = new NoSleep();
     }
 
@@ -89,21 +89,16 @@ function App() {
           console.error('Failed to enable NoSleep.js:', err);
         });
       }
-      // Listeners are automatically removed due to { once: true }
     };
 
-    // Add event listeners for the first user interaction to enable NoSleep
     document.body.addEventListener('click', enableWakeLockOnClick, { once: true });
     document.body.addEventListener('touchstart', enableWakeLockOnClick, { once: true });
     
     return () => {
-      // Only remove listeners if they haven't fired.
-      // NoSleep instance itself is not disabled or nulled here,
-      // allowing the wake lock to persist as per user request.
       document.body.removeEventListener('click', enableWakeLockOnClick);
       document.body.removeEventListener('touchstart', enableWakeLockOnClick);
     };
-  }, []); // Empty dependency array ensures this runs once on mount
+  }, []); 
 
   useEffect(() => {
     return () => {
@@ -163,19 +158,17 @@ function App() {
   );
 
   const cleanupWebRTCInstance = React.useCallback(
-    (id) => { // 'id' is the PeerConnection ID
+    (id) => { 
       console.log(`[App Cleanup] Attempting to clean up for PC ID: ${id}`);
       const pc = peerConns.current[id];
 
       if (pc) {
-        // Clear ICE connection timeout if it exists
         if (pc._iceTimeoutId) {
           clearTimeout(pc._iceTimeoutId);
           delete pc._iceTimeoutId;
           console.log(`[App Cleanup] Cleared ICE timeout for PC ID: ${id}`);
         }
 
-        // If it's a zip PC, clean up its associated DataChannels
         if (pc._associatedTransferIds) {
           console.log(`[App Cleanup] PC ID: ${id} is a zip PC. Cleaning associated DCs:`, Array.from(pc._associatedTransferIds));
           pc._associatedTransferIds.forEach((transferId) => {
@@ -188,10 +181,8 @@ function App() {
               delete dataChannels.current[transferId];
             }
           });
-          delete pc._associatedTransferIds; // Clean up the Set itself
+          delete pc._associatedTransferIds; 
         } else {
-          // If not a zip PC (or _associatedTransferIds was already cleaned),
-          // 'id' might also be the ID for a single DataChannel (for single file transfers where pcId === dcId)
           const singleDc = dataChannels.current[id];
           if (singleDc) {
             console.log(`[App Cleanup] PC ID: ${id} might be for a single DC. Cleaning DC: ${id}`);
@@ -203,7 +194,6 @@ function App() {
           }
         }
 
-        // Close the PeerConnection itself
         try {
           if (pc.signalingState !== "closed") {
             pc.close();
@@ -213,8 +203,7 @@ function App() {
         delete peerConns.current[id];
       } else {
         console.warn(`[App Cleanup] No PeerConnection found for ID: ${id} during cleanup attempt.`);
-        // Still try to clean up other refs by this ID in case they are orphaned
-        if (dataChannels.current[id]) { // If an orphaned DC with this ID exists
+        if (dataChannels.current[id]) { 
              console.log(`[App Cleanup] Found orphaned DC with ID: ${id}. Cleaning it.`);
              try {
                 if (dataChannels.current[id].readyState !== "closed") dataChannels.current[id].close();
@@ -223,13 +212,11 @@ function App() {
         }
       }
 
-      // Clean up from heartbeat tracking if it was a zip PC
       if (activeZipPcHeartbeats.current.hasOwnProperty(id)) {
         delete activeZipPcHeartbeats.current[id];
         console.log(`[App Cleanup] Removed PC ID: ${id} from heartbeat tracking.`);
       }
 
-      // Clean up pending signals for this PC ID
       if (pendingSignals.current && pendingSignals.current[id]) {
         delete pendingSignals.current[id];
         console.log(`[App Cleanup] Cleared pending signals for PC ID: ${id}`);
@@ -290,14 +277,12 @@ function App() {
         postMessage({ fileId: transferFileId, filename: fileMeta.name, mimetype: fileMeta.type, fileSize: fileMeta.size, });
         socket.emit("download-file", { room: driveCode, fileId: fileMeta.fileId, transferFileId, name: fileMeta.name, size: fileMeta.size, type: fileMeta.type, });
         const fileIndex = receiverFilesMeta.findIndex((f) => f.fileId === fileMeta.fileId);
-        cleanupWebRTCInstance(transferFileId); // Cleanup before starting new WebRTC for this transfer
-        // Call startWebRTC and await it since it's now async
+        cleanupWebRTCInstance(transferFileId); 
         try {
           await startWebRTC({ isSender: false, code: driveCode, fileIndex, filesRef: { current: receiverFilesMeta }, peerConns, dataChannels, setError, driveCode, socket, sendSWMetaAndChunk, cleanupWebRTCInstance, makeFileId, fileId: transferFileId, });
         } catch (e) {
           console.error(`[App Receiver] Error calling startWebRTC for single file ${transferFileId}:`, e);
           setError(`Failed to start WebRTC for file ${fileMeta.name}.`);
-          // Ensure cleanup if startWebRTC itself throws before full setup
           cleanupWebRTCInstance(transferFileId);
           setDownloadingFiles((prev) => { const s = new Set(prev); s.delete(fileMeta.fileId); return s; });
         }
@@ -352,14 +337,10 @@ function App() {
     setFiles(combinedFiles);
     const combinedFilesMeta = combinedFiles.map(({ name, size, type, fileId, path }) => ({ name, size, type, fileId, path, }));
     if (!driveCode) {
-      // This is a new drive creation
       console.log("[App Sender] Creating a new drive. Cleaning up any existing WebRTC state.");
       Object.keys(peerConns.current).forEach(cleanupWebRTCInstance);
-      // dataChannels, pendingSignals, activeZipPcHeartbeats are cleaned within cleanupWebRTCInstance
-      // or should be reset if they are global to the drive.
-      // For safety, explicitly clear pendingSignals for a new drive.
       pendingSignals.current = {}; 
-      activeZipPcHeartbeats.current = {}; // Reset heartbeat tracking for a new drive
+      activeZipPcHeartbeats.current = {}; 
 
       let code = "";
       const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -392,10 +373,10 @@ function App() {
       const filesMeta = files.map(({ name, size, type, fileId, path }) => ({ name, size, type, fileId, path, }));
       socket.emit("file-list", { room: driveCode, filesMeta });
     };
-    socket.on("connect", handler); // Re-emit on initial connect if drive is already set
-    if (socket.connected) handler(); // Also call if already connected
+    socket.on("connect", handler); 
+    if (socket.connected) handler(); 
     return () => socket.off("connect", handler);
-  }, [driveCode, files, socket]); // files dependency is important here
+  }, [driveCode, files, socket]); 
 
   useEffect(() => {
     if (!(driveCode && files.length > 0)) return;
@@ -420,23 +401,20 @@ function App() {
   }, [socket]);
 
   useEffect(() => {
-    const HEARTBEAT_TIMEOUT_MS = 90000; // Increased to 90 seconds
-    const CHECK_INTERVAL_MS = 15000; // Check every 15 seconds
+    const HEARTBEAT_TIMEOUT_MS = 90000; 
+    const CHECK_INTERVAL_MS = 15000; 
 
     const intervalId = setInterval(() => {
       const now = Date.now();
       Object.keys(activeZipPcHeartbeats.current).forEach((pcId) => {
         const lastHeartbeatTime = activeZipPcHeartbeats.current[pcId];
-        if (typeof lastHeartbeatTime === 'number') { // Ensure the timestamp exists and is a number
+        if (typeof lastHeartbeatTime === 'number') { 
           if (now - lastHeartbeatTime > HEARTBEAT_TIMEOUT_MS) {
             console.warn(`[App Sender] Zip PC ${pcId} heartbeat timeout. Last heartbeat was ${Math.round((now - lastHeartbeatTime)/1000)}s ago (threshold: ${HEARTBEAT_TIMEOUT_MS / 1000}s). Cleaning up.`);
             cleanupWebRTCInstance(pcId);
           }
         } else {
-          // This case should ideally not happen if pcId is still in Object.keys and was properly initialized.
-          // Could indicate a race condition if deleted between Object.keys and access.
           console.warn(`[App Sender] Heartbeat check: pcId ${pcId} found in keys, but its timestamp was not a number:`, lastHeartbeatTime, ". Potentially already cleaned up or race condition.");
-          // cleanupWebRTCInstance(pcId); // Optionally cleanup here too if this state is considered invalid
         }
       });
     }, CHECK_INTERVAL_MS);
@@ -468,12 +446,11 @@ function App() {
           return;
         }
         let pc = peerConns.current[pcIdToUse];
-        // downloadHandler is already async, so await getIceServers() is fine here
         let isNewPc = false;
         if (!pc) {
           isNewPc = true;
           try {
-            const iceServersConfig = await getIceServers(); // Fetch dynamic config
+            const iceServersConfig = await getIceServers(); 
             pc = new window.RTCPeerConnection({ iceServers: iceServersConfig });
           } catch (e) {
             setError(`Sender: Failed to initialize WebRTC: ${e.message}`);
@@ -483,10 +460,8 @@ function App() {
           peerConns.current[pcIdToUse] = pc;
           activeZipPcHeartbeats.current[pcIdToUse] = Date.now();
 
-          // ---- ADD ICE Connection Timeout for Sender Zip PC ----
-          const iceConnectionTimeoutMs = 30000; // 30 seconds
+          const iceConnectionTimeoutMs = 30000; 
           const iceTimeoutId = setTimeout(() => {
-            // Check pc reference again as it might have been cleaned up by another process
             const currentPC = peerConns.current[pcIdToUse];
             if (currentPC && currentPC.connectionState !== "connected" && currentPC.connectionState !== "completed") {
               console.warn(`[App Sender Zip/Folder] PC ${pcIdToUse} ICE connection timed out after ${iceConnectionTimeoutMs / 1000}s. State: ${currentPC.connectionState}. Cleaning up.`);
@@ -495,8 +470,7 @@ function App() {
             }
           }, iceConnectionTimeoutMs);
           pc._iceTimeoutId = iceTimeoutId; 
-          // ---- END ICE Connection Timeout ----
-
+          
           pc.onicecandidate = (event) => {
             if (event.candidate) socket.emit("signal", { room: driveCode, fileId: pcIdToUse, data: { candidate: event.candidate }, });
           };
@@ -508,8 +482,8 @@ function App() {
             }
           };
           pc.onconnectionstatechange = () => {
-            const currentPC = peerConns.current[pcIdToUse]; // Get fresh reference
-            if (!currentPC) return; // PC might have been cleaned up
+            const currentPC = peerConns.current[pcIdToUse]; 
+            if (!currentPC) return; 
 
             console.log(`[App Sender Zip/Folder] PC ${pcIdToUse} connection state: ${currentPC.connectionState}. ICE: ${currentPC.iceConnectionState}, Signaling: ${currentPC.signalingState}`);
             if (currentPC.connectionState === "connected" || currentPC.connectionState === "completed") {
@@ -522,7 +496,7 @@ function App() {
             }
           };
           pc.onsignalingstatechange = () => { 
-            const currentPC = peerConns.current[pcIdToUse]; // Get fresh reference
+            const currentPC = peerConns.current[pcIdToUse]; 
             if (!currentPC) return;
             console.log(`[App Sender Zip/Folder] PC ${pcIdToUse} signaling state: ${currentPC.signalingState}. ICE: ${currentPC.iceConnectionState}, Connection: ${currentPC.connectionState}`);
           };
@@ -558,7 +532,7 @@ function App() {
                 try {
                   if (dc.readyState === "open") {
                     dc.send(e.target.result);
-                    offset += e.target.result.byteLength; // Use actual byteLength
+                    offset += e.target.result.byteLength; 
                     Promise.resolve().then(sendChunk);
                   } else { delete dataChannels.current[useTransferFileId]; }
                 } catch (err) { delete dataChannels.current[useTransferFileId]; }
@@ -571,7 +545,7 @@ function App() {
           }
           sendChunk();
         };
-        dc.onerror = (event) => { // event is RTCErrorEvent
+        dc.onerror = (event) => { 
           const errorDetail = event.error ? `RTCError: ${event.error.message || 'No message'}. Detail: ${event.error.errorDetail || 'N/A'}. SCTP Cause: ${event.error.sctpCauseCode || 'N/A'}. HTTP Status: ${event.error.httpRequestStatusCode || 'N/A'}. SDP Line: ${event.error.sdpLineNumber || 'N/A'}. Received Alert: ${event.error.receivedAlert || 'N/A'}. Sent Alert: ${event.error.sentAlert || 'N/A'}.` : 'Unknown DataChannel error';
           console.error(`[App Sender Zip/Folder] DataChannel error for transferId: ${useTransferFileId}, file: ${fileObj.name}. Event:`, event, 'Parsed Details:', errorDetail);
           setError(`Sender: DataChannel error for ${fileObj.name}. Details: ${event.error?.errorDetail || 'Connection issue'}`);
@@ -591,7 +565,6 @@ function App() {
             .catch((e) => { setError(`Sender: Failed to create offer: ${e.message}`); cleanupWebRTCInstance(pcIdToUse); });
         }
       } else {
-        // This is for sender side of single file transfer
         try {
           await startWebRTC({ isSender: true, code: driveCode, fileIndex, filesRef, peerConns, dataChannels, setError, driveCode, socket, sendSWMetaAndChunk, cleanupWebRTCInstance, makeFileId, fileId: useTransferFileId, });
         } catch (e) {
@@ -603,18 +576,15 @@ function App() {
     };
     socket.on("download-file", downloadHandler);
     return () => socket.off("download-file", downloadHandler);
-  }, [socket, driveCode, handleSignal, cleanupWebRTCInstance, sendSWMetaAndChunk]); // Added dependencies
+  }, [socket, driveCode, handleSignal, cleanupWebRTCInstance, sendSWMetaAndChunk]); 
 
   useEffect(() => {
     if (step === "receiver" && driveCode) {
       if (driveCode !== prevDriveCodeRef.current || prevStepRef.current !== "receiver") {
         console.log(`[App Receiver] Joining new drive ${driveCode} or switching to receiver step. Cleaning up ALL existing WebRTC instances.`);
         Object.keys(peerConns.current).forEach(cleanupWebRTCInstance);
-        // cleanupWebRTCInstance handles associated dataChannels.
-        // For any DCs not associated with a PC being cleaned (e.g. orphaned), clear them.
         Object.keys(dataChannels.current).forEach(dcId => {
-            // Check if this dcId corresponds to an existing PC or an associated transferId of an existing PC
-            let isAssociated = peerConns.current[dcId]; // True if dcId is a pcId
+            let isAssociated = peerConns.current[dcId]; 
             if (!isAssociated) {
                 for (const pc of Object.values(peerConns.current)) {
                     if (pc && pc._associatedTransferIds && pc._associatedTransferIds.has(dcId)) {
@@ -623,9 +593,7 @@ function App() {
                     }
                 }
             }
-            // If it's not associated with any PC that would have been cleaned by the loop above,
-            // or if the PC was already gone but DC lingered.
-            if (!isAssociated && dataChannels.current[dcId]) { // Check if DC still exists
+            if (!isAssociated && dataChannels.current[dcId]) { 
                  console.log(`[App Receiver] Cleaning up potentially orphaned dataChannel: ${dcId}`);
                  try {
                     if (dataChannels.current[dcId].readyState !== "closed") dataChannels.current[dcId].close();
@@ -634,7 +602,7 @@ function App() {
             }
         });
         pendingSignals.current = {};
-        activeZipPcHeartbeats.current = {}; // Reset heartbeat tracking
+        activeZipPcHeartbeats.current = {}; 
         console.log("[App Receiver] Finished cleanup for new drive/receiver step.");
       }
       prevDriveCodeRef.current = driveCode;
@@ -690,7 +658,7 @@ function App() {
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [step, files.length, isZipping]); // Corrected files dependency
+  }, [step, files.length, isZipping]); 
 
   function isDownloading(fileId) {
     return downloadingFiles.has(fileId);
@@ -793,6 +761,16 @@ function App() {
     </div>
   );
 
+  const openInstructionsModal = () => {
+    setShowWhyModal(false);
+    setShowInstructionsModal(true);
+  };
+
+  const openWhyModal = () => {
+    setShowInstructionsModal(false);
+    setShowWhyModal(true);
+  };
+
   if (step === "init") {
     return (
       <>
@@ -830,6 +808,47 @@ function App() {
                   </div>
                 </div>
               )}
+            </div>
+            <div className="instructions-container">
+              <div className="instruction-div" onClick={openInstructionsModal}>
+                <span className="instruction-text">Instructions</span>
+                <svg className="instruction-arrow" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M9.5 6L15.5 12L9.5 18" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div className="instruction-div" onClick={openWhyModal}>
+                <span className="instruction-text">Why InfinityShare</span>
+                <svg className="instruction-arrow" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M9.5 6L15.5 12L9.5 18" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            </div>
+            <Modal show={showInstructionsModal} onClose={() => setShowInstructionsModal(false)} title="How to Use InfinityShare">
+              <div className="modal-list">
+                <h4>Quick Steps:</h4>
+                <ul>
+                  <li><strong>Connect Devices:</strong> Same Wi-Fi or hotspot.</li>
+                  <li><strong>Send & Share:</strong> Upload files, then share QR/link/code.</li>
+                  <li><strong>Keep Tabs Open:</strong> Essential on all devices.</li>
+                  <li><strong>Install PWA (Optional):</strong> For app-like access (Desktop: Install icon in address bar; Android: Menu → "Install app"; iOS: Share → "Add to Home Screen").</li>
+                </ul>
+              </div>
+            </Modal>
+            <Modal show={showWhyModal} onClose={() => setShowWhyModal(false)} title="Why Choose InfinityShare?">
+              <div className="modal-list">
+                <ul>
+                  <li><strong>No Uploads, Unlimited Size:</strong> Direct P2P transfer, no server storage.</li>
+                  <li><strong>Safe and Secure:</strong> Encrypted transfers, files never touch our servers.</li>
+                  <li><strong>Temporary & Direct Links:</strong> Links active only while sender's tab is open.</li>
+                  <li><strong>Fast Transfers:</strong> Quicker than upload/download, especially locally.</li>
+                  <li><strong>Folder Support:</strong> Share entire folders easily.</li>
+                  <li><strong>Cross-Platform & PWA:</strong> Works on modern browsers, installable as an app.</li>
+                </ul>
+                <p>For more information, visit my <a href="https://github.com/Shanmus4/infinityshare" target="_blank" rel="noopener noreferrer">GitHub repository</a>.</p>
+              </div>
+            </Modal>
+            <div className="copyright-text">
+              © {new Date().getFullYear()} Shanmu. All Rights Reserved. Developed using Gemini 2.5 Pro. 🤖
             </div>
           </div>
         </div>
@@ -882,6 +901,9 @@ function App() {
           <div className={`toast-snackbar ${showToast ? "show" : ""}`}>
             <svg className="toast-snackbar-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.72"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.72-1.72"></path></svg>
             Link Copied!
+          </div>
+          <div className="copyright-text">
+            © {new Date().getFullYear()} Shanmu. All Rights Reserved. Developed using Gemini 2.5 Pro. 🤖
           </div>
         </div>
       </>
@@ -944,6 +966,9 @@ function App() {
                 </div>
               )}
               <FileList files={receiverFilesMeta} onDownload={handleDownloadRequest} isSender={false} isDownloading={isDownloading} onDownloadFolder={handleDownloadFolder} isZipping={isZipping} setError={setError} />
+            </div>
+            <div className="copyright-text">
+              © {new Date().getFullYear()} Shanmu. All Rights Reserved. Developed using Gemini 2.5 Pro. 🤖
             </div>
           </div>
         </div>

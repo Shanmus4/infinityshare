@@ -23,7 +23,7 @@ html {
 }
 
 body {
-  font-family: "Mabry Pro", Arial, sans-serif; /* Added Mabry Pro */
+  font-family: "Mabry Pro", Arial, sans-serif;
   background: var(--Grey-Light-Grey);
   margin: 0;
   padding: 0 32px;
@@ -31,7 +31,7 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start; /* Align content to the start (top) */
+  justify-content: flex-start;
   align-items: center;
   overflow-x: hidden;
 }
@@ -41,32 +41,32 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start; /* Align content to the start (top) */
+  justify-content: flex-start;
   align-items: center;
-  position: relative; /* Make #root a positioning context */
+  position: relative;
 }
 
 /* Header Styles */
 .app-header {
   display: flex;
-  width: 100%; /* Let max-width and content define width */
+  width: 100%;
   max-width: 980px;
-  padding: 16px 20px; /* Added some horizontal padding */
-  box-sizing: border-box; /* Ensure padding is included in width calculation */
+  padding: 16px 20px;
+  box-sizing: border-box;
   justify-content: space-between;
   align-items: center;
   position: absolute;
-  top: 0; /* Position at the top */
-  left: 50%; /* Center horizontally */
-  transform: translateX(-50%); /* Adjust for centering */
-  z-index: 10; /* Ensure it's above other content if necessary */
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
 }
 
 .website-name {
   display: flex;
   align-items: center;
   gap: 8px;
-  cursor: pointer; /* For clickable feel */
+  cursor: pointer;
 }
 
 .website-logo-icon {
@@ -77,45 +77,42 @@ body {
 
 .website-name-text {
   color: var(--Primary-Green, #24a094);
-  font-family: "Mabry Pro", sans-serif; /* Ensure Mabry Pro is used */
+  font-family: "Mabry Pro", sans-serif;
   font-size: 32px;
   font-style: normal;
   font-weight: 900;
-  line-height: 79.2px; /* 247.5% - this seems very large, might need adjustment */
-  /* Consider a more standard line-height like 1.2 or normal if 79.2px is too much */
+  line-height: 79.2px; 
 }
 
 .github-link {
-  /* Style the anchor tag for the GitHub icon */
-  display: flex; /* Helps with alignment if needed */
+  display: flex; 
   align-items: center;
 }
 
 .header-icons-right {
   display: flex;
   align-items: center;
-  gap: 16px; /* Gap between home and GitHub icons */
+  gap: 16px; 
 }
 
 .header-icon-link {
-  display: flex; /* For alignment of SVG within */
+  display: flex; 
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  padding: 4px; /* Optional: if you want a little padding around icons */
-  border-radius: 50%; /* Optional: for a circular hover effect */
+  padding: 4px; 
+  border-radius: 50%; 
   transition: background-color 0.2s ease;
 }
 
 .header-icon-link:hover {
-  background-color: rgba(0, 0, 0, 0.05); /* Subtle hover effect */
+  background-color: rgba(0, 0, 0, 0.05); 
 }
 
 .header-icon-svg {
-  /* Common styling for icon SVGs */
   aspect-ratio: 1/1;
-  fill: var(--Primary-Green); /* Changed default fill to Primary Green */
-  display: block; /* Ensure SVG behaves as a block */
+  fill: var(--Primary-Green); 
+  display: block; 
 }
 
 .home-icon {
@@ -132,24 +129,23 @@ body {
 .main-section {
   display: flex;
   max-width: 980px;
-  width: 100%; /* Ensure it takes available width up to max-width */
+  width: 100%; 
   padding: 24px 0px;
   flex-direction: column;
-  justify-content: center; /* This will center content if body has enough height */
-  align-items: center; /* This should center its children like .content-div */
-  flex: 1 0 0; /* Allows this section to grow and fill available space */
-  /* align-self: stretch; */ /* Removed to allow parent's align-items:center to work */
-  margin-top: 80px; /* Adjust if header is taller or needs more space */
-  box-sizing: border-box; /* Include padding in width/height */
+  justify-content: center; 
+  align-items: center; 
+  flex: 1 0 0; 
+  margin-top: 80px; 
+  box-sizing: border-box; 
 }
 
 .content-div {
   display: flex;
   flex-direction: column;
-  align-items: flex-start; /* Changed from center to flex-start as per spec */
-  gap: 32px;
+  align-items: flex-start; 
+  gap: 24px;
   align-self: stretch;
-  width: 100%; /* Ensure it takes full width of main-section */
+  width: 100%; 
 }
 
 .send-receive-div {
@@ -167,17 +163,11 @@ body {
 .subhead {
   display: flex;
   align-items: center;
-  gap: 8px; /* Gap between icon and text in subhead */
+  gap: 8px; 
 }
 
-/* .subhead-icon { */ /* Removed as SVG is now direct child of .subhead */
-/* width: 24px; */
-/* height: 24px; */
-/* aspect-ratio: 1/1; */
-/* } */
-
 .subhead-text {
-  color: #000; /* Direct color, not variable for now */
+  color: #000; 
   text-align: center;
   font-family: "Mabry Pro", sans-serif;
   font-size: 24px;
@@ -186,10 +176,7 @@ body {
   line-height: 30px; /* 125% */
 }
 
-/* Overriding existing .container and .dropzone for the new design */
 .container {
-  /* This class might not be directly used for the main layout anymore if .main-section takes over */
-  /* If still used for other views, review its styling. For now, keeping original for other steps. */
   max-width: 400px;
   margin: 2em auto;
   background: #fff;
@@ -200,7 +187,6 @@ body {
 }
 
 .dropzone {
-  /* This is for the react-dropzone component's wrapper */
   display: flex;
   height: 266px;
   flex-direction: column;
@@ -209,19 +195,16 @@ body {
   gap: 8px;
   align-self: stretch;
   border: 1px dashed var(--Black-Pure-Black, #000);
-  /* background-color: var(--White-Pure-White); */ /* Replaced by subtle green */
   background-color: rgba(
     36,
     160,
     148,
     0.01
-  ); /* --Primary-Green at 0.1 opacity */
-  /* background-image: radial-gradient(var(--Grey-Dark-Grey, #808080) 0.5px, transparent 0.5px); */ /* Dots removed */
-  /* background-size: 5px 5px; */ /* Dots removed */
+  ); 
   cursor: pointer;
-  padding: 20px; /* Add some padding */
+  padding: 20px; 
   box-sizing: border-box;
-  transition: background-color 0.2s ease, border-color 0.2s ease; /* For interactions */
+  transition: background-color 0.2s ease, border-color 0.2s ease; 
 }
 
 .dropzone:hover {
@@ -230,24 +213,22 @@ body {
     160,
     148,
     0.15
-  ); /* Slightly more opaque on hover */
+  ); 
   border-color: var(--Primary-Green, #24a094);
 }
 
 .dropzone.drag-over {
-  /* Class to be added by JS when dragging over */
   background-color: rgba(
     36,
     160,
     148,
     0.2
-  ); /* --Primary-Green at 0.2 opacity on drag over */
+  ); 
   border-style: solid;
   border-color: var(--Primary-Green, #24a094);
 }
 
 .dropzone-internal-content {
-  /* Styles for the custom content inside react-dropzone */
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -275,11 +256,11 @@ body {
 }
 
 .upload-warning {
-  color: #e74c3c; /* Existing warning color */
+  color: #e74c3c; 
   margin-bottom: 1em;
   font-weight: bold;
-  font-size: 14px; /* Adjust as needed */
-  align-self: center; /* Center warning text */
+  font-size: 14px; 
+  align-self: center; 
   text-align: center;
 }
 
@@ -291,7 +272,6 @@ body {
 }
 
 .drive-code-input {
-  /* Styles for the text input field */
   display: flex;
   height: 48px;
   padding: 10px 18px;
@@ -306,41 +286,28 @@ body {
   font-style: normal;
   font-weight: 400;
   line-height: 24px; /* 150% */
-  color: var(--Black-Pure-Black, #000); /* User entered text color */
+  color: var(--Black-Pure-Black, #000); 
   box-sizing: border-box;
 }
 
 .drive-code-input::placeholder {
   color: var(--Grey-Dark-Grey, #808080);
-  /* text-align: center; Placeholder text alignment can be tricky, often inherits from input */
 }
 
-/* Overriding existing input[type="text"] and button for the new design in this context */
-/* These might need to be more specific if other inputs/buttons exist */
 input[type="text"] {
-  /* General override, consider more specific selectors if needed */
-  /* width: 70%; */ /* Replaced by flex behavior in receive-subcontainer */
-  padding: 10px 18px; /* Match new spec */
-  /* margin-right: 0.5em; */ /* Replaced by gap */
-  border: 0.8px solid var(--Black-Pure-Black, #000); /* Match new spec */
-  border-radius: 3px; /* Match new spec */
-  height: 48px; /* Match new spec */
+  padding: 10px 18px; 
+  border: 0.8px solid var(--Black-Pure-Black, #000); 
+  border-radius: 3px; 
+  height: 48px; 
   box-sizing: border-box;
   font-family: "Mabry Pro", sans-serif;
   font-size: 16px;
 }
 
 button {
-  /* General override, consider more specific selectors if needed */
-  /* background: #4f8cff; */ /* Overridden by new button style */
-  /* color: #fff; */ /* Overridden by new button style */
-  /* border: none; */ /* Overridden by new button style */
-  /* border-radius: 4px; */ /* Overridden by new button style */
-  /* padding: 0.6em 1.2em; */ /* Overridden by new button style */
   cursor: pointer;
-  /* margin-top: 1em; */ /* Context-dependent */
-  font-family: "Mabry Pro", sans-serif; /* Ensure font consistency */
-  font-weight: 500; /* A bit bolder for buttons */
+  font-family: "Mabry Pro", sans-serif; 
+  font-weight: 500; 
 }
 
 .join-drive-button {
@@ -358,42 +325,36 @@ button {
   font-size: 16px;
   font-weight: 500;
   line-height: 24px;
-  /* Default state: NO shadow as per latest instruction */
-  /* box-shadow: 5px 5px 0px 0px var(--Black-Pure-Black, #000); */
   transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
   margin-top: 0;
 }
 
 .join-drive-button:hover {
-  /* Hover state: SHOWS shadow as per latest instruction */
   background: var(
     --Primary-Light-Pink,
     #ff90e7
-  ); /* Background remains the same */
-  border-radius: 4px; /* Maintained */
-  border: 0.8px solid var(--Black-Pure-Black, #000); /* Maintained */
+  ); 
+  border-radius: 4px; 
+  border: 0.8px solid var(--Black-Pure-Black, #000); 
   box-shadow: 5px 5px 0px 0px var(--Black-Pure-Black, #000);
-  /* No transform on hover */
 }
 
 .join-drive-button:active {
-  /* Click state */
-  background: var(--Primary-Light-Pink, #ff90e7); /* Maintained */
-  box-shadow: none; /* Shadow disappears */
+  background: var(--Primary-Light-Pink, #ff90e7); 
+  box-shadow: none; 
   transform: translate(
     5px,
     5px
-  ); /* Moves right and down to cover hover shadow position */
+  ); 
 }
 
 .join-drive-button.loading {
-  /* Loading state */
   border-radius: 4px;
   opacity: 0.5;
   background: var(--Black-Pure-Black, #000);
-  color: var(--White-Pure-White, #fff); /* Text color for dark loading button */
-  box-shadow: none; /* Remove shadow in loading state */
-  pointer-events: none; /* Disable clicks */
+  color: var(--White-Pure-White, #fff); 
+  box-shadow: none; 
+  pointer-events: none; 
 }
 
 button:disabled {
@@ -403,27 +364,22 @@ button:disabled {
   opacity: 1 !important;
   pointer-events: none !important;
 }
-/* Remove generic button hover if it conflicts */
-/* button:hover {
-  background: #2566d4;
-} */
 
-/* Error Message Styling */
 .error-subcontainer {
-  display: flex; /* To align icon and text if needed, or just for the field itself */
-  width: 100%; /* Take full width of its parent (.send-receive-div) */
-  margin-top: 16px; /* Space above the error message */
+  display: flex; 
+  width: 100%; 
+  margin-top: 16px; 
 }
 
 .error-field {
   display: flex;
   align-items: center;
-  padding: 10px 18px; /* Consistent padding */
-  gap: 8px; /* Space between icon and text */
+  padding: 10px 18px; 
+  gap: 8px; 
   border-radius: 3px;
   border: 0.8px solid var(--Secondary-Dark-Red, #98282a);
   background: rgba(152, 40, 42, 0.2);
-  width: 100%; /* Make the field take full width of .error-subcontainer */
+  width: 100%; 
   box-sizing: border-box;
 }
 
@@ -431,30 +387,28 @@ button:disabled {
   width: 24px;
   height: 24px;
   aspect-ratio: 1/1;
-  flex-shrink: 0; /* Prevent icon from shrinking */
+  flex-shrink: 0; 
 }
 
 .error-text {
-  color: var(--Secondary-Dark-Red, #98282a); /* Make text red as well */
+  color: var(--Secondary-Dark-Red, #98282a); 
   font-family: "Mabry Pro", sans-serif;
-  font-size: 14px; /* Slightly smaller for error messages */
+  font-size: 14px; 
   line-height: 20px;
-  flex-grow: 1; /* Allow text to take remaining space */
+  flex-grow: 1; 
 }
 
-/* Sender View Specific Styles */
 .append-div {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 12px;
   align-self: stretch;
-  width: 100%; /* Ensure it takes full width */
+  width: 100%; 
 }
 
 .info-for-user {
   display: flex;
-  /* height: 48px; */ /* Height will be determined by content + padding */
   padding: 10px 18px;
   align-items: center;
   gap: 8px;
@@ -475,20 +429,16 @@ button:disabled {
 .info-text {
   color: var(--Secondary-Yellow, #6f5700);
   font-family: "Mabry Pro", sans-serif;
-  font-size: 14px; /* Slightly smaller for info messages */
+  font-size: 14px; 
   line-height: 20px;
   flex-grow: 1;
 }
 
-/* Modifier for the dropzone in the sender append view */
 .dropzone.dropzone-append {
-  height: 136px; /* Reverted height back to 136px */
-  /* Inherits other .dropzone styles like border, background, etc. */
+  height: 136px; 
 }
 
-/* Styles for QR Code / Link / File List sections in Sender View */
 .sharing-info-section {
-  /* This is the main container for QR, Link, Code */
   display: flex;
   padding: 40px;
   flex-direction: column;
@@ -497,67 +447,59 @@ button:disabled {
   align-self: stretch;
   border: 1px solid var(--Black-Black, #0d0d0d);
   background: var(--White-Pure-White, #fff);
-  /* Removed layout styles, now handled by .link-details */
 }
 
 .link-details {
-  /* Wrapper for QR and Right Div */
   display: flex;
   align-items: center;
   gap: 24px;
   align-self: stretch;
-  width: 100%; /* Ensure it takes full width of parent */
+  width: 100%; 
 }
 
 .qr-code-container {
-  /* For the QR code block */
-  width: 200px; /* Increased base size */
+  width: 200px; 
   height: 200px;
   aspect-ratio: 1/1;
-  /* background: url(<path-to-image>) lightgray 50% / cover no-repeat; */ /* Placeholder, actual QR is canvas */
-  background-color: lightgray; /* Fallback if QR doesn't load */
-  display: flex; /* To center the canvas if smaller */
+  background-color: lightgray; 
+  display: flex; 
   justify-content: center;
   align-items: center;
-  flex-shrink: 0; /* Prevent shrinking */
+  flex-shrink: 0; 
 }
 
-/* Ensure canvas fills the container */
 .qr-code-container canvas {
   width: 100% !important;
   height: 100% !important;
-  object-fit: contain; /* Scale QR code correctly within bounds */
+  object-fit: contain; 
 }
 
 .link-details-right-div {
   display: flex;
   flex-direction: column;
-  justify-content: space-between; /* Distributes space between link and code */
+  justify-content: space-between; 
   align-items: flex-start;
-  flex: 1 1 0; /* Allow shrinking (middle value 1) */
-  min-width: 0; /* Crucial for allowing flex items with overflow text to shrink */
-  align-self: stretch; /* Stretches to height of .sharing-info-section */
+  flex: 1 1 0; 
+  min-width: 0; 
+  align-self: stretch; 
 }
 
 .subcontainer-padding {
-  /* For Drive Link */
   display: flex;
   padding: 16px;
   justify-content: space-between;
   align-items: center;
   align-self: stretch;
   border: 1px solid var(--Black-Pure-Black, #000);
-  /* Removed border */
-  min-width: 0; /* Allow shrinking if necessary */
+  min-width: 0; 
 }
 
 .drive-link-text {
-  /* User provided styles */
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 1;
-  line-clamp: 1; /* Limit to one line */
-  flex: 1 0 0; /* Use flex: 1 0 0 as provided */
+  line-clamp: 1; 
+  flex: 1 0 0; 
   overflow: hidden;
   color: var(--Black-Pure-Black, #000);
   text-overflow: ellipsis;
@@ -566,9 +508,8 @@ button:disabled {
   font-style: normal;
   font-weight: 400;
   line-height: 24px; /* 120% */
-  /* Added/Retained properties */
-  margin-right: 10px; /* Space before copy button */
-  min-width: 0; /* Helps flex item shrink and trigger ellipsis */
+  margin-right: 10px; 
+  min-width: 0; 
 }
 
 .copy-button {
@@ -579,26 +520,24 @@ button:disabled {
   align-items: center;
   border-radius: 2px;
   border: 0.48px solid var(--Black-Pure-Black, #000);
-  background: var(--White-Pure-White, #fff); /* White background */
+  background: var(--White-Pure-White, #fff); 
   cursor: pointer;
   flex-shrink: 0;
-  transition: transform 0.1s ease-out, box-shadow 0.1s ease-out; /* Add transition */
-  /* background-color: violet; */ /* Ensure debug color is removed */
+  transition: transform 0.1s ease-out, box-shadow 0.1s ease-out; 
 }
 
 .copy-button:hover {
-  box-shadow: 3px 3px 0px 0px var(--Black-Pure-Black, #000); /* Shadow on hover */
+  box-shadow: 3px 3px 0px 0px var(--Black-Pure-Black, #000); 
 }
 
 .copy-button:active {
-  transform: translate(3px, 3px); /* Move on active */
-  box-shadow: none; /* Remove shadow on active */
+  transform: translate(3px, 3px); 
+  box-shadow: none; 
 }
 
 .copy-button svg {
-  width: 24px; /* Adjusted from 32px to fit 48px button with some padding */
+  width: 24px; 
   height: 24px;
-  /* flex-shrink: 0; */ /* Not needed on SVG if parent is flex centered */
 }
 
 .drive-code-display-div {
@@ -626,18 +565,17 @@ button:disabled {
   font-style: normal;
   font-weight: 700;
   line-height: 32px;
-  overflow-wrap: break-word; /* Prevent long codes from breaking layout */
+  overflow-wrap: break-word; 
 }
 
-/* Toast/Snackbar Styling */
 .toast-snackbar {
   position: fixed;
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  background-color: var(--White-Pure-White, #fff); /* White background */
-  color: var(--Black-Pure-Black, #000); /* Black text */
-  border: 1.5px solid var(--Black-Pure-Black, #000); /* Black border */
+  background-color: var(--White-Pure-White, #fff); 
+  color: var(--Black-Pure-Black, #000); 
+  border: 1.5px solid var(--Black-Pure-Black, #000); 
   padding: 12px 20px;
   z-index: 1000;
   display: flex;
@@ -647,23 +585,22 @@ button:disabled {
   font-size: 14px;
   opacity: 0;
   visibility: hidden;
-  transform: translateX(-50%) translateY(100%); /* Start centered below viewport */
-  transition: transform 0.3s ease-out, opacity 0.3s ease-out, visibility 0.3s; /* Add transform to transition */
+  transform: translateX(-50%) translateY(100%); 
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out, visibility 0.3s; 
 }
 
 .toast-snackbar.show {
   opacity: 1;
   visibility: visible;
-  transform: translateX(-50%) translateY(0); /* Slide up to final centered position */
+  transform: translateX(-50%) translateY(0); 
 }
 
 .toast-snackbar-icon {
-  width: 18px; /* Adjusted size for snackbar */
+  width: 18px; 
   height: 18px;
 }
 
 .file-list-section {
-  /* Keep this if used in receiver view */
   display: flex;
   flex-direction: column;
   padding: 20px;
@@ -673,40 +610,32 @@ button:disabled {
   box-sizing: border-box;
 }
 
-/* FileList Component Styles (New Structure) */
 .drive-contents-div {
-  /* Renamed from .file-list-section */
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
   align-self: stretch;
-  width: 100%; /* Ensure full width */
-  /* Removed padding/border/background as it's now inside sharing-info */
+  width: 100%; 
 }
 
-/* Styles for the new div-based structure */
 .drive-contents-div > .structure {
-  /* Apply border only to direct children of drive-contents-div */
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   align-self: stretch;
   width: 100%;
-  border: 1px solid var(--Black-Black, #0d0d0d); /* Added border */
+  border: 1px solid var(--Black-Black, #0d0d0d); 
 }
 
 .level-div {
-  /* Base style for folder/file rows */
   display: flex;
-  padding: 16px 16px; /* Updated padding */
-  justify-content: space-between; /* Updated justification */
+  padding: 16px 16px; 
+  justify-content: space-between; 
   align-items: center;
   align-self: stretch;
   width: 100%;
-  /* gap: 16px; */ /* Removed gap */
   transition: background-color 0.2s ease;
-  /* Indentation will be handled dynamically via style prop based on level */
 }
 
 .level-div:hover {
@@ -714,14 +643,11 @@ button:disabled {
 }
 
 .level-div.file-level {
-  /* Modifier for files inside folders */
-  padding-left: 32px; /* Specific padding for files */
+  padding-left: 32px; 
   padding-right: 32px;
-  /* border-bottom: none; */ /* No border for files inside folders - Removed as .level-div has no border */
 }
 
 .arrow-folder-div {
-  /* Container for arrow + folder icon/name */
   display: flex;
   align-items: center;
   gap: 16px;
@@ -736,7 +662,7 @@ button:disabled {
   aspect-ratio: 1/1;
   flex-shrink: 0;
   transition: transform 0.2s ease;
-  display: flex; /* Center SVG inside */
+  display: flex; 
   justify-content: center;
   align-items: center;
 }
@@ -758,20 +684,18 @@ button:disabled {
 
 .folder-icon-svg,
 .file-icon-svg {
-  /* Combined styles for icons */
   width: 24px;
   height: 24px;
   aspect-ratio: 1/1;
   flex-shrink: 0;
 }
-/* Specific fill/stroke can be added for file types later */
+
 .file-icon-svg path {
-  fill: var(--Primary-Green); /* Example: Default file icon color */
+  fill: var(--Primary-Green); 
 }
 
 .folder-name-text,
 .file-name-text {
-  /* Combined style for names */
   color: var(--Black-Pure-Black, #000);
   font-family: "Mabry Pro", sans-serif;
   font-size: 20px;
@@ -784,138 +708,269 @@ button:disabled {
 }
 
 .level-action-button {
-  /* New base class for action buttons in file list */
-  /* Style for the delete button icon */
   width: 32px;
   height: 32px;
   aspect-ratio: 1/1;
   cursor: pointer;
   flex-shrink: 0;
-  margin-left: auto; /* Push delete button to the right */
-  padding: 0; /* Remove padding to let flexbox center the icon */
+  margin-left: auto; 
+  padding: 0; 
   background: none;
   border: none;
-  display: flex; /* Added for centering icon */
-  justify-content: center; /* Added for centering icon */
-  align-items: center; /* Added for centering icon */
+  display: flex; 
+  justify-content: center; 
+  align-items: center; 
 }
 
 .level-action-button svg {
   display: block;
-  /* width: 100%; */ /* Let explicit size in MQ control this */
-  /* height: 100%; */
 }
 .level-action-button {
-  /* ... existing styles ... */
-  border: 1px solid var(--Black-Pure-Black, #000); /* Added border */
+  border: 1px solid var(--Black-Pure-Black, #000); 
   transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
 }
 
 .level-action-button:hover {
-  /* Add shadow on hover */
   box-shadow: 3px 3px 0px 0px var(--Black-Pure-Black, #000);
-  background: none; /* Ensure no background change on hover */
+  background: none; 
 }
-/* Removed hover fill change */
-/* .level-delete-button:hover svg path { ... } */
 
 .level-action-button:active {
-  /* Add transform on active */
-  transform: translate(3px, 3px); /* Adjusted to match shadow */
-  box-shadow: none; /* Remove shadow on active */
-  background: none; /* Ensure no background change on active */
+  transform: translate(3px, 3px); 
+  box-shadow: none; 
+  background: none; 
 }
 
 .folder-children-container {
-  /* Wrapper for nested items */
   width: 100%;
-  padding-left: 0; /* Reset padding, indentation is on level-div */
+  padding-left: 0; 
 }
 
 .file-list-empty-textfield {
   display: flex;
   padding: 10px 18px;
   align-items: center;
-  gap: 8px; /* Optional: if an icon were to be added */
+  gap: 8px; 
   align-self: stretch;
   border-radius: 3px;
-  border: 0.8px solid var(--Grey-Dark-Grey, #808080); /* Neutral border */
-  background: rgba(200, 200, 200, 0.1); /* Subtle background */
-  color: var(--Grey-Dark-Grey, #808080); /* Neutral text color */
+  border: 0.8px solid var(--Grey-Dark-Grey, #808080); 
+  background: rgba(200, 200, 200, 0.1); 
+  color: var(--Grey-Dark-Grey, #808080); 
   font-family: "Mabry Pro", sans-serif;
   font-size: 14px;
   line-height: 20px;
-  text-align: center; /* Center the text */
-  justify-content: center; /* Center content if flex */
-  width: 100%; /* Take full width */
+  text-align: center; 
+  justify-content: center; 
+  width: 100%; 
   box-sizing: border-box;
-  margin-top: 8px; /* Add some space if it's inside a container */
+  margin-top: 8px; 
 }
 
 .file-list-error {
   color: red;
   font-weight: bold;
-  padding: 20px; /* Add some padding */
+  padding: 20px; 
+}
+
+/* Copyright Text Style */
+.copyright-text {
+  font-size: 20px;
+  color: var(--Grey-Dark-Grey);
+  text-align: center;
+  width: 100%;
+  padding: 16px 0;
+  margin-top: auto; 
+}
+
+/* Instructions Section Styles */
+.instructions-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  align-self: stretch;
+  margin-top: 48px;
+}
+
+.instruction-div {
+  display: flex;
+  padding: 24px 40px;
+  justify-content: space-between;
+  align-items: center;
+  align-self: stretch;
+  background-color: var(--Grey-Light-Grey);
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.instruction-div:hover {
+  background-color: var(--White-Pure-White);
+  border: var(--Black-Pure-Black) 1px solid;
+}
+
+.instruction-div:hover .instruction-arrow {
+  transform: translateX(5px);
+}
+
+.instruction-text {
+  color: var(--Black-Pure-Black, #000);
+  text-align: left; 
+  font-family: "Mabry Pro";
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: normal;
+}
+
+.instruction-arrow {
+  width: 24px;
+  height: 24px;
+  aspect-ratio: 1/1;
+  transition: transform 0.2s ease; 
+}
+
+.instruction-arrow path {
+  stroke: var(--Black-Pure-Black); 
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw; /* Ensure it covers full viewport width */
+  height: 100vh; /* Ensure it covers full viewport height */
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  /* The overlay is a direct child of body, so it's not affected by #root's transform */
+}
+
+.modal-content {
+  background-color: var(--White-Pure-White);
+  padding: 32px;
+  border-radius: 4px;
+  border: 1px solid var(--Black-Black);
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--Grey-Light-Grey);
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+}
+
+.modal-title {
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--Black-Black);
+  margin: 0;
+}
+
+.modal-close-button {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  color: var(--Black-Black);
+}
+
+.modal-close-button svg {
+  width: 24px;
+  height: 24px;
+}
+
+.modal-body {
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--Black-Black);
+}
+
+.modal-body p {
+  margin-bottom: 1em;
+}
+
+.modal-body ul {
+  list-style-type: disc;
+  padding-left: 20px;
+  margin-top: 0.5em;
+}
+.modal-body ul li {
+  margin-bottom: 0.5em;
+}
+
+.modal-body a {
+  color: var(--Primary-Green);
+  text-decoration: underline;
+}
+
+.modal-body a:hover {
+  color: var(--Secondary-Dark-Pink);
 }
 
 /* --- Responsive Styles --- */
-
 @media (max-width: 768px) {
   body {
-    padding: 0 16px; /* Reduce body horizontal padding */
+    padding: 0 16px; 
   }
 
   .app-header {
-    padding: 12px 10px; /* Reduce header padding */
+    padding: 12px 10px; 
   }
   .website-logo-icon {
-    /* Keep website logo size if different */
     width: 36px;
     height: 36px;
   }
   .home-icon {
-    /* Responsive size for home icon */
     width: 40px;
     height: 40px;
   }
   .github-icon {
-    /* Responsive size for github icon */
     width: 36px;
     height: 36px;
   }
   .website-name-text {
-    font-size: 24px; /* Smaller website name */
-    line-height: normal; /* Adjust line height */
+    font-size: 24px; 
+    line-height: normal; 
   }
 
   .main-section {
-    padding: 16px 0px; /* Reduce main section vertical padding */
-    margin-top: 70px; /* Adjust margin if header height changed */
+    padding: 16px 0px; 
+    margin-top: 70px; 
   }
 
   .send-receive-div,
   .sharing-info-section {
-    padding: 20px; /* Reduce padding for main content blocks */
-    gap: 20px; /* Reduce gap in content blocks */
+    padding: 20px; 
+    gap: 20px; 
   }
   .append-div {
-    gap: 10px; /* Reduce gap in append div */
+    gap: 10px; 
   }
 
   .subhead-text {
-    font-size: 20px; /* Smaller subheadings */
+    font-size: 20px; 
   }
 
   .dropzone {
-    height: 200px; /* Smaller dropzone */
+    height: 200px; 
     padding: 15px;
   }
   .dropzone-text {
-    font-size: 16px; /* Smaller text in dropzone */
+    font-size: 16px; 
     line-height: 1.4;
   }
   .dropzone.dropzone-append {
-    height: 120px; /* Adjust append dropzone height */
+    height: 120px; 
   }
   .dropzone-icon {
     width: 36px;
@@ -924,101 +979,95 @@ button:disabled {
 
   .drive-code-input,
   input[type="text"] {
-    font-size: 14px; /* Smaller font in inputs */
-    height: 42px; /* Adjust input height */
+    font-size: 14px; 
+    height: 42px; 
     padding: 8px 12px;
   }
 
   button,
   .join-drive-button,
   .file-list-button {
-    /* Target file list download buttons too */
-    font-size: 14px; /* Smaller font in buttons */
-    padding: 10px 12px; /* Adjust button padding */
-    height: 42px; /* Consistent button height */
+    font-size: 14px; 
+    padding: 10px 12px; 
+    height: 42px; 
   }
   .join-drive-button.loading {
-    font-size: 14px; /* Ensure loading state matches */
+    font-size: 14px; 
   }
   .copy-button {
     width: 40px;
     height: 40px;
   }
   .copy-button svg {
-    width: 20px; /* Explicit size for SVG */
+    width: 20px; 
     height: 20px;
-    flex-shrink: 0; /* Prevent SVG from shrinking */
+    flex-shrink: 0; 
   }
   .level-action-button {
-    /* Target base class for responsiveness */
-    width: 30px; /* Container size */
+    width: 30px; 
     height: 30px;
   }
   .level-action-button svg {
-    width: 18px; /* Explicit size for SVG */
+    width: 18px; 
     height: 18px;
-    flex-shrink: 0; /* Prevent SVG from shrinking */
+    flex-shrink: 0; 
   }
 
-  /* Move stacking of link-details to this breakpoint */
   .link-details {
-    flex-direction: column; /* Stack QR and right details */
-    align-items: center; /* Center items when stacked */
+    flex-direction: column; 
+    align-items: center; 
     gap: 16px;
   }
-  /* Adjust QR container size for tablet */
   .qr-code-container {
     width: 160px;
     height: 160px;
   }
   .link-details-right-div {
-    align-items: center; /* Center text elements */
+    align-items: center; 
     text-align: center;
-    gap: 12px; /* Space between link and code display */
-    width: 100%; /* Ensure it takes full width when stacked */
+    gap: 12px; 
+    width: 100%; 
   }
   .subcontainer-padding {
-    /* Drive link container */
-    /* flex-direction: column; */ /* Keep side-by-side */
-    align-items: center; /* Keep vertical alignment centered */
-    gap: 8px; /* Keep gap */
-    padding: 10px; /* Reduce padding */
-    width: 100%; /* Ensure it takes full width */
-    box-sizing: border-box; /* Include padding in width */
+    align-items: center; 
+    gap: 8px; 
+    padding: 10px; 
+    width: 100%; 
+    box-sizing: border-box; 
   }
   .drive-link-text {
-    font-size: 16px; /* Smaller drive link text */
+    font-size: 16px; 
   }
   .drive-code-value {
-    font-size: 30px; /* Smaller drive code display */
+    font-size: 30px; 
     line-height: 1.1;
   }
 
   .folder-name-text,
   .file-name-text {
-    font-size: 16px; /* Smaller file/folder names */
+    font-size: 16px; 
   }
   .file-size {
-    font-size: 12px; /* Smaller file size text */
+    font-size: 12px; 
   }
 
   .folder-arrow-icon,
   .folder-icon-svg,
   .file-icon-svg {
-    width: 20px; /* Smaller icons in file list */
+    width: 20px; 
     height: 20px;
   }
   .arrow-folder-div {
-    gap: 8px; /* Reduce gap for folder arrow and icon/name */
+    gap: 8px; 
   }
   .level-div {
-    padding: 12px 16px; /* Reduce padding in file list rows */
+    padding: 12px 16px; 
   }
 
   .file-list-empty-textfield,
   .error-field,
   .info-for-user {
-    font-size: 13px; /* Smaller text for info/error/empty messages */
+    font-size: 13px; 
     padding: 8px 12px;
   }
   .error-icon,
@@ -1026,15 +1075,32 @@ button:disabled {
     width: 20px;
     height: 20px;
   }
+  .copyright-text {
+    font-size: 12px; 
+  }
+  .instruction-text {
+    font-size: 18px;
+  }
+  .instruction-div {
+    padding: 16px 24px;
+  }
+  .modal-content {
+    padding: 24px;
+    max-height: 90vh;
+  }
+  .modal-title {
+    font-size: 20px;
+  }
+  .modal-body {
+    font-size: 14px;
+  }
 }
 
 @media (max-width: 480px) {
   body {
-    padding: 0 8px; /* Further reduce body padding */
+    padding: 0 8px; 
   }
   .app-header {
-    /* Consider stacking header items if needed, or further reducing sizes */
-    /* For now, just reducing padding further */
     padding: 10px 5px;
   }
   .website-logo-icon,
@@ -1046,12 +1112,12 @@ button:disabled {
     font-size: 20px;
   }
   .main-section {
-    margin-top: 60px; /* Adjust if header is smaller */
+    margin-top: 60px; 
   }
 
   .send-receive-div,
   .sharing-info-section {
-    padding: 15px; /* Further reduce padding */
+    padding: 15px; 
     gap: 15px;
   }
   .append-div {
@@ -1062,7 +1128,6 @@ button:disabled {
     font-size: 18px;
   }
   .subhead svg {
-    /* Target SVGs directly in subhead */
     width: 20px;
     height: 20px;
   }
@@ -1082,52 +1147,42 @@ button:disabled {
   }
 
   .receive-subcontainer {
-    flex-direction: column; /* Stack input and button */
-    align-items: stretch; /* Make items take full width */
-    gap: 12px; /* Add gap when stacked */
+    flex-direction: column; 
+    align-items: stretch; 
+    gap: 12px; 
   }
   .drive-code-input,
   .join-drive-button {
-    width: 100%; /* Full width when stacked */
-    max-width: none; /* Remove max-width for button if it had one */
-    margin-right: 0; /* Remove margin if any */
+    width: 100%; 
+    max-width: none; 
+    margin-right: 0; 
   }
-  /* .join-drive-button {
-      margin-top: 12px;
-  } */ /* Gap handles this now */
 
-  /* .link-details stacking moved to 768px breakpoint */
   .qr-code-container {
-    width: 120px; /* Smaller QR code for mobile */
+    width: 120px; 
     height: 120px;
-    /* margin-bottom: 16px; */ /* Gap handles this */
   }
-  /* .link-details-right-div alignment moved to 768px breakpoint */
   .subcontainer-padding {
-    /* Drive link container */
-    /* flex-direction: column; */ /* REMOVE - Keep link and button side-by-side */
-    align-items: center; /* Keep vertical alignment centered */
-    gap: 8px; /* Keep gap */
-    padding: 10px; /* Reduce padding */
-    width: 100%; /* Ensure it takes full width */
-    box-sizing: border-box; /* Include padding in width */
+    align-items: center; 
+    gap: 8px; 
+    padding: 10px; 
+    width: 100%; 
+    box-sizing: border-box; 
   }
   .drive-link-text {
-    font-size: 14px; /* Smaller link text */
-    /* width: 100%; */ /* Already set in base style */
-    /* box-sizing: border-box; */ /* Already set in base style */
+    font-size: 14px; 
   }
   .drive-code-value {
-    font-size: 24px; /* Smaller drive code */
+    font-size: 24px; 
   }
   .copy-button {
     width: 36px;
     height: 36px;
   }
   .copy-button svg {
-    width: 18px; /* Explicit size for SVG */
+    width: 18px; 
     height: 18px;
-    flex-shrink: 0; /* Prevent SVG from shrinking */
+    flex-shrink: 0; 
   }
 
   .folder-name-text,
@@ -1138,7 +1193,7 @@ button:disabled {
     font-size: 11px;
   }
   .level-div {
-    padding: 10px 12px; /* Further reduce padding in file list rows */
+    padding: 10px 12px; 
   }
   .file-list-button {
     padding: 8px 10px;
@@ -1146,23 +1201,43 @@ button:disabled {
     font-size: 13px;
   }
   .level-action-button {
-    /* Target base class for responsiveness */
-    width: 26px; /* Container size */
+    width: 26px; 
     height: 26px;
   }
   .level-action-button svg {
-    width: 16px; /* Explicit size for SVG */
+    width: 16px; 
     height: 16px;
-    flex-shrink: 0; /* Prevent SVG from shrinking */
+    flex-shrink: 0; 
+  }
+  .copyright-text {
+    font-size: 10px; 
+  }
+  .instruction-text {
+    font-size: 16px;
+  }
+  .instruction-div {
+    padding: 12px 20px;
+  }
+  .instructions-container {
+    margin-top: 24px;
+  }
+  .modal-content {
+    padding: 16px;
+    width: 95%;
+  }
+  .modal-title {
+    font-size: 18px;
+  }
+  .modal-body {
+    font-size: 13px;
   }
 }
 
 /* Receiver View Specific Styles */
 .receiver-view-container > .subhead {
-  /* Target direct child subhead for "Files in Drive" */
   width: 100%;
-  justify-content: flex-start; /* Align "Files in Drive" text to the left */
-  margin-bottom: 16px; /* Add some space below the title */
+  justify-content: flex-start; 
+  margin-bottom: 16px; 
 }
 
 .receiver-top-div {
@@ -1171,27 +1246,23 @@ button:disabled {
   align-items: center;
   align-self: stretch;
   width: 100%;
-  margin-bottom: 24px; /* Space before file list or progress */
+  margin-bottom: 24px; 
 }
 
 .download-all-button {
-  /* Uses .join-drive-button styles by default */
-  /* Add any overrides if needed */
-  min-width: 180px; /* Ensure it has some minimum width */
+  min-width: 180px; 
 }
 
 .download-all-button.disabled {
   background: #bbb !important;
   color: #4e4e4e !important;
   cursor: not-allowed !important;
-  opacity: 1 !important; /* Override general button disabled opacity if needed */
-  box-shadow: none; /* Remove shadow when disabled */
-  transform: none; /* Remove transform when disabled */
+  opacity: 1 !important; 
+  box-shadow: none; 
+  transform: none; 
 }
 
-/* New Progress Bar Styles */
 .progress-display-container {
-  /* Renamed from .global-zip-progress-container */
   display: flex;
   padding: 24px 16px;
   flex-direction: column;
@@ -1206,28 +1277,27 @@ button:disabled {
   font-size: 16px;
   font-weight: 500;
   color: var(--Black-Black, #0d0d0d);
-  margin-bottom: 8px; /* Space between filename and progress bar */
-  text-align: left; /* Align to the start of the container */
-  word-break: break-all; /* Ensure long filenames wrap */
+  margin-bottom: 8px; 
+  text-align: left; 
+  word-break: break-all; 
 }
 
 .progress-bar-wrapper {
-  width: 100%; /* As per spec */
+  width: 100%; 
   height: 24px;
   border: 1px solid var(--Black-Pure-Black, #000);
   background-color: var(
     --White-Pure-White,
     #fff
-  ); /* Background for the non-progress part */
-  position: relative; /* For positioning text */
-  overflow: hidden; /* To ensure fill doesn't go out */
+  ); 
+  position: relative; 
+  overflow: hidden; 
 }
 
 .progress-bar-fill {
   background: var(--Primary-Green, #24a094);
   height: 100%;
-  transition: width 0.2s ease-out; /* Smooth progress animation */
-  /* No rounded corners */
+  transition: width 0.2s ease-out; 
 }
 
 .progress-bar-text {
@@ -1241,29 +1311,24 @@ button:disabled {
   align-items: center;
   font-size: 14px;
   font-weight: 500;
-  line-height: 24px; /* Match height */
-  color: var(--Black-Pure-Black, #000); /* Default to black */
-  z-index: 1; /* Ensure it's above the fill for the inverse effect */
-  /* mix-blend-mode: difference; */ /* This can create the inverse effect but might need careful handling */
+  line-height: 24px; 
+  color: var(--Black-Pure-Black, #000); 
+  z-index: 1; 
 }
 
-/* This is a common trick for inverse text color on progress bars */
-/* We'll need JS to toggle this class or use a more complex CSS setup */
 .progress-bar-text.inverse {
   color: var(--White-Pure-White, #fff);
 }
 
 .progress-stats-container {
-  /* Renamed from .progress-stats */
   display: flex;
   justify-content: space-between;
   align-items: center;
   align-self: stretch;
-  width: 100%; /* Ensure it takes full width */
+  width: 100%; 
 }
 
 .progress-stats-container span {
-  /* For "Speed:" and "ETR:" labels */
   font-size: 16px;
   font-style: normal;
   font-weight: 400;
@@ -1272,43 +1337,39 @@ button:disabled {
 }
 
 .progress-stats-container .stat-value {
-  /* For the actual speed/ETA values */
   color: var(--Primary-Green, #24a094);
-  font-weight: 500; /* Make values slightly bolder */
+  font-weight: 500; 
 }
 
 .progress-info-text {
-  /* Renamed from .progress-wait-text */
   color: var(--Black-Black, #0d0d0d);
   font-family: "Mabry Pro";
   font-size: 14px;
   font-style: normal;
   font-weight: 300;
   line-height: normal;
-  width: 100%; /* Ensure it takes full width and centers */
+  width: 100%; 
 }
 
 .receiver-error-subcontainer {
-  margin-top: 0; /* Remove top margin if it's the only thing after FileList */
+  margin-top: 0; 
 }
 
-/* Responsive adjustments for receiver top div */
 @media (max-width: 768px) {
-  /* Or your preferred mobile breakpoint like 480px */
   .receiver-top-div {
     flex-direction: column;
-    align-items: stretch; /* Make items take full width when stacked */
-    gap: 16px; /* Add some gap when stacked */
+    align-items: stretch; 
+    gap: 16px; 
   }
   .receiver-top-div .drive-code-display-div {
-    align-items: center; /* Center the drive code text when stacked */
+    align-items: center; 
   }
   .download-all-button {
-    width: 100%; /* Make button full width when stacked */
-    max-width: none; /* Remove max-width if set */
+    width: 100%; 
+    max-width: none; 
   }
   .progress-bar-wrapper {
-    width: 100%; /* Make progress bar responsive on smaller screens */
+    width: 100%; 
   }
   .progress-stats-container {
     flex-direction: column;
@@ -1319,5 +1380,12 @@ button:disabled {
 
 .level-action-button.disabled svg,
 .level-download-icon-button.disabled svg {
-  opacity: 0.3 !important; /* Ensure opacity is applied for disabled icon */
+  opacity: 0.3 !important; 
+}
+
+@media (min-width: 769px) {
+  #root {
+    transform: scale(0.8);
+    transform-origin: top center;
+  }
 }
