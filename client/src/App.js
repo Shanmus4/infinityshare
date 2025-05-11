@@ -590,9 +590,34 @@ function App() {
   useEffect(() => {
     if (step === "receiver" && driveCode) {
       if (driveCode !== prevDriveCodeRef.current || prevStepRef.current !== "receiver") {
+        console.log(`[App Receiver] Joining new drive ${driveCode} or switching to receiver step. Cleaning up ALL existing WebRTC instances.`);
         Object.keys(peerConns.current).forEach(cleanupWebRTCInstance);
-        Object.keys(dataChannels.current).forEach(cleanupWebRTCInstance);
+        // cleanupWebRTCInstance handles associated dataChannels.
+        // For any DCs not associated with a PC being cleaned (e.g. orphaned), clear them.
+        Object.keys(dataChannels.current).forEach(dcId => {
+            // Check if this dcId corresponds to an existing PC or an associated transferId of an existing PC
+            let isAssociated = peerConns.current[dcId]; // True if dcId is a pcId
+            if (!isAssociated) {
+                for (const pc of Object.values(peerConns.current)) {
+                    if (pc && pc._associatedTransferIds && pc._associatedTransferIds.has(dcId)) {
+                        isAssociated = true;
+                        break;
+                    }
+                }
+            }
+            // If it's not associated with any PC that would have been cleaned by the loop above,
+            // or if the PC was already gone but DC lingered.
+            if (!isAssociated && dataChannels.current[dcId]) { // Check if DC still exists
+                 console.log(`[App Receiver] Cleaning up potentially orphaned dataChannel: ${dcId}`);
+                 try {
+                    if (dataChannels.current[dcId].readyState !== "closed") dataChannels.current[dcId].close();
+                 } catch(e) {/*ignore*/}
+                 delete dataChannels.current[dcId];
+            }
+        });
         pendingSignals.current = {};
+        activeZipPcHeartbeats.current = {}; // Reset heartbeat tracking
+        console.log("[App Receiver] Finished cleanup for new drive/receiver step.");
       }
       prevDriveCodeRef.current = driveCode;
       const joinAndRequest = () => {
