@@ -1313,7 +1313,6 @@ function App() {
               title="How to Use InfinityShare"
             >
               <div className="modal-list">
-                
                 <ul>
                   <ul>
                     <li>
@@ -1322,7 +1321,7 @@ function App() {
                     </li>
                     <li>
                       <strong>Send & Share:</strong> Upload your file, then
-                      share the QR code, link, or code with the other device.
+                      share the QR code, link, or drive code with the other device.
                     </li>
                     <li>
                       <strong>Keep Tabs Open:</strong> Don’t close the tab on
@@ -1336,8 +1335,7 @@ function App() {
                           the address bar.
                         </li>
                         <li>
-                          <strong>Android:</strong> Tap the menu (⋮) → “Install
-                          app.”
+                          <strong>Android:</strong> Tap the menu (⋮) → “Add to Home Screen.”
                         </li>
                         <li>
                           <strong>iOS (Safari only):</strong> Tap the Share icon
