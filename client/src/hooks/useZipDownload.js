@@ -192,13 +192,13 @@ export function useZipDownload({
           if (event.errorCode === 701) {
             stun701Failures++;
             console.warn(
-              `[useZipDownload] ICE candidate error 701 (STUN lookup) for ${pcId}: ${errorText}. Count: ${stun701Failures}/${ICE_SERVERS.length}`
+              `[useZipDownload] ICE candidate error 701 (STUN lookup) for ${pcId}: ${errorText}. Count: ${stun701Failures}/${iceServersConfig.length}`
             );
-            if (stun701Failures >= ICE_SERVERS.length) {
+            if (stun701Failures >= iceServersConfig.length) {
               const specificErrorMsg =
                 "Connection failed: Unable to contact STUN servers. This might be due to your network, firewall (check UDP traffic), or DNS settings. Please check your connection and try again. (All STUNs reported 701)";
               console.error(
-                `[useZipDownload] All STUN servers (${ICE_SERVERS.length}) failed with error 701 for ${pcId}. Setting error: "${specificErrorMsg}"`
+                `[useZipDownload] All STUN servers (${iceServersConfig.length}) failed with error 701 for ${pcId}. Setting error: "${specificErrorMsg}"`
               );
               setError(specificErrorMsg);
               // The connection will likely transition to 'failed' state, which will call resetZipState.
