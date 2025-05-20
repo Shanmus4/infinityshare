@@ -170,6 +170,8 @@ export function useZipDownload({
           `[useZipDownload] Gathered ICE candidate for ${pcId}: Type: ${event.candidate.type}, Address: ${event.candidate.address}, Port: ${event.candidate.port}, Protocol: ${event.candidate.protocol}`,
           event.candidate
         );
+        // Add logging for the candidate string
+        console.log("ICE Candidate:", event.candidate.candidate);
         socket.emit("signal", {
           room: driveCode,
           fileId: pcId,
@@ -177,6 +179,8 @@ export function useZipDownload({
         });
       } else {
         console.log(`[useZipDownload] End of ICE candidates for ${pcId}.`);
+        // Add logging for end of candidates
+        console.log("All ICE candidates sent.");
       }
     };
     pc.onicecandidateerror = (event) => {

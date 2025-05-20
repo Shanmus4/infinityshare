@@ -66,9 +66,13 @@ export async function startWebRTC({ // Made async
   pc.onicecandidate = (event) => {
     if (event.candidate) {
       console.log(`[WebRTC Single] Gathered ICE candidate for ${fileId}: Type: ${event.candidate.type}, Address: ${event.candidate.address}, Port: ${event.candidate.port}, Protocol: ${event.candidate.protocol}`, event.candidate);
+      // Add logging for the candidate string
+      console.log("ICE Candidate:", event.candidate.candidate);
       socket.emit('signal', { room: driveCode, fileId, data: { candidate: event.candidate } });
     } else {
        console.log(`[WebRTC Single] End of ICE candidates for ${fileId}.`);
+       // Add logging for end of candidates
+       console.log("All ICE candidates sent.");
     }
   };
   if (isSender) {
