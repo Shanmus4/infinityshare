@@ -199,17 +199,23 @@ export function useZipDownload({
               `[useZipDownload] ICE candidate error 701 (STUN lookup) for ${pcId}: ${errorText}. Count: ${stun701Failures}/${iceServersConfig.length}`
             );
             if (stun701Failures >= iceServersConfig.length) {
+              const specificErrorMsg =
+                "Connection failed: Unable to contact STUN servers. This might be due to your network, firewall (check UDP traffic), or DNS settings. Please check your connection and try again. (All STUNs reported 701)";
               console.error(
                 `[useZipDownload] All STUN servers (${iceServersConfig.length}) failed with error 701 for ${pcId}. Setting error: "${specificErrorMsg}"`
               );
-              setError(specificErrorMsg);
+              // setError(specificErrorMsg); // Removed UI error display
               // The connection will likely transition to 'failed' state, which will call resetZipState.
             }
           } else {
-            setError(`ICE candidate error: ${event.errorCode} - ${errorText}`);
+            const specificErrorMsg = `ICE candidate error: ${event.errorCode} - ${errorText}`;
+            console.error(`[useZipDownload] Non-701 ICE candidate error: ${specificErrorMsg}`); // Log this specific error
+            // setError(specificErrorMsg); // Removed UI error display
           }
         } else {
-          setError("ICE candidate error (unknown code)");
+          const specificErrorMsg = "ICE candidate error (unknown code)";
+          console.error(`[useZipDownload] Unknown ICE candidate error: ${specificErrorMsg}`); // Log this specific error
+          // setError(specificErrorMsg); // Removed UI error display
         }
       };
       pc.onconnectionstatechange = () => {
