@@ -195,8 +195,6 @@ export function useZipDownload({
               `[useZipDownload] ICE candidate error 701 (STUN lookup) for ${pcId}: ${errorText}. Count: ${stun701Failures}/${iceServersConfig.length}`
             );
             if (stun701Failures >= iceServersConfig.length) {
-              const specificErrorMsg =
-                "Connection failed: Unable to contact STUN servers. This might be due to your network, firewall (check UDP traffic), or DNS settings. Please check your connection and try again. (All STUNs reported 701)";
               console.error(
                 `[useZipDownload] All STUN servers (${iceServersConfig.length}) failed with error 701 for ${pcId}. Setting error: "${specificErrorMsg}"`
               );
