@@ -264,9 +264,11 @@ io.on("connection", (socket) => {
   });
 });
 
-app.get("/ping", (req, res) => {
-  res.send("pong");
+app.get('/ping', (req, res) => {
+  console.log(`[PING] Keep-alive ping received at ${new Date().toISOString()}`);
+  res.send('pong');
 });
+
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, (err) => {
