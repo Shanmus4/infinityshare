@@ -728,7 +728,7 @@ function App() {
           let offset = 0;
           const MAX_BUFFERED_AMOUNT = 4 * 1024 * 1024;
           dc.bufferedAmountLowThreshold = 2 * 1024 * 1024;
-          function sendChunk() {
+          async function sendChunk() {
             if (offset < fileObj.size) {
               if (dc.bufferedAmount > MAX_BUFFERED_AMOUNT) {
                 dc.onbufferedamountlow = () => {
@@ -737,28 +737,19 @@ function App() {
                 };
                 return;
               }
-              const slice = fileObj.file.slice(
-                offset,
-                offset + Math.min(chunkSize, fileObj.size - offset)
-              );
-              const reader = new FileReader();
-              reader.onload = (e) => {
-                try {
-                  if (dc.readyState === "open") {
-                    dc.send(e.target.result);
-                    offset += e.target.result.byteLength;
-                    Promise.resolve().then(sendChunk);
-                  } else {
-                    delete dataChannels.current[useTransferFileId];
-                  }
-                } catch (err) {
+              const nextChunkSize = Math.min(chunkSize, fileObj.size - offset);
+              try {
+                const buffer = await fileObj.file.slice(offset, offset + nextChunkSize).arrayBuffer();
+                if (dc.readyState === "open") {
+                  dc.send(buffer);
+                  offset += buffer.byteLength;
+                  Promise.resolve().then(sendChunk);
+                } else {
                   delete dataChannels.current[useTransferFileId];
                 }
-              };
-              reader.onerror = () => {
+              } catch (err) {
                 delete dataChannels.current[useTransferFileId];
-              };
-              reader.readAsArrayBuffer(slice);
+              }
             } else {
               dc.send("EOF:" + fileObj.name);
             }

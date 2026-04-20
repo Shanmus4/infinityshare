@@ -89,38 +89,30 @@ export async function startWebRTC({ // Made async
       let offset = 0;
       const MAX_BUFFERED_AMOUNT = 4 * 1024 * 1024; // Try 4MB buffer
       dc.bufferedAmountLowThreshold = 2 * 1024 * 1024; // Set threshold to 2MB
-      function sendChunk() {
+      async function sendChunk() {
         if (offset < file.size) {
           if (dc.bufferedAmount > MAX_BUFFERED_AMOUNT) {
             //console.log('[WebRTC] Sender: Buffer full, waiting to drain for', fileId);
             dc.onbufferedamountlow = () => {
               dc.onbufferedamountlow = null;
-              Promise.resolve().then(sendChunk); // Use microtask for faster re-queue
+              Promise.resolve().then(sendChunk);
             };
             return;
           }
           const nextChunkSize = Math.min(chunkSize, file.size - offset);
-          const slice = file.file.slice(offset, offset + nextChunkSize);
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            try {
-              if (dc.readyState === 'open') {
-                dc.send(e.target.result);
-                //console.log('[WebRTC] Sender: Sent chunk for', fileId, file?.name, 'offset', offset, 'size', nextChunkSize);
-                offset += nextChunkSize;
-                Promise.resolve().then(sendChunk); // Use microtask for faster re-queue
-              } else {
-                console.error('[WebRTC] Sender: Data channel not open:', dc.readyState);
-                // setError && setError('Sender: DataChannel closed unexpectedly'); // Changed to console.error
-              }
-            } catch (err) {
-              // setError && setError('Sender: DataChannel send failed: ' + err.message); // Changed to console.error
-              console.error('[WebRTC] Sender: DataChannel send error', err);
-              // Try to recover with a delay, but still use microtask for the retry
-              setTimeout(() => Promise.resolve().then(sendChunk), 1000);
+          try {
+            const buffer = await file.file.slice(offset, offset + nextChunkSize).arrayBuffer();
+            if (dc.readyState === 'open') {
+              dc.send(buffer);
+              offset += nextChunkSize;
+              Promise.resolve().then(sendChunk);
+            } else {
+              console.error('[WebRTC] Sender: Data channel not open:', dc.readyState);
             }
-          };
-          reader.readAsArrayBuffer(slice);
+          } catch (err) {
+            console.error('[WebRTC] Sender: Read/send error', err);
+            setTimeout(() => Promise.resolve().then(sendChunk), 1000);
+          }
         } else {
           console.log(`[WebRTC Single Sender] Sending EOF for ${fileId}: ${file.name}`);
           dc.send('EOF:' + file.name);

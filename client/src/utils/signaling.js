@@ -76,10 +76,4 @@ export function getIceServers() {
   return iceServerConfigPromise;
 }
 
-// For places that might still expect a static array (though they should be updated)
-export let ICE_SERVERS = []; // Deprecated, use getIceServers()
-getIceServers().then(servers => {
-  ICE_SERVERS = servers; 
-  // Log will indicate if it's STUN_ONLY or includes TURN based on which fetch function is active in getIceServers()
-  console.log("ICE Servers (should now include TURN if backend is working) have been asynchronously set:", ICE_SERVERS);
-});
+// ICE_SERVERS static export removed. All code paths should use getIceServers() async function.
