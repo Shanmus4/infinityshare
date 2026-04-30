@@ -9,7 +9,7 @@ import { startWebRTC } from "./hooks/useWebRTC";
 import { makeFileId } from "./utils/fileHelpers";
 import { useZipDownload } from "./hooks/useZipDownload";
 import { getIceServers } from "./utils/signaling";
-import { debugLog, LogCategory, getEnvironmentInfo, summarizeIceServers, countPeerConnections, getPcState, subscribeToLogs } from "./utils/debugLog";
+import { debugLog, LogCategory, getEnvironmentInfo, summarizeIceServers, countPeerConnections, getPcState, subscribeToLogs, injectRemoteLog } from "./utils/debugLog";
 import DebugPanel from "./components/DebugPanel";
 import NoSleep from "nosleep.js";
 
@@ -78,6 +78,7 @@ function App() {
       if (entry.level === 'error') console.error(prefix, entry.message, entry.data);
       else if (entry.level === 'warn') console.warn(prefix, entry.message, entry.data);
       else console.log(prefix, entry.message, entry.data);
+      injectRemoteLog(entry);
     };
     socket.on('debug-log', handler);
     return () => socket.off('debug-log', handler);

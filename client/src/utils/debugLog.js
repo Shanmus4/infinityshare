@@ -51,6 +51,10 @@ function _addToBuffer(entry) {
   _notifyListeners();
 }
 
+export function injectRemoteLog(entry) {
+  _addToBuffer(entry);
+}
+
 /**
  * Get a snapshot of the current environment for diagnostic purposes.
  */
