@@ -9,6 +9,8 @@ import { startWebRTC } from "./hooks/useWebRTC";
 import { makeFileId } from "./utils/fileHelpers";
 import { useZipDownload } from "./hooks/useZipDownload";
 import { getIceServers } from "./utils/signaling";
+import { debugLog, LogCategory, getEnvironmentInfo, summarizeIceServers, countPeerConnections, getPcState, subscribeToLogs } from "./utils/debugLog";
+import DebugPanel from "./components/DebugPanel";
 import NoSleep from "nosleep.js";
 
 function App() {
@@ -50,16 +52,57 @@ function App() {
   const pendingSignals = useRef({});
   window.pendingSignals = pendingSignals.current;
 
+  // Determine role for debug logs
+  const isSenderRole = step === 'uploaded' || step === 'init';
+  const logSource = isSenderRole ? 'SENDER' : 'RECEIVER';
+
+  // Shorthand for debug logging
+  const dlog = React.useCallback((category, level, message, data, relay = true) => {
+    debugLog({ socket, driveCode, source: logSource, category, level, message, data, relay });
+  }, [socket, driveCode, logSource]);
+
+  // --- Remote debug-log listener: receive logs from the other peer ---
   useEffect(() => {
-    const handleConnect = () =>
-      console.log("[Socket] Connected to signaling server. ID:", socket.id);
+    const handler = (log) => {
+      const entry = {
+        timestamp: log.timestamp || Date.now(),
+        timeStr: log.timestamp ? new Date(log.timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '',
+        source: log.source || 'REMOTE',
+        category: log.category || 'SYSTEM',
+        level: log.level || 'info',
+        message: log.message || '',
+        data: log.data || null,
+        _isRemote: true,
+      };
+      const prefix = `[REMOTE ${entry.source}] [${entry.category}]`;
+      if (entry.level === 'error') console.error(prefix, entry.message, entry.data);
+      else if (entry.level === 'warn') console.warn(prefix, entry.message, entry.data);
+      else console.log(prefix, entry.message, entry.data);
+    };
+    socket.on('debug-log', handler);
+    return () => socket.off('debug-log', handler);
+  }, [socket]);
+
+  useEffect(() => {
+    const handleConnect = () => {
+      dlog(LogCategory.SOCKET, 'info', `Connected to signaling server. Socket ID: ${socket.id}`);
+      dlog(LogCategory.NETWORK, 'info', 'Environment snapshot', getEnvironmentInfo(), false);
+      // Check ICE/TURN config
+      getIceServers().then(servers => {
+        const summary = summarizeIceServers(servers);
+        const turnAvailable = summary.turn > 0 || summary.turnTls > 0;
+        dlog(LogCategory.TURN_STUN, turnAvailable ? 'info' : 'warn',
+          turnAvailable
+            ? `ICE servers: ${summary.stun} STUN, ${summary.turn} TURN, ${summary.turnTls} TURNS`
+            : `⚠️ NO TURN SERVERS - only ${summary.stun} STUN. Remote transfers will likely FAIL!`,
+          summary
+        );
+      });
+    };
     const handleDisconnect = (reason) =>
-      console.warn(
-        "[Socket] Disconnected from signaling server. Reason:",
-        reason
-      );
+      dlog(LogCategory.SOCKET, 'warn', `Disconnected from signaling server. Reason: ${reason}`, { reason });
     const handleConnectError = (error) =>
-      console.error("[Socket] Connection error with signaling server:", error);
+      dlog(LogCategory.SOCKET, 'error', `Socket connection error: ${error.message}`, { error: error.message });
 
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
@@ -68,7 +111,7 @@ function App() {
     if (socket.connected) {
       handleConnect();
     } else {
-      console.log("[Socket] Initially not connected. Attempting to connect...");
+      dlog(LogCategory.SOCKET, 'info', 'Not connected yet. Attempting...');
     }
 
     return () => {
@@ -76,7 +119,17 @@ function App() {
       socket.off("disconnect", handleDisconnect);
       socket.off("connect_error", handleConnectError);
     };
-  }, [socket]);
+  }, [socket, dlog]);
+
+  // --- Network online/offline monitoring ---
+  useEffect(() => {
+    const onOnline = () => dlog(LogCategory.NETWORK, 'info', '🟢 Browser went ONLINE');
+    const onOffline = () => dlog(LogCategory.NETWORK, 'error', '🔴 Browser went OFFLINE');
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => { window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline); };
+  }, [dlog]);
+
   const activeZipPcHeartbeats = useRef({});
   const prevDriveCodeRef = useRef(null);
   const prevStepRef = useRef();
@@ -184,35 +237,22 @@ function App() {
 
   const cleanupWebRTCInstance = React.useCallback(
     (id) => {
-      console.log(`[App Cleanup] Attempting to clean up for PC ID: ${id}`);
+      const pcCount = countPeerConnections(peerConns, dataChannels);
+      dlog(LogCategory.CLEANUP, 'info', `Cleanup starting for ID: ${id}`, { ...pcCount });
       const pc = peerConns.current[id];
 
       if (pc) {
         if (pc._iceTimeoutId) {
           clearTimeout(pc._iceTimeoutId);
           delete pc._iceTimeoutId;
-          console.log(`[App Cleanup] Cleared ICE timeout for PC ID: ${id}`);
         }
 
         if (pc._associatedTransferIds) {
-          console.log(
-            `[App Cleanup] PC ID: ${id} is a zip PC. Cleaning associated DCs:`,
-            Array.from(pc._associatedTransferIds)
-          );
+          dlog(LogCategory.CLEANUP, 'info', `Zip PC ${id}: cleaning ${pc._associatedTransferIds.size} associated DCs`);
           pc._associatedTransferIds.forEach((transferId) => {
             const associatedDc = dataChannels.current[transferId];
             if (associatedDc) {
-              try {
-                if (associatedDc.readyState !== "closed") associatedDc.close();
-                console.log(
-                  `[App Cleanup] Closed associated DC: ${transferId} for PC ID: ${id}`
-                );
-              } catch (e) {
-                console.warn(
-                  `[App Cleanup] Error closing associated DC ${transferId}:`,
-                  e
-                );
-              }
+              try { if (associatedDc.readyState !== "closed") associatedDc.close(); } catch (e) { /* ignore */ }
               delete dataChannels.current[transferId];
             }
           });
@@ -220,15 +260,7 @@ function App() {
         } else {
           const singleDc = dataChannels.current[id];
           if (singleDc) {
-            console.log(
-              `[App Cleanup] PC ID: ${id} might be for a single DC. Cleaning DC: ${id}`
-            );
-            try {
-              if (singleDc.readyState !== "closed") singleDc.close();
-              console.log(`[App Cleanup] Closed single DC: ${id}`);
-            } catch (e) {
-              console.warn(`[App Cleanup] Error closing single DC ${id}:`, e);
-            }
+            try { if (singleDc.readyState !== "closed") singleDc.close(); } catch (e) { /* ignore */ }
             delete dataChannels.current[id];
           }
         }
@@ -236,45 +268,50 @@ function App() {
         try {
           if (pc.signalingState !== "closed") {
             pc.close();
-            console.log(`[App Cleanup] Closed PC ID: ${id}`);
+            dlog(LogCategory.CLEANUP, 'info', `Closed PC: ${id}`);
           }
         } catch (e) {
-          console.warn(`[App Cleanup] Error closing PC ID ${id}:`, e);
+          dlog(LogCategory.CLEANUP, 'warn', `Error closing PC ${id}: ${e.message}`);
         }
         delete peerConns.current[id];
       } else {
-        console.warn(
-          `[App Cleanup] No PeerConnection found for ID: ${id} during cleanup attempt.`
-        );
+        dlog(LogCategory.CLEANUP, 'warn', `No PC found for ID: ${id}`);
         if (dataChannels.current[id]) {
-          console.log(
-            `[App Cleanup] Found orphaned DC with ID: ${id}. Cleaning it.`
-          );
-          try {
-            if (dataChannels.current[id].readyState !== "closed")
-              dataChannels.current[id].close();
-          } catch (e) {
-            /*ignore*/
-          }
+          try { if (dataChannels.current[id].readyState !== "closed") dataChannels.current[id].close(); } catch (e) { /* ignore */ }
           delete dataChannels.current[id];
         }
       }
 
       if (activeZipPcHeartbeats.current.hasOwnProperty(id)) {
         delete activeZipPcHeartbeats.current[id];
-        console.log(
-          `[App Cleanup] Removed PC ID: ${id} from heartbeat tracking.`
-        );
       }
-
       if (pendingSignals.current && pendingSignals.current[id]) {
         delete pendingSignals.current[id];
-        console.log(`[App Cleanup] Cleared pending signals for PC ID: ${id}`);
       }
-      console.log(`[App Cleanup] Finished cleanup for ID: ${id}`);
+
+      const afterCount = countPeerConnections(peerConns, dataChannels);
+      dlog(LogCategory.CLEANUP, 'info', `Cleanup done for ${id}. PCs: ${afterCount.totalPCs}, DCs: ${afterCount.totalDCs}`, afterCount);
     },
-    [peerConns, dataChannels, pendingSignals, activeZipPcHeartbeats]
+    [peerConns, dataChannels, pendingSignals, activeZipPcHeartbeats, dlog]
   );
+
+  // --- Stale PC cleanup: periodically close PCs stuck in bad states ---
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const counts = countPeerConnections(peerConns, dataChannels);
+      if (counts.totalPCs > 0) {
+        dlog(LogCategory.CLEANUP, 'info', `Periodic PC check: ${counts.totalPCs} PCs, ${counts.totalDCs} DCs`, counts, false);
+      }
+      Object.entries(peerConns.current).forEach(([id, pc]) => {
+        if (!pc) { delete peerConns.current[id]; return; }
+        if (['closed', 'failed'].includes(pc.connectionState)) {
+          dlog(LogCategory.CLEANUP, 'warn', `Stale PC detected: ${id} in state ${pc.connectionState}. Auto-cleaning.`);
+          cleanupWebRTCInstance(id);
+        }
+      });
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [cleanupWebRTCInstance, dlog]);
 
   function sendSWMetaAndChunk(fileId, chunk, filename, mimeType, fileSize) {
     if (!navigator.serviceWorker.controller) {
@@ -601,7 +638,7 @@ function App() {
         (f) => f.fileId === requestedFileId
       );
       if (!fileObj) {
-        console.error(`File not found for download: ${requestedFileId}`);
+        dlog(LogCategory.TRANSFER, 'error', `File not found for download: ${requestedFileId}`);
         return;
       }
       const useTransferFileId = transferFileId || makeFileId();
@@ -609,16 +646,34 @@ function App() {
         (f) => f.fileId === fileObj.fileId
       );
       if (fileIndex === -1) {
-        console.error(`File index not found for download: ${fileObj.fileId}`);
+        dlog(LogCategory.TRANSFER, 'error', `File index not found: ${fileObj.fileId}`);
         return;
       }
       const pcIdToUse = mainPcId;
 
+      // --- PC count safety guard ---
+      const MAX_PCS = 50;
+      const currentPcCount = Object.keys(peerConns.current).length;
+      if (currentPcCount >= MAX_PCS) {
+        dlog(LogCategory.WEBRTC, 'error', `PC limit reached (${currentPcCount}/${MAX_PCS}). Refusing new PC. Cleaning stale PCs first.`);
+        Object.entries(peerConns.current).forEach(([id, pc]) => {
+          if (pc && ['closed', 'failed'].includes(pc.connectionState)) {
+            cleanupWebRTCInstance(id);
+          }
+        });
+        if (Object.keys(peerConns.current).length >= MAX_PCS) {
+          setError(`Too many active connections (${currentPcCount}). Please wait for current transfers to complete.`);
+          return;
+        }
+      }
+
+      dlog(LogCategory.TRANSFER, 'info', `Download request: ${fileObj.name} (${(fileObj.size / 1024 / 1024).toFixed(1)}MB)`, {
+        requestedFileId, transferFileId: useTransferFileId, isZipRequest, isFolderRequest, mainPcId: pcIdToUse, activePCs: currentPcCount
+      });
+
       if (isZipRequest || isFolderRequest) {
         if (!pcIdToUse) {
-          console.error(
-            `${isZipRequest ? "Zip" : "Folder"} request without mainPcId!`
-          );
+          dlog(LogCategory.WEBRTC, 'error', `${isZipRequest ? "Zip" : "Folder"} request without mainPcId!`);
           return;
         }
         let pc = peerConns.current[pcIdToUse];
@@ -628,7 +683,9 @@ function App() {
           try {
             const iceServersConfig = await getIceServers();
             pc = new window.RTCPeerConnection({ iceServers: iceServersConfig });
+            dlog(LogCategory.WEBRTC, 'info', `Created new zip PC: ${pcIdToUse}`, { iceServers: summarizeIceServers(iceServersConfig) });
           } catch (e) {
+            dlog(LogCategory.WEBRTC, 'error', `Failed to create RTCPeerConnection: ${e.message}`);
             setError(`Sender: Failed to initialize WebRTC: ${e.message}`);
             return;
           }
@@ -827,10 +884,7 @@ function App() {
             fileId: useTransferFileId,
           });
         } catch (e) {
-          console.error(
-            `[App Sender] Error calling startWebRTC for single file ${useTransferFileId}:`,
-            e
-          );
+          dlog(LogCategory.WEBRTC, 'error', `Failed to start WebRTC for single file: ${fileObj.name} (${useTransferFileId}): ${e.message}`);
           setError(`Failed to start WebRTC for file ${fileObj.name}.`);
           cleanupWebRTCInstance(useTransferFileId);
         }
@@ -844,6 +898,7 @@ function App() {
     handleSignal,
     cleanupWebRTCInstance,
     sendSWMetaAndChunk,
+    dlog,
   ]);
 
   useEffect(() => {
@@ -1389,6 +1444,7 @@ function App() {
             </div>
           </div>
         </div>
+        <DebugPanel />
       </>
     );
   }
@@ -1530,6 +1586,7 @@ function App() {
             using Gemini 2.5 Pro. 🤖
           </div>
         </div>
+        <DebugPanel />
       </>
     );
   }
@@ -1700,6 +1757,7 @@ function App() {
             </div>
           </div>
         </div>
+        <DebugPanel />
       </>
     );
   }

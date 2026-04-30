@@ -259,6 +259,13 @@ io.on("connection", (socket) => {
     socket.to(signalRoom).emit("signal", data);
   });
 
+  socket.on("debug-log", (data) => {
+    if (data?.room) {
+      // Relay debug logs to all other clients in the room (sender <-> receiver)
+      socket.to(data.room).emit("debug-log", data);
+    }
+  });
+
   socket.on("disconnect", (reason) => {
     console.log("Client disconnected:", socket.id, "reason:", reason);
   });

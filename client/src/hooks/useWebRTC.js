@@ -1,5 +1,5 @@
 import { getIceServers } from '../utils/signaling'; // Changed import
-
+import { debugLog, LogCategory } from '../utils/debugLog';
 export async function startWebRTC({ // Made async
   isSender,
   code,
@@ -29,34 +29,33 @@ export async function startWebRTC({ // Made async
   const pc = new window.RTCPeerConnection({ iceServers: iceServersConfig });
   peerConns.current[fileId] = pc;
 
-  // --- Detailed Logging ADDED ---
+  const logSource = isSender ? 'SENDER' : 'RECEIVER';
+  const dlog = (category, level, message, data) => {
+    debugLog({ socket, driveCode, source: logSource, category, level, message, data });
+  };
   pc.oniceconnectionstatechange = () => {
-    console.log(`[WebRTC Single] ICE connection state change for ${fileId}: ${pc.iceConnectionState}`);
+    dlog(LogCategory.ICE, 'info', `ICE connection state change for ${fileId}: ${pc.iceConnectionState}`);
   };
   pc.onconnectionstatechange = () => {
-    console.log(`[WebRTC Single] Connection state change for ${fileId}: ${pc.connectionState}`);
+    dlog(LogCategory.WEBRTC, 'info', `Connection state change for ${fileId}: ${pc.connectionState}`);
      if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
-      console.error(`[WebRTC Single] WebRTC connection failed or disconnected for ${fileId}. State: ${pc.connectionState}`);
-      // setError && setError(`WebRTC connection failed or disconnected for ${fileId}. State: ${pc.connectionState}`); // Changed to console.error
-      // Consider cleanup here too? cleanupWebRTCInstance(fileId);
+      dlog(LogCategory.WEBRTC, 'error', `WebRTC connection failed or disconnected for ${fileId}. State: ${pc.connectionState}`);
     }
   };
   pc.onsignalingstatechange = () => {
-    console.log(`[WebRTC Single] Signaling state change for ${fileId}: ${pc.signalingState}`);
+    dlog(LogCategory.WEBRTC, 'info', `Signaling state change for ${fileId}: ${pc.signalingState}`);
   };
   pc.onicecandidateerror = (event) => {
-    console.error(`[WebRTC Single] ICE candidate error for ${fileId}:`, event);
+    dlog(LogCategory.ICE, 'error', `ICE candidate error for ${fileId}:`, { errorCode: event.errorCode, hostCandidate: event.hostCandidate, url: event.url, errorText: event.errorText });
     if (event.errorCode) {
-       console.error(`  Error Code: ${event.errorCode}, Host Candidate: ${event.hostCandidate}, Server URL: ${event.url}, Text: ${event.errorText}`);
        if (event.errorCode !== 701) {
         setError && setError(`ICE candidate gathering error for ${fileId}. Code: ${event.errorCode}`);
        } else {
-        console.warn(`[WebRTC Single] ICE candidate error 701 (ignorable) for ${fileId}:`, event.errorText);
+        dlog(LogCategory.ICE, 'warn', `ICE candidate error 701 (ignorable) for ${fileId}: ${event.errorText}`);
        }
     } else {
       setError && setError(`ICE candidate gathering error for ${fileId}. Code: N/A`);
     }
-    // Consider cleanup here too? cleanupWebRTCInstance(fileId);
   };
   // --- End Detailed Logging ---
 
@@ -65,14 +64,10 @@ export async function startWebRTC({ // Made async
   // Always set onicecandidate for both sender and receiver
   pc.onicecandidate = (event) => {
     if (event.candidate) {
-      console.log(`[WebRTC Single] Gathered ICE candidate for ${fileId}: Type: ${event.candidate.type}, Address: ${event.candidate.address}, Port: ${event.candidate.port}, Protocol: ${event.candidate.protocol}`, event.candidate);
-      // Add logging for the candidate string
-      console.log("ICE Candidate:", event.candidate.candidate);
+      dlog(LogCategory.ICE, 'info', `Gathered ICE candidate for ${fileId}`, { candidate: event.candidate.candidate });
       socket.emit('signal', { room: driveCode, fileId, data: { candidate: event.candidate } });
     } else {
-       console.log(`[WebRTC Single] End of ICE candidates for ${fileId}.`);
-       // Add logging for end of candidates
-       console.log("All ICE candidates sent.");
+       dlog(LogCategory.ICE, 'info', `End of ICE candidates for ${fileId}.`);
     }
   };
   if (isSender) {
@@ -80,10 +75,10 @@ export async function startWebRTC({ // Made async
     dc.binaryType = 'arraybuffer';
     dataChannels.current[fileId] = dc;
     const file = filesRef.current[fileIndex];
-    console.log(`[WebRTC Single Sender] Data channel created for ${fileId}`);
+    dlog(LogCategory.DATACHANNEL, 'info', `Data channel created for ${fileId}`);
     dc.onopen = () => {
-      console.log(`[WebRTC Single Sender] Data channel opened for ${fileId}`);
-      console.log(`[WebRTC Single Sender] Sending META for ${fileId}: ${file.name}:${file.size}`);
+      dlog(LogCategory.DATACHANNEL, 'info', `Data channel opened for ${fileId}`);
+      dlog(LogCategory.TRANSFER, 'info', `Sending META for ${fileId}: ${file.name}:${file.size}`);
       dc.send(`META:${file.name}:${file.size}`);
       const chunkSize = 256 * 1024; // Chunk size is 256KB
       let offset = 0;
@@ -107,14 +102,14 @@ export async function startWebRTC({ // Made async
               offset += nextChunkSize;
               Promise.resolve().then(sendChunk);
             } else {
-              console.error('[WebRTC] Sender: Data channel not open:', dc.readyState);
+              dlog(LogCategory.DATACHANNEL, 'error', `Data channel not open: ${dc.readyState}`);
             }
           } catch (err) {
-            console.error('[WebRTC] Sender: Read/send error', err);
+            dlog(LogCategory.DATACHANNEL, 'error', `Read/send error: ${err.message}`);
             setTimeout(() => Promise.resolve().then(sendChunk), 1000);
           }
         } else {
-          console.log(`[WebRTC Single Sender] Sending EOF for ${fileId}: ${file.name}`);
+          dlog(LogCategory.TRANSFER, 'info', `Sending EOF for ${fileId}: ${file.name}`);
           dc.send('EOF:' + file.name);
         }
       }
@@ -122,16 +117,16 @@ export async function startWebRTC({ // Made async
     };
     dc.onerror = (event) => { // event is RTCErrorEvent
       const errorDetail = event.error ? `${event.error.name}: ${event.error.message}` : 'Unknown DataChannel error';
-      console.error(`[WebRTC] Sender: DataChannel error for ${fileId}: ${errorDetail}`, event);
+      dlog(LogCategory.DATACHANNEL, 'error', `DataChannel error for ${fileId}: ${errorDetail}`, { errorDetail });
     };
     pc.createOffer().then(offer => {
       pc.setLocalDescription(offer);
-      console.log(`[WebRTC Single Sender] Emitting offer signal for ${fileId}`);
+      dlog(LogCategory.WEBRTC, 'info', `Emitting offer signal for ${fileId}`);
       socket.emit('signal', { room: driveCode, fileId, data: { sdp: offer } });
     });
   }
   pc.ondatachannel = (event) => {
-    console.log(`[WebRTC Single Receiver] ondatachannel triggered for ${fileId}`);
+    dlog(LogCategory.DATACHANNEL, 'info', `ondatachannel triggered for ${fileId}`);
     const dc = event.channel;
     dc.binaryType = 'arraybuffer';
     dataChannels.current[fileId] = dc;
@@ -140,10 +135,10 @@ export async function startWebRTC({ // Made async
     let receivedBytes = 0;
     let receivedChunks = [];
     let metaSent = false;
-    console.log(`[WebRTC Single Receiver] Data channel received for ${fileId}`);
+    dlog(LogCategory.DATACHANNEL, 'info', `Data channel received for ${fileId}`);
 
     dc.onopen = () => { // Add onopen log for receiver DC
-        console.log(`[WebRTC Single Receiver] DataChannel opened for ${fileId}`);
+        dlog(LogCategory.DATACHANNEL, 'info', `DataChannel opened for ${fileId}`);
     };
 
     dc.onmessage = async (e) => {
@@ -166,16 +161,15 @@ export async function startWebRTC({ // Made async
              console.warn('[WebRTC] Receiver: META received but no SW controller for single download', fileId);
         }
       } else if (typeof e.data === 'string' && e.data.startsWith('EOF:')) {
-        console.log(`[WebRTC Single Receiver] EOF received for ${fileId}`);
+        dlog(LogCategory.TRANSFER, 'info', `EOF received for ${fileId}`);
 
         if (fileId && navigator.serviceWorker.controller) {
-          console.log(`[WebRTC Single Receiver] Sending EOF to SW for ${fileId}`);
+          dlog(LogCategory.SERVICE_WORKER, 'info', `Sending EOF to SW for ${fileId}`);
           navigator.serviceWorker.controller.postMessage({
             type: 'chunk',
             fileId: fileId,
             done: true
           });
-          console.log(`[WebRTC Single Receiver] EOF sent to SW for ${fileId}`);
           // Give SW time to process before cleaning up this specific connection
           setTimeout(() => {
             cleanupWebRTCInstance(fileId);
@@ -204,15 +198,15 @@ export async function startWebRTC({ // Made async
     dc.onerror = (event) => { // event is RTCErrorEvent
       // Single download logic
       const errorDetail = event.error ? `${event.error.name}: ${event.error.message}` : 'Unknown DataChannel error';
-      console.error(`[WebRTC] Receiver: DataChannel error for ${fileId}: ${errorDetail}`, event);
+      dlog(LogCategory.DATACHANNEL, 'error', `DataChannel error for ${fileId}: ${errorDetail}`, { errorDetail });
     };
     dc.onclose = () => { // Add onclose log for receiver DC
-        console.log(`[WebRTC Single Receiver] DataChannel closed for ${fileId}`);
+        dlog(LogCategory.DATACHANNEL, 'info', `DataChannel closed for ${fileId}`);
     };
   };
   // Process any buffered signals for this fileId (receiver side)
   if (!isSender && window.pendingSignals && window.pendingSignals[fileId]) {
-    console.log(`[WebRTC Single Receiver] Processing ${window.pendingSignals[fileId].length} pending signals for ${fileId}`);
+    dlog(LogCategory.WEBRTC, 'info', `Processing ${window.pendingSignals[fileId].length} pending signals for ${fileId}`);
     window.pendingSignals[fileId].forEach(({ data, room }) => {
       if (data && data.sdp) {
         if (data.sdp.type === 'offer') {

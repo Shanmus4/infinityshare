@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { getIceServers } from "../utils/signaling"; // Changed import
+import { debugLog, LogCategory } from "../utils/debugLog";
 
 export function useZipDownload({
   receiverFilesMeta, // Full list
@@ -62,6 +63,10 @@ export function useZipDownload({
       heartbeatIntervalRef.current = null;
     }
   };
+
+  const dlog = useCallback((category, level, message, data) => {
+    debugLog({ socket, driveCode, source: 'RECEIVER', category, level, message, data });
+  }, [socket, driveCode]);
 
   // Modified to accept an optional folderPathFilter
   const startZipProcess = useCallback(
@@ -156,7 +161,7 @@ export function useZipDownload({
     const iceTimeoutId = setTimeout(() => {
       const currentPC = peerConns.current[pcId]; // Get fresh reference
       if (currentPC && currentPC.connectionState !== "connected" && currentPC.connectionState !== "completed") {
-        console.warn(`[useZipDownload] Receiver PC ${pcId} ICE connection timed out after ${iceConnectionTimeoutMs / 1000}s. State: ${currentPC.connectionState}. Resetting zip state.`);
+        dlog(LogCategory.WEBRTC, 'error', `Receiver PC ${pcId} ICE connection timed out after ${iceConnectionTimeoutMs / 1000}s. State: ${currentPC.connectionState}. Resetting zip state.`);
         setError('Connection attempt timed out. Please check network and try again.');
         resetZipState(); // This calls cleanupWebRTCInstance which should also clear pc._iceTimeoutId
       }
@@ -166,56 +171,33 @@ export function useZipDownload({
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log(
-          `[useZipDownload] Gathered ICE candidate for ${pcId}: Type: ${event.candidate.type}, Address: ${event.candidate.address}, Port: ${event.candidate.port}, Protocol: ${event.candidate.protocol}`,
-          event.candidate
-        );
-        // Add logging for the candidate string
-        console.log("ICE Candidate:", event.candidate.candidate);
+        dlog(LogCategory.ICE, 'info', `Gathered ICE candidate for ${pcId}`, { candidate: event.candidate.candidate });
         socket.emit("signal", {
           room: driveCode,
           fileId: pcId,
           data: { candidate: event.candidate },
         });
       } else {
-        console.log(`[useZipDownload] End of ICE candidates for ${pcId}.`);
-        // Add logging for end of candidates
-        console.log("All ICE candidates sent.");
+        dlog(LogCategory.ICE, 'info', `End of ICE candidates for ${pcId}.`);
       }
     };
     pc.onicecandidateerror = (event) => {
-        console.error(
-          `[useZipDownload] ICE candidate error for ${pcId}:`,
-          event
-        );
+        dlog(LogCategory.ICE, 'error', `ICE candidate error for ${pcId}:`, { errorCode: event.errorCode, hostCandidate: event.hostCandidate, url: event.url, errorText: event.errorText });
         if (event.errorCode) {
           const errorText = event.errorText || "No error text";
-          console.error(
-            `  Error Code: ${event.errorCode}, Host Candidate: ${event.hostCandidate}, Server URL: ${event.url}, Text: ${errorText}`
-          );
           if (event.errorCode === 701) {
             stun701Failures++;
-            console.warn(
-              `[useZipDownload] ICE candidate error 701 (STUN lookup) for ${pcId}: ${errorText}. Count: ${stun701Failures}/${iceServersConfig.length}`
-            );
+            dlog(LogCategory.ICE, 'warn', `ICE candidate error 701 (STUN lookup) for ${pcId}: ${errorText}. Count: ${stun701Failures}/${iceServersConfig.length}`);
             if (stun701Failures >= iceServersConfig.length) {
-              const specificErrorMsg =
-                "Connection failed: Unable to contact STUN servers. This might be due to your network, firewall (check UDP traffic), or DNS settings. Please check your connection and try again. (All STUNs reported 701)";
-              console.error(
-                `[useZipDownload] All STUN servers (${iceServersConfig.length}) failed with error 701 for ${pcId}. Setting error: "${specificErrorMsg}"`
-              );
-              // setError(specificErrorMsg); // Removed UI error display
-              // The connection will likely transition to 'failed' state, which will call resetZipState.
+              const specificErrorMsg = "Connection failed: Unable to contact STUN servers.";
+              dlog(LogCategory.ICE, 'error', `All STUN servers (${iceServersConfig.length}) failed with error 701 for ${pcId}.`);
             }
           } else {
             const specificErrorMsg = `ICE candidate error: ${event.errorCode} - ${errorText}`;
-            console.error(`[useZipDownload] Non-701 ICE candidate error: ${specificErrorMsg}`); // Log this specific error
-            // setError(specificErrorMsg); // Removed UI error display
+            dlog(LogCategory.ICE, 'error', `Non-701 ICE candidate error: ${specificErrorMsg}`);
           }
         } else {
-          const specificErrorMsg = "ICE candidate error (unknown code)";
-          console.error(`[useZipDownload] Unknown ICE candidate error: ${specificErrorMsg}`); // Log this specific error
-          // setError(specificErrorMsg); // Removed UI error display
+          dlog(LogCategory.ICE, 'error', `Unknown ICE candidate error`);
         }
       };
       pc.onconnectionstatechange = () => {
@@ -223,24 +205,18 @@ export function useZipDownload({
       const currentPC = peerConns.current[pcId]; // Get fresh reference
       if (!currentPC) return; // PC might have been cleaned up
 
-      console.log(
-        `[useZipDownload] PC connection state change for ${pcId}: ${newState}. ICE State: ${currentPC.iceConnectionState}, Signaling State: ${currentPC.signalingState}`
-      );
+      dlog(LogCategory.WEBRTC, 'info', `PC connection state change for ${pcId}: ${newState}`, { iceState: currentPC.iceConnectionState, signalingState: currentPC.signalingState });
 
       if (newState === "connected" || newState === "completed") {
         if (currentPC._iceTimeoutId) clearTimeout(currentPC._iceTimeoutId);
         setConnectionStatus("stable");
         setError(""); 
-        console.log(`[useZipDownload] PC ${pcId} connected.`);
       } else if (newState === "disconnected") {
         setConnectionStatus("interrupted");
         setError((prevError) =>
           prevError && prevError.includes("STUN servers")
             ? prevError
             : "Connection interrupted. Attempting to reconnect..."
-        );
-        console.warn(
-          `[useZipDownload] PC ${pcId} disconnected. Waiting for potential auto-reconnect.`
         );
       } else if (newState === "failed") {
         if (currentPC._iceTimeoutId) clearTimeout(currentPC._iceTimeoutId);
@@ -263,32 +239,24 @@ export function useZipDownload({
           if (prevError && prevError.includes("Connection lost")) return prevError;
           return "Zip download connection closed. Please try again.";
         });
-        console.error(
-          `[useZipDownload] Main PC ${pcId} closed. This is likely final.`
-        );
+        dlog(LogCategory.WEBRTC, 'error', `Main PC ${pcId} closed. This is likely final.`);
         resetZipState();
       }
     };
     pc.onsignalingstatechange = () =>
-        console.log(
-          `[useZipDownload] PC signaling state change for ${pcId}: ${pc.signalingState}. ICE State: ${pc.iceConnectionState}, Connection State: ${pc.connectionState}`
-        );
+        dlog(LogCategory.WEBRTC, 'info', `PC signaling state change for ${pcId}: ${pc.signalingState}`, { iceState: pc.iceConnectionState, connState: pc.connectionState });
 
       // --- Data Channel Handler ---
       pc.ondatachannel = (event) => {
         const dc = event.channel;
         const transferFileId = dc.label;
-        console.log(
-          `[useZipDownload] Received data channel for transferId: ${transferFileId}`
-        );
+        dlog(LogCategory.DATACHANNEL, 'info', `Received data channel for transferId: ${transferFileId}`);
 
         if (
           !currentZipOperation.current ||
           !currentZipOperation.current.filesToDownload.has(transferFileId)
         ) {
-          console.error(
-            `[useZipDownload] Received data channel for unknown/inactive transferId: ${transferFileId}`
-          );
+          dlog(LogCategory.DATACHANNEL, 'error', `Received data channel for unknown/inactive transferId: ${transferFileId}`);
           dc.close();
           return;
         }
@@ -296,9 +264,7 @@ export function useZipDownload({
         dataChannels.current[transferFileId] = dc;
         dc.binaryType = "arraybuffer";
         dc.onopen = () =>
-          console.log(
-            `[useZipDownload] DataChannel opened for transferId: ${transferFileId}`
-          );
+          dlog(LogCategory.DATACHANNEL, 'info', `DataChannel opened for transferId: ${transferFileId}`);
 
         dc.onmessage = (e) => {
           const fileMeta =
@@ -308,9 +274,7 @@ export function useZipDownload({
 
           if (typeof e.data === "string" && e.data.startsWith("EOF:")) {
             filesDownloaded++;
-            console.log(
-              `[useZipDownload] File complete: ${originalFileId} (${filesDownloaded}/${filesToInclude.length})`
-            );
+            dlog(LogCategory.TRANSFER, 'info', `File complete: ${originalFileId} (${filesDownloaded}/${filesToInclude.length})`);
             if (filesDownloaded === filesToInclude.length) {
               generateZip(zipFileName, filesToInclude, folderPathFilter); // Pass necessary info
             }
