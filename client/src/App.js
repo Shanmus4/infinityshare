@@ -1119,22 +1119,12 @@ function App() {
         className="website-name"
         onClick={() => (window.location.href = "/")}
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="48"
-          height="48"
-          viewBox="0 0 48 48"
-          fill="none"
-          className="website-logo-icon"
-        >
-          <path
-            d="M24 24C24 24 18.522 34 13 34C7.478 34 4 29.522 4 24C4 18.478 7.478 14 13 14C18.522 14 24 24 24 24ZM24 24C24 24 29.478 34 35 34C40.522 34 44 29.522 44 24C44 18.478 40.522 14 35 14C29.478 14 24 24 24 24Z"
-            stroke="#24A094"
-            strokeWidth="5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <div className="website-logo-icon">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="18" height="18">
+            <path d="M12 12c-2-2.5-4-4-6-4a4 4 0 0 0 0 8c2 0 4-1.5 6-4z" stroke="#fff" strokeWidth="1.8" fill="none"/>
+            <path d="M12 12c2 2.5 4 4 6 4a4 4 0 0 0 0-8c-2 0-4 1.5-6 4z" stroke="#fff" strokeWidth="1.8" fill="none"/>
+          </svg>
+        </div>
         <span className="website-name-text">InfinityShare</span>
       </div>
       <div className="header-icons-right">

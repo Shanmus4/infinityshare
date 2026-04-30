@@ -7,6 +7,7 @@ function DropzoneArea({ onDrop, children, className: additionalClassName = '' })
     <Dropzone
       onDrop={onDrop}
       multiple
+      useFsAccessApi={false}
       onDragEnter={(e) => {
         // Add class when dragging over
         if (e.target && e.target.classList) { // Check if e.target and classList exist

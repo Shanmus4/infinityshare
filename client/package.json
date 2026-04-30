@@ -6,6 +6,7 @@
     "file-saver": "^2.0.5",
     "jszip": "^3.10.1",
     "nosleep.js": "^0.12.0",
+    "qr-code-styling": "^1.9.2",
     "qrcode.react": "^3.1.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
