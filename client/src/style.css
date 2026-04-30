@@ -84,9 +84,10 @@ body {
 /* Header */
 .app-header {
   display: flex;
-  width: 100%;
-  max-width: 680px;
-  padding: 24px 0 32px;
+  width: calc(100% + 40px);
+  max-width: 720px;
+  padding: 24px 20px 32px;
+  margin: 0 -20px;
   box-sizing: border-box;
   justify-content: space-between;
   align-items: center;
@@ -547,9 +548,10 @@ button:disabled {
   text-overflow: ellipsis;
   color: var(--text-2);
   font-family: monospace;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 400;
-  line-height: 1.4;
+  height: 28px;
+  line-height: 28px;
   margin-right: 8px;
 }
 
