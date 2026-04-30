@@ -957,13 +957,17 @@ button:disabled {
 @media (max-width: 768px) {
   body { padding: 0 16px; }
 
-  .app-header { padding: 16px 0 24px; }
+  .app-header { 
+    padding: 16px 0 24px; 
+    width: 100%;
+    margin: 0;
+  }
 
   .website-logo-icon { width: 28px; height: 28px; }
   .home-icon  { width: 14px; height: 14px; }
   .github-icon { width: 14px; height: 14px; }
   .website-name-text {
-    font-size: 24px; 
+    font-size: 16px; 
     line-height: normal; 
   }
 
