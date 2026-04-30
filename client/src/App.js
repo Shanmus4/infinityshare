@@ -541,6 +541,7 @@ function App() {
         fileId,
         path,
       }));
+      socket.emit("create-room", driveCode); // Re-join room on reconnect
       socket.emit("file-list", { room: driveCode, filesMeta });
     };
     socket.on("connect", handler);
