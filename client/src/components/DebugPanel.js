@@ -100,7 +100,7 @@ function DebugPanel() {
           fontSize: '18px',
           cursor: 'pointer',
           boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-          display: 'flex',
+          display: 'none',
           alignItems: 'center',
           justifyContent: 'center',
           transition: 'background 0.2s ease',

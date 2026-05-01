@@ -743,6 +743,7 @@ button:disabled {
   font-size: 11px;
   color: var(--text-3);
   margin-left: 4px;
+  margin-right: 12px;
   flex-shrink: 0;
 }
 
@@ -995,7 +996,7 @@ button:disabled {
 
   .link-details {
     flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
     gap: 16px;
   }
   .qr-code-container { width: 88px; height: 88px; }
@@ -1023,7 +1024,9 @@ button:disabled {
 
 
 
-  .qr-code-container { width: 72px; height: 72px; }
+  .qr-code-container { width: 108px; height: 108px; }
+  .drive-link-text { font-size: 11px; }
+  .level-action-button { opacity: 1 !important; }
   .drive-code-value { font-size: 20px; }
   .modal-content { padding: 16px; width: 95%; }
 }
