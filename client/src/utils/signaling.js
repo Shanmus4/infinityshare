@@ -13,6 +13,7 @@ let apiBaseUrl = SIGNALING_SERVER_URL.replace(/^ws/, 'http');
 
 // Single, correct declaration of FALLBACK_ICE_SERVERS
 const FALLBACK_ICE_SERVERS = [
+  // Free STUN Servers
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
   { urls: "stun:stun2.l.google.com:19302" },
@@ -22,7 +23,23 @@ const FALLBACK_ICE_SERVERS = [
   { urls: "stun:stun.nextcloud.com:3478" },
   { urls: "stun:stun.voipbuster.com:3478" },
   { urls: "stun:stun.vline.com:3478" },
-  { urls: "stun:stun.sipnet.ru:3478" }
+  { urls: "stun:stun.sipnet.ru:3478" },
+  // Free public TURN Server (OpenRelay Project by Metered)
+  {
+    urls: "turn:global.relay.metered.ca:80",
+    username: "openrelayproject",
+    credential: "openrelayproject"
+  },
+  {
+    urls: "turn:global.relay.metered.ca:443",
+    username: "openrelayproject",
+    credential: "openrelayproject"
+  },
+  {
+    urls: "turn:global.relay.metered.ca:443?transport=tcp",
+    username: "openrelayproject",
+    credential: "openrelayproject"
+  }
 ];
 
 let iceServerConfigPromise = null;
