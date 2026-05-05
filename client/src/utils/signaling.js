@@ -27,18 +27,18 @@ const FALLBACK_ICE_SERVERS = [
   // Free public TURN Server (OpenRelay Project by Metered)
   {
     urls: "turn:global.relay.metered.ca:80",
-    username: "openrelayproject",
-    credential: "openrelayproject"
+    username: "387a419fd66811ef83479d56",
+    credential: "5fqct84CGhpuTqMs"
   },
   {
     urls: "turn:global.relay.metered.ca:443",
-    username: "openrelayproject",
-    credential: "openrelayproject"
+    username: "387a419fd66811ef83479d56",
+    credential: "5fqct84CGhpuTqMs"
   },
   {
-    urls: "turn:global.relay.metered.ca:443?transport=tcp",
-    username: "openrelayproject",
-    credential: "openrelayproject"
+    urls: "turns:global.relay.metered.ca:443?transport=tcp",
+    username: "387a419fd66811ef83479d56",
+    credential: "5fqct84CGhpuTqMs"
   }
 ];
 
