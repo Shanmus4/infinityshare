@@ -11,9 +11,11 @@ let apiBaseUrl = SIGNALING_SERVER_URL.replace(/^ws/, 'http');
 // If SIGNALING_SERVER_URL is like 'wss://your-domain.com', apiBaseUrl becomes 'https://your-domain.com'
 // If SIGNALING_SERVER_URL is like 'ws://localhost:3000', apiBaseUrl becomes 'http://localhost:3000'
 
-// Single, correct declaration of FALLBACK_ICE_SERVERS
+// Single, correct declaration of FALLBACK_ICE_SERVERS.
+// Only public STUN servers are kept here. TURN credentials must NEVER be
+// hardcoded in the client bundle — they are served by the signaling server's
+// /api/ice-servers endpoint which reads them from server-side env vars.
 const FALLBACK_ICE_SERVERS = [
-  // Free STUN Servers
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
   { urls: "stun:stun2.l.google.com:19302" },
@@ -23,23 +25,7 @@ const FALLBACK_ICE_SERVERS = [
   { urls: "stun:stun.nextcloud.com:3478" },
   { urls: "stun:stun.voipbuster.com:3478" },
   { urls: "stun:stun.vline.com:3478" },
-  { urls: "stun:stun.sipnet.ru:3478" },
-  // Free public TURN Server (OpenRelay Project by Metered)
-  {
-    urls: "turn:global.relay.metered.ca:80",
-    username: "387a419fd66811ef83479d56",
-    credential: "5fqct84CGhpuTqMs"
-  },
-  {
-    urls: "turn:global.relay.metered.ca:443",
-    username: "387a419fd66811ef83479d56",
-    credential: "5fqct84CGhpuTqMs"
-  },
-  {
-    urls: "turns:global.relay.metered.ca:443?transport=tcp",
-    username: "387a419fd66811ef83479d56",
-    credential: "5fqct84CGhpuTqMs"
-  }
+  { urls: "stun:stun.sipnet.ru:3478" }
 ];
 
 let iceServerConfigPromise = null;

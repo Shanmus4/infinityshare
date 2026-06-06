@@ -117,9 +117,44 @@ app.get("/api/ice-servers", async (req, res) => {
     return res.status(403).json({ error: "Origin not allowed" });
   }
 
+  // Build Metered TURN entries from env (if configured). These are the
+  // permanent fallback when Twilio is down or unreachable.
+  const meteredUser = process.env.METERED_TURN_USERNAME;
+  const meteredCred = process.env.METERED_TURN_CREDENTIAL;
+  const meteredHost =
+    process.env.METERED_TURN_HOST || "global.relay.metered.ca";
+  const buildMeteredServers = () => {
+    if (!meteredUser || !meteredCred) return [];
+    return [
+      {
+        urls: `turn:${meteredHost}:80`,
+        username: meteredUser,
+        credential: meteredCred,
+      },
+      {
+        urls: `turn:${meteredHost}:443`,
+        username: meteredUser,
+        credential: meteredCred,
+      },
+      {
+        urls: `turns:${meteredHost}:443?transport=tcp`,
+        username: meteredUser,
+        credential: meteredCred,
+      },
+    ];
+  };
+
+  const meteredServers = buildMeteredServers();
+
   if (!accountSid || !authToken) {
+    if (meteredServers.length > 0) {
+      console.warn(
+        "/api/ice-servers: Twilio not configured. Returning Metered TURN only."
+      );
+      return res.json({ iceServers: meteredServers });
+    }
     console.error(
-      "/api/ice-servers: Twilio credentials not configured on server."
+      "/api/ice-servers: No TURN providers configured (Twilio + Metered both missing)."
     );
     return res
       .status(500)
@@ -133,12 +168,20 @@ app.get("/api/ice-servers", async (req, res) => {
     console.log(
       "[API] Successfully fetched temporary ICE servers from Twilio."
     );
-    res.json({ iceServers: token.iceServers });
+    // Merge Metered TURN as additional fallback. Order matters: Twilio first,
+    // Metered second — browsers try them in order.
+    res.json({ iceServers: [...token.iceServers, ...meteredServers] });
   } catch (error) {
     console.error(
       "[API] Error fetching Twilio TURN credentials:",
       error.message
     );
+    if (meteredServers.length > 0) {
+      console.warn(
+        "[API] Falling back to Metered TURN servers from env vars."
+      );
+      return res.json({ iceServers: meteredServers });
+    }
     res
       .status(500)
       .json({ error: "Failed to get TURN credentials from Twilio." });
