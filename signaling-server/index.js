@@ -72,7 +72,10 @@ if (
 }
 
 // --- Socket.IO Setup ---
+// maxHttpBufferSize raised from default 1 MB so large file-list payloads
+// (folders with many thousands of items, e.g. a full codebase) are not dropped.
 const io = new Server(server, {
+  maxHttpBufferSize: 100 * 1024 * 1024, // 100 MB
   cors: {
     origin: (origin, callback) => {
       if (
